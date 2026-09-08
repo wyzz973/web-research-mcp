@@ -29,7 +29,13 @@
 
 独立子 Agent 与根任务复核后修正：categories 扩大 SearXNG 引擎范围、来源 ID 不一致、总超时丢失已有候选、取消后提前返回、同游标调用取消互相影响、非法孤立配置被忽略、解析并发配置失效和 CSS 噪声。每项都补了相应回归证据。
 
-公开内容扫描没有命中实际实例 secret；data、artifacts、.cache、环境文件均被忽略。GitHub 仓库和 CI 结果在推送后核对。
+公开内容扫描没有命中实际实例 secret；data、artifacts、.cache、环境文件均被忽略。实际暂存的 128 个文件扫描通过，非法模块依赖和循环依赖的临时反例也被检查脚本拒绝。
+
+## GitHub 发布
+
+已创建 [wyzz973/web-research-mcp](https://github.com/wyzz973/web-research-mcp)，可见性 PUBLIC，默认分支 main。首个实现提交为 `bfec06ba4634ea30e02ba9f7fa2d5a989f88f7a6`，对应 [GitHub CI](https://github.com/wyzz973/web-research-mcp/actions/runs/34243465415) 已成功。CI 在 Linux 上执行冻结安装、完整确定性检查和干净 tarball 安装测试。
+
+本机主 SearXNG 继续监听 127.0.0.1:18888 且 Healthy；18889 临时探针实例及其私有配置已清理。本机额外验收说明保存在被 Git 忽略的 .cache/acceptance.md，说明了真实 Node 24 路径；公开 README 保持平台可移植的安装方式。
 
 ## 未验证与未实现
 

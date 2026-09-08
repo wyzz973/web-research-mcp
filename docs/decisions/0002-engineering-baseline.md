@@ -2,7 +2,7 @@
 
 Status: accepted
 
-Implementation: implemented; verification-in-progress
+Implementation: implemented
 
 日期：2026-09-08。参考版本与来源见 [DSH 开发实践](../references/deepseek-harness-practices.md)。
 

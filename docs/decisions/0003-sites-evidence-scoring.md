@@ -2,7 +2,7 @@
 
 Status: accepted
 
-Implementation: implemented; verification-in-progress
+Implementation: implemented
 
 日期：2026-09-08。用户要求搜索时可指定 sites/域名，返回原文片段证据、置信度和相关联程度。
 
