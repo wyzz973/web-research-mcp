@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.2-draft",
+  "request_id": "example-last-page",
+  "status": "ok",
+  "source_id": "example-paged-source",
+  "snapshot_id": "example-paged-snapshot",
+  "url": "https://example.com/paged",
+  "final_url": "https://example.com/paged",
+  "title": "Constructed paginated example",
+  "fetched_at": "2026-09-08T00:00:00Z",
+  "content_type": "text/plain",
+  "content": "Last page.\n",
+  "content_sha256": "f7587580d9ff6b2f79a2f03818a061a196e153409eb20962611c09f3fb265c8c",
+  "segments": [
+    {
+      "id": "example-last-page-segment",
+      "text": "Last page.\n",
+      "start_char": 12,
+      "end_char": 23
+    }
+  ],
+  "truncated": false,
+  "next_cursor": null,
+  "warnings": [],
+  "error": null
+}

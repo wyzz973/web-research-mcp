@@ -1,0 +1,9 @@
+{
+  "query": "MCP tools structuredContent",
+  "sites": ["example.com"],
+  "exclude_domains": ["forum.example.com"],
+  "include_subdomains": true,
+  "limit": 5,
+  "evidence_mode": "extract",
+  "max_evidence_results": 3
+}

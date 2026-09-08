@@ -1,0 +1,30 @@
+name: web-research-mcp
+services:
+  searxng:
+    image: searxng/searxng@sha256:3547509b419cd6a67333d6d68bd1ffad8d46d3669d82e7a7bd538f7b45827432
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:18888:8080'
+    volumes:
+      - ../.cache/searxng:/etc/searxng:rw
+      - searxng-cache:/var/cache/searxng
+    environment:
+      GRANIAN_WORKERS: '1'
+      GRANIAN_BLOCKING_THREADS: '4'
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 768m
+    cpus: 2
+    pids_limit: 256
+    healthcheck:
+      test:
+        - CMD
+        - /usr/local/searxng/.venv/bin/python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3).read()"
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+volumes:
+  searxng-cache:

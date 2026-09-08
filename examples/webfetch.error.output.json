@@ -1,0 +1,11 @@
+{
+  "schema_version": "0.2-draft",
+  "request_id": "example-fetch-error",
+  "status": "error",
+  "warnings": [],
+  "error": {
+    "code": "FETCH_BLOCKED",
+    "message": "Only public HTTP/HTTPS destinations are allowed.",
+    "retryable": false
+  }
+}

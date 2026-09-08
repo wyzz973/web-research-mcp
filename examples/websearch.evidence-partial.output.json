@@ -1,0 +1,114 @@
+{
+  "schema_version": "0.2-draft",
+  "request_id": "example-partial-evidence",
+  "status": "partial",
+  "query": "MCP tools structuredContent",
+  "results": [
+    {
+      "source_id": "example-evidence-source",
+      "title": "MCP tools structuredContent example",
+      "url": "https://docs.example.com/guide",
+      "snippet": "Illustrative search summary, separate from the fetched excerpt.",
+      "rank": 1,
+      "providers": ["searxng"],
+      "evidence_level": "page_excerpt",
+      "published_at": null,
+      "evidence_status": "verified",
+      "evidence": [
+        {
+          "id": "example-evidence-1",
+          "quote": "MCP tools return structuredContent.",
+          "url": "https://docs.example.com/guide",
+          "snapshot_id": "example-evidence-snapshot",
+          "snapshot_format": "text",
+          "content_sha256": "7daabc2a83acdfe99116086566ee21604cf0b8253f953f3d974b231fc50e9be2",
+          "segment_id": "example-evidence-segment",
+          "start_char": 0,
+          "end_char": 35,
+          "fetched_at": "2026-09-08T00:00:00Z",
+          "expires_at": "2026-09-09T00:00:00Z",
+          "extractor_version": "illustrative-text-v1",
+          "snapshot_cursor": "EXAMPLE_EVIDENCE_SNAPSHOT_CURSOR",
+          "verification": "exact_match",
+          "relevance": {
+            "score": 1,
+            "method": "lexical_coverage_v1",
+            "version": "lexical_coverage_v1:illustrative",
+            "basis": "quote",
+            "matched_terms": ["mcp", "tools", "structuredcontent"],
+            "reasons": ["Constructed token coverage example; not a probability."]
+          }
+        }
+      ],
+      "relevance": {
+        "score": 1,
+        "method": "lexical_coverage_v1",
+        "version": "lexical_coverage_v1:illustrative",
+        "basis": "title_snippet",
+        "matched_terms": ["mcp", "tools", "structuredcontent"],
+        "reasons": ["Constructed token coverage example; not a probability."]
+      },
+      "confidence": {
+        "scope": "evidence_traceability",
+        "level": "high",
+        "method": "traceability_v1",
+        "reasons": [
+          "Constructed excerpt matches the retained snapshot; this is not a truth claim."
+        ],
+        "fact_probability": null
+      },
+      "warnings": []
+    },
+    {
+      "source_id": "example-out-of-scope",
+      "title": "MCP example",
+      "url": "https://docs.example.com/redirect",
+      "snippet": "Constructed redirect case.",
+      "rank": 2,
+      "providers": ["searxng"],
+      "evidence_level": "search_snippet",
+      "published_at": null,
+      "evidence_status": "out_of_scope",
+      "evidence": [],
+      "relevance": {
+        "score": 0.3333333333333333,
+        "method": "lexical_coverage_v1",
+        "version": "lexical_coverage_v1:illustrative",
+        "basis": "title_snippet",
+        "matched_terms": ["mcp"],
+        "reasons": ["Constructed token coverage example; not a probability."]
+      },
+      "confidence": {
+        "scope": "evidence_traceability",
+        "level": "low",
+        "method": "traceability_v1",
+        "reasons": ["The redirect leaves the requested sites; no page excerpt was acquired."],
+        "fact_probability": null
+      },
+      "warnings": ["Redirect target outside requested sites was not contacted."]
+    }
+  ],
+  "providers": [
+    {
+      "id": "searxng",
+      "status": "ok",
+      "message": null
+    }
+  ],
+  "warnings": ["Evidence acquired for only 1 of 2 targeted results."],
+  "error": null,
+  "next_cursor": null,
+  "scope": {
+    "sites": ["example.com"],
+    "exclude_domains": ["forum.example.com"],
+    "include_subdomains": true,
+    "enforcement": "application",
+    "upstream_mode": "query_rewrite",
+    "removed_count": 1
+  },
+  "evidence_summary": {
+    "mode": "extract",
+    "target_results": 2,
+    "verified_results": 1
+  }
+}

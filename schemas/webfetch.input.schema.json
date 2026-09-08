@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "webfetch.input",
+  "description": "Versioned MCP business contract. Runtime validation is authoritative for external JSON.",
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "cursor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "format": {
+      "enum": ["markdown", "text"],
+      "default": "markdown",
+      "description": "Default applies to initial URL reads only; omitted format on continuation inherits the cursor format."
+    },
+    "max_chars": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 50000,
+      "default": 12000
+    }
+  },
+  "required": [],
+  "additionalProperties": false,
+  "oneOf": [
+    {
+      "required": ["url"],
+      "not": {
+        "required": ["cursor"]
+      }
+    },
+    {
+      "required": ["cursor"],
+      "not": {
+        "required": ["url"]
+      }
+    }
+  ]
+}

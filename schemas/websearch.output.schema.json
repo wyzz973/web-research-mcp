@@ -1,0 +1,762 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "websearch.output",
+  "description": "Versioned MCP business contract. Runtime validation is authoritative for external JSON.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "0.2-draft"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": ["ok", "partial", "empty", "error"]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "error": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "CONFIGURATION_REQUIRED",
+                "RATE_LIMITED",
+                "UPSTREAM_BLOCKED",
+                "UPSTREAM_UNAVAILABLE",
+                "TIMEOUT",
+                "FETCH_BLOCKED",
+                "ROBOTS_DENIED",
+                "UNSUPPORTED_CONTENT_TYPE",
+                "RESPONSE_TOO_LARGE",
+                "EXTRACTION_FAILED",
+                "CURSOR_EXPIRED",
+                "CURSOR_MISMATCH",
+                "HTTP_ERROR",
+                "CANCELLED",
+                "STORAGE_UNAVAILABLE",
+                "INTERNAL_ERROR",
+                "INVALID_ARGUMENT",
+                "SEARCH_BUDGET_EXHAUSTED"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "retry_after_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "http_status": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            }
+          },
+          "required": ["code", "message", "retryable"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "query": {
+      "type": "string",
+      "minLength": 1
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https?://"
+          },
+          "snippet": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "providers": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "evidence_level": {
+            "enum": ["search_snippet", "page_excerpt"]
+          },
+          "published_at": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "evidence_status": {
+            "enum": [
+              "not_requested",
+              "verified",
+              "unavailable",
+              "no_match",
+              "skipped_budget",
+              "out_of_scope"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "$ref": "#/$defs/evidence"
+            }
+          },
+          "relevance": {
+            "$ref": "#/$defs/relevance",
+            "properties": {
+              "basis": {
+                "const": "title_snippet"
+              }
+            }
+          },
+          "confidence": {
+            "$ref": "#/$defs/confidence"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "source_id",
+          "title",
+          "url",
+          "snippet",
+          "rank",
+          "providers",
+          "evidence_level",
+          "published_at",
+          "evidence_status",
+          "evidence",
+          "relevance",
+          "confidence",
+          "warnings"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "evidence_status": {
+                  "const": "verified"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "evidence": {
+                  "minItems": 1
+                },
+                "evidence_level": {
+                  "const": "page_excerpt"
+                },
+                "confidence": {
+                  "properties": {
+                    "level": {
+                      "enum": ["high", "medium"]
+                    }
+                  }
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "evidence": {
+                  "maxItems": 0
+                },
+                "evidence_level": {
+                  "const": "search_snippet"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "evidence_status": {
+                  "enum": ["not_requested", "skipped_budget"]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "confidence": {
+                  "properties": {
+                    "level": {
+                      "const": "unknown"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "evidence_status": {
+                  "enum": ["unavailable", "no_match", "out_of_scope"]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "confidence": {
+                  "properties": {
+                    "level": {
+                      "const": "low"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": ["ok", "partial", "error"]
+          },
+          "message": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["id", "status", "message"],
+        "additionalProperties": false
+      }
+    },
+    "next_cursor": {
+      "type": ["string", "null"]
+    },
+    "scope": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/scope"
+        }
+      ]
+    },
+    "evidence_summary": {
+      "$ref": "#/$defs/evidence_summary"
+    }
+  },
+  "required": [
+    "schema_version",
+    "request_id",
+    "status",
+    "warnings",
+    "error",
+    "query",
+    "results",
+    "providers",
+    "next_cursor",
+    "scope",
+    "evidence_summary"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "error"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "enum": [
+                  "CONFIGURATION_REQUIRED",
+                  "RATE_LIMITED",
+                  "UPSTREAM_BLOCKED",
+                  "UPSTREAM_UNAVAILABLE",
+                  "TIMEOUT",
+                  "FETCH_BLOCKED",
+                  "ROBOTS_DENIED",
+                  "UNSUPPORTED_CONTENT_TYPE",
+                  "RESPONSE_TOO_LARGE",
+                  "EXTRACTION_FAILED",
+                  "CURSOR_EXPIRED",
+                  "CURSOR_MISMATCH",
+                  "HTTP_ERROR",
+                  "CANCELLED",
+                  "STORAGE_UNAVAILABLE",
+                  "INTERNAL_ERROR",
+                  "INVALID_ARGUMENT",
+                  "SEARCH_BUDGET_EXHAUSTED"
+                ]
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "retryable": {
+                "type": "boolean"
+              },
+              "retry_after_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "http_status": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 599
+              }
+            },
+            "required": ["code", "message", "retryable"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "else": {
+        "required": [],
+        "properties": {
+          "error": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": ["ok", "partial"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "results": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": ["empty", "error"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "results": {
+            "maxItems": 0
+          },
+          "next_cursor": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "partial"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "warnings": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": ["ok", "partial", "empty"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "scope": {
+            "$ref": "#/$defs/scope"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_summary": {
+            "properties": {
+              "mode": {
+                "const": "none"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "results": {
+            "items": {
+              "properties": {
+                "evidence_status": {
+                  "const": "not_requested"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_summary": {
+            "properties": {
+              "mode": {
+                "const": "extract"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "results": {
+            "items": {
+              "properties": {
+                "evidence_status": {
+                  "not": {
+                    "const": "not_requested"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "relevance": {
+      "type": "object",
+      "properties": {
+        "score": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "method": {
+          "enum": ["lexical_coverage_v1", "none"]
+        },
+        "version": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "basis": {
+          "enum": ["title_snippet", "quote"]
+        },
+        "matched_terms": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reasons": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": ["score", "method", "version", "basis", "matched_terms", "reasons"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "method": {
+                "const": "none"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "null"
+              },
+              "version": {
+                "type": "null"
+              },
+              "matched_terms": {
+                "maxItems": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "score": {
+                "type": "number"
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "confidence": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "const": "evidence_traceability"
+        },
+        "level": {
+          "enum": ["high", "medium", "low", "unknown"]
+        },
+        "method": {
+          "const": "traceability_v1"
+        },
+        "reasons": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "fact_probability": {
+          "type": "null"
+        }
+      },
+      "required": ["scope", "level", "method", "reasons", "fact_probability"],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 800
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://"
+        },
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "snapshot_format": {
+          "const": "text"
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "segment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_char": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_char": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "fetched_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "extractor_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "snapshot_cursor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verification": {
+          "const": "exact_match"
+        },
+        "relevance": {
+          "$ref": "#/$defs/relevance",
+          "properties": {
+            "basis": {
+              "const": "quote"
+            }
+          }
+        }
+      },
+      "required": [
+        "id",
+        "quote",
+        "url",
+        "snapshot_id",
+        "snapshot_format",
+        "content_sha256",
+        "segment_id",
+        "start_char",
+        "end_char",
+        "fetched_at",
+        "expires_at",
+        "extractor_version",
+        "snapshot_cursor",
+        "verification",
+        "relevance"
+      ],
+      "additionalProperties": false
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "sites": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "format": "hostname"
+          }
+        },
+        "exclude_domains": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "format": "hostname"
+          }
+        },
+        "include_subdomains": {
+          "type": "boolean"
+        },
+        "enforcement": {
+          "enum": ["application", "none"]
+        },
+        "upstream_mode": {
+          "enum": ["none", "native", "query_rewrite", "post_filter_only", "mixed"]
+        },
+        "removed_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "sites",
+        "exclude_domains",
+        "include_subdomains",
+        "enforcement",
+        "upstream_mode",
+        "removed_count"
+      ],
+      "additionalProperties": false
+    },
+    "evidence_summary": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": ["none", "extract"]
+        },
+        "target_results": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "verified_results": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        }
+      },
+      "required": ["mode", "target_results", "verified_results"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "none"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "target_results": {
+                "const": 0
+              },
+              "verified_results": {
+                "const": 0
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

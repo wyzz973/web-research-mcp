@@ -1,0 +1,59 @@
+{
+  "schema_version": "0.2-draft",
+  "request_id": "example-search",
+  "status": "ok",
+  "query": "MCP tools structuredContent",
+  "results": [
+    {
+      "source_id": "example-source",
+      "title": "Illustrative search result",
+      "url": "https://example.com/",
+      "snippet": "Constructed example, not a live search result.",
+      "rank": 1,
+      "providers": ["searxng"],
+      "evidence_level": "search_snippet",
+      "published_at": null,
+      "evidence_status": "not_requested",
+      "evidence": [],
+      "relevance": {
+        "score": 0,
+        "method": "lexical_coverage_v1",
+        "version": "lexical_coverage_v1:illustrative",
+        "basis": "title_snippet",
+        "matched_terms": [],
+        "reasons": ["Constructed token coverage example; not a probability."]
+      },
+      "confidence": {
+        "scope": "evidence_traceability",
+        "level": "unknown",
+        "method": "traceability_v1",
+        "reasons": ["Page evidence was not requested."],
+        "fact_probability": null
+      },
+      "warnings": []
+    }
+  ],
+  "providers": [
+    {
+      "id": "searxng",
+      "status": "ok",
+      "message": null
+    }
+  ],
+  "next_cursor": null,
+  "warnings": [],
+  "error": null,
+  "scope": {
+    "sites": [],
+    "exclude_domains": [],
+    "include_subdomains": true,
+    "enforcement": "none",
+    "upstream_mode": "none",
+    "removed_count": 0
+  },
+  "evidence_summary": {
+    "mode": "none",
+    "target_results": 0,
+    "verified_results": 0
+  }
+}

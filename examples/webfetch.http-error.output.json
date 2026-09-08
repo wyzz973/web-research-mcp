@@ -1,0 +1,12 @@
+{
+  "schema_version": "0.2-draft",
+  "request_id": "example-http-error",
+  "status": "error",
+  "warnings": [],
+  "error": {
+    "code": "HTTP_ERROR",
+    "message": "The public resource returned HTTP 404. Check the URL.",
+    "retryable": false,
+    "http_status": 404
+  }
+}

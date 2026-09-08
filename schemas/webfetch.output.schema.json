@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "webfetch.output",
+  "description": "Versioned MCP business contract. Runtime validation is authoritative for external JSON.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "0.2-draft"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": ["ok", "partial", "error"]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "error": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "code": {
+              "enum": [
+                "CONFIGURATION_REQUIRED",
+                "RATE_LIMITED",
+                "UPSTREAM_BLOCKED",
+                "UPSTREAM_UNAVAILABLE",
+                "TIMEOUT",
+                "FETCH_BLOCKED",
+                "ROBOTS_DENIED",
+                "UNSUPPORTED_CONTENT_TYPE",
+                "RESPONSE_TOO_LARGE",
+                "EXTRACTION_FAILED",
+                "CURSOR_EXPIRED",
+                "CURSOR_MISMATCH",
+                "HTTP_ERROR",
+                "CANCELLED",
+                "STORAGE_UNAVAILABLE",
+                "INTERNAL_ERROR",
+                "INVALID_ARGUMENT",
+                "SEARCH_BUDGET_EXHAUSTED"
+              ]
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "retry_after_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "http_status": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            }
+          },
+          "required": ["code", "message", "retryable"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "final_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "title": {
+      "type": "string"
+    },
+    "fetched_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "content_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content": {
+      "type": "string"
+    },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string"
+          },
+          "start_char": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end_char": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": ["id", "text", "start_char", "end_char"],
+        "additionalProperties": false
+      }
+    },
+    "truncated": {
+      "type": "boolean",
+      "description": "True only when more snapshot content remains after this page; the final page is false even when its start offset is nonzero."
+    },
+    "next_cursor": {
+      "type": ["string", "null"]
+    }
+  },
+  "required": ["schema_version", "request_id", "status", "warnings", "error"],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "error"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "enum": [
+                  "CONFIGURATION_REQUIRED",
+                  "RATE_LIMITED",
+                  "UPSTREAM_BLOCKED",
+                  "UPSTREAM_UNAVAILABLE",
+                  "TIMEOUT",
+                  "FETCH_BLOCKED",
+                  "ROBOTS_DENIED",
+                  "UNSUPPORTED_CONTENT_TYPE",
+                  "RESPONSE_TOO_LARGE",
+                  "EXTRACTION_FAILED",
+                  "CURSOR_EXPIRED",
+                  "CURSOR_MISMATCH",
+                  "HTTP_ERROR",
+                  "CANCELLED",
+                  "STORAGE_UNAVAILABLE",
+                  "INTERNAL_ERROR",
+                  "INVALID_ARGUMENT",
+                  "SEARCH_BUDGET_EXHAUSTED"
+                ]
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "retryable": {
+                "type": "boolean"
+              },
+              "retry_after_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "http_status": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 599
+              }
+            },
+            "required": ["code", "message", "retryable"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "source_id",
+          "snapshot_id",
+          "url",
+          "final_url",
+          "title",
+          "fetched_at",
+          "content_type",
+          "content",
+          "content_sha256",
+          "segments",
+          "truncated",
+          "next_cursor"
+        ],
+        "properties": {
+          "error": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "partial"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "warnings": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "truncated": {
+            "const": true
+          }
+        },
+        "required": ["truncated"]
+      },
+      "then": {
+        "properties": {
+          "next_cursor": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "truncated": {
+            "const": false
+          }
+        },
+        "required": ["truncated"]
+      },
+      "then": {
+        "properties": {
+          "next_cursor": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
+}

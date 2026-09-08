@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "websearch.input",
+  "description": "Versioned MCP business contract. Runtime validation is authoritative for external JSON.",
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20,
+      "default": 8
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 32,
+      "default": "auto"
+    },
+    "time_range": {
+      "enum": ["any", "day", "month", "year"],
+      "default": "any"
+    },
+    "include_domains": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 253,
+        "pattern": "^[^\\s/:@*?#\\\\]+$"
+      },
+      "description": "Alias for sites; cannot be supplied together with sites."
+    },
+    "exclude_domains": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 253,
+        "pattern": "^[^\\s/:@*?#\\\\]+$"
+      },
+      "description": "DNS hostnames only, including IDN. Runtime resolves IDNA and rejects IPs, single-label names and public suffixes."
+    },
+    "cursor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sites": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 253,
+        "pattern": "^[^\\s/:@*?#\\\\]+$"
+      },
+      "description": "DNS hostnames only, including IDN. Runtime resolves IDNA and rejects IPs, single-label names and public suffixes."
+    },
+    "include_subdomains": {
+      "type": "boolean",
+      "default": true
+    },
+    "evidence_mode": {
+      "enum": ["none", "extract"],
+      "default": "none"
+    },
+    "max_evidence_results": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "default": 3,
+      "description": "Only valid with evidence_mode=extract; bounded by deployment limits and returned results."
+    }
+  },
+  "required": ["query"],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "not": {
+        "required": ["sites", "include_domains"]
+      }
+    },
+    {
+      "if": {
+        "required": ["max_evidence_results"]
+      },
+      "then": {
+        "required": ["evidence_mode"],
+        "properties": {
+          "evidence_mode": {
+            "const": "extract"
+          }
+        }
+      }
+    }
+  ]
+}

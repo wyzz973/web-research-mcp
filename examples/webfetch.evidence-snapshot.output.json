@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.2-draft",
+  "request_id": "example-evidence-read",
+  "status": "ok",
+  "source_id": "example-evidence-source",
+  "snapshot_id": "example-evidence-snapshot",
+  "url": "https://docs.example.com/guide",
+  "final_url": "https://docs.example.com/guide",
+  "title": "Constructed evidence snapshot",
+  "fetched_at": "2026-09-08T00:00:00Z",
+  "content_type": "text/plain",
+  "content": "MCP tools return structuredContent.\nThis is constructed example text.\n",
+  "content_sha256": "7daabc2a83acdfe99116086566ee21604cf0b8253f953f3d974b231fc50e9be2",
+  "segments": [
+    {
+      "id": "example-evidence-segment",
+      "text": "MCP tools return structuredContent.\nThis is constructed example text.\n",
+      "start_char": 0,
+      "end_char": 70
+    }
+  ],
+  "truncated": false,
+  "next_cursor": null,
+  "warnings": [],
+  "error": null
+}

@@ -1,0 +1,28 @@
+{
+  "schema_version": "0.2-draft",
+  "request_id": "example-search-budget",
+  "status": "error",
+  "query": "MCP tools",
+  "results": [],
+  "providers": [],
+  "next_cursor": null,
+  "warnings": ["Candidate collection stopped before all configured site branches were sampled."],
+  "error": {
+    "code": "SEARCH_BUDGET_EXHAUSTED",
+    "message": "Narrow the sites or query before retrying.",
+    "retryable": false
+  },
+  "scope": {
+    "sites": ["example.com"],
+    "exclude_domains": [],
+    "include_subdomains": true,
+    "enforcement": "application",
+    "upstream_mode": "query_rewrite",
+    "removed_count": 20
+  },
+  "evidence_summary": {
+    "mode": "none",
+    "target_results": 0,
+    "verified_results": 0
+  }
+}

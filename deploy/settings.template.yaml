@@ -1,0 +1,47 @@
+# Run node scripts/searxng-setup.mjs; the generated private file stays in .cache/.
+use_default_settings:
+  engines:
+    keep_only:
+      - duckduckgo
+      - bing
+      - google
+      - brave
+
+general:
+  instance_name: Web Research MCP Local Search
+  debug: false
+  enable_metrics: false
+
+server:
+  secret_key: '__LOCAL_RANDOM_SECRET__'
+  limiter: false
+  public_instance: false
+  image_proxy: false
+
+search:
+  formats:
+    - html
+    - json
+  autocomplete: ''
+  favicon_resolver: ''
+  safe_search: 1
+  default_lang: auto
+
+outgoing:
+  request_timeout: 8.0
+  max_request_timeout: 12.0
+
+engines:
+  - name: duckduckgo
+    engine: duckduckgo
+    disabled: false
+  - name: bing
+    engine: bing
+    disabled: false
+  - name: google
+    engine: google
+    disabled: false
+  - name: brave
+    engine: brave
+    brave_category: search
+    disabled: false

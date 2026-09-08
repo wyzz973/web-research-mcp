@@ -1,0 +1,319 @@
+import { request as httpRequest } from 'node:http'
+import { request as httpsRequest } from 'node:https'
+import { AppError, throwIfAborted } from '../shared/errors.ts'
+import { canonicalUrl, resolveScope } from '../shared/domain-scope.ts'
+import type {
+  SearchPage,
+  SearchPageRequest,
+  SearchProvider,
+  SearchSource,
+} from '../shared/types.ts'
+
+import { KEYLESS_ENGINES } from '../shared/search-policy.ts'
+export { KEYLESS_ENGINES } from '../shared/search-policy.ts'
+const MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+
+function record(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** SearXNG parses modifiers before engines=. Reject controls, preserving normal site: and quoted text. */
+export function validateSearchQuery(query: string): void {
+  if (!query.trim() || query.length > 4000)
+    throw new AppError('INVALID_ARGUMENT', 'Invalid search query length.')
+  // Python str.isspace includes four C0 separators and NEL in addition to JavaScript whitespace.
+  // eslint-disable-next-line no-control-regex -- Match Python's actual query-token boundaries to prevent modifier bypass.
+  const separators = /[\s\u001c-\u001f\u0085]+/u
+  if (query.split(separators).some((part) => /^[!:]/u.test(part) || /^<\p{N}/u.test(part))) {
+    throw new AppError(
+      'INVALID_ARGUMENT',
+      'SearXNG engine, bang, language, and timeout directives are not allowed in query.',
+    )
+  }
+}
+
+function upstreamFailure(reason: string): AppError {
+  if (/captcha|blocked|forbidden|access.denied|too.many.requests|429/iu.test(reason)) {
+    return new AppError('UPSTREAM_BLOCKED', 'The configured search engines blocked the request.')
+  }
+  if (/timeout|timed.out/iu.test(reason))
+    return new AppError('TIMEOUT', 'Search engines timed out.', true)
+  return new AppError(
+    'UPSTREAM_UNAVAILABLE',
+    'The configured search engines are unavailable.',
+    true,
+  )
+}
+
+function parsePage(payload: unknown, allowed: ReadonlySet<string>): SearchPage {
+  if (!record(payload) || !Array.isArray(payload.results)) {
+    throw new AppError(
+      'UPSTREAM_UNAVAILABLE',
+      'Search endpoint returned an invalid response.',
+      true,
+    )
+  }
+  const errors: string[] = []
+  if (payload.unresponsive_engines !== undefined) {
+    if (!Array.isArray(payload.unresponsive_engines)) {
+      throw new AppError(
+        'UPSTREAM_UNAVAILABLE',
+        'Search endpoint returned invalid engine diagnostics.',
+        true,
+      )
+    }
+    for (const entry of payload.unresponsive_engines) {
+      if (!Array.isArray(entry) || typeof entry[0] !== 'string' || typeof entry[1] !== 'string') {
+        throw new AppError(
+          'UPSTREAM_UNAVAILABLE',
+          'Search endpoint returned invalid engine diagnostics.',
+          true,
+        )
+      }
+      const failure = upstreamFailure(entry[1])
+      errors.push(`${failure.code}: ${allowed.has(entry[0]) ? entry[0] : 'unconfigured_engine'}`)
+    }
+  }
+  const sources: SearchSource[] = []
+  for (const row of payload.results.slice(0, 200)) {
+    if (!record(row) || typeof row.url !== 'string' || typeof row.title !== 'string') {
+      errors.push('UPSTREAM_UNAVAILABLE: invalid_result')
+      continue
+    }
+    const engines: unknown = row.engines ?? (typeof row.engine === 'string' ? [row.engine] : [])
+    if (
+      !Array.isArray(engines) ||
+      engines.length === 0 ||
+      engines.some((engine) => typeof engine !== 'string' || !allowed.has(engine))
+    ) {
+      throw new AppError(
+        'UPSTREAM_UNAVAILABLE',
+        'Search endpoint returned a result from an unconfigured engine.',
+      )
+    }
+    let url: string
+    try {
+      url = canonicalUrl(row.url)
+    } catch {
+      errors.push('UPSTREAM_UNAVAILABLE: invalid_result_url')
+      continue
+    }
+    const date = typeof row.publishedDate === 'string' ? Date.parse(row.publishedDate) : NaN
+    sources.push({
+      url,
+      title: Array.from(row.title).slice(0, 500).join(''),
+      snippet:
+        typeof row.content === 'string' ? Array.from(row.content).slice(0, 3000).join('') : '',
+      publishedAt: Number.isFinite(date) ? new Date(date).toISOString() : null,
+      engines: engines.filter((engine): engine is string => typeof engine === 'string'),
+    })
+  }
+  if (payload.results.length > 200) errors.push('UPSTREAM_UNAVAILABLE: response_candidate_limit')
+  if (sources.length === 0 && errors.length > 0) throw upstreamFailure(errors.join(' '))
+  return { sources, errors, exhausted: payload.results.length === 0 || payload.paging === false }
+}
+
+/** Owns all requests to one operator-configured infrastructure endpoint; never follows redirects. */
+export function createSearxngProvider(options: {
+  baseUrl: string
+  engines: readonly string[]
+  timeoutMs: number
+}): SearchProvider {
+  let endpoint: URL
+  try {
+    const base = new URL(options.baseUrl)
+    if (
+      !['https:', 'http:'].includes(base.protocol) ||
+      base.username ||
+      base.password ||
+      base.search ||
+      base.hash
+    )
+      throw new Error('invalid endpoint')
+    endpoint = new URL(
+      base.pathname.endsWith('/search') ? base.href : `${base.href.replace(/\/$/u, '')}/search`,
+    )
+  } catch {
+    throw new AppError(
+      'INVALID_ARGUMENT',
+      'SearXNG URL must be an HTTP(S) base URL without credentials, query, or fragment.',
+    )
+  }
+  const allowed = new Set(options.engines)
+  if (
+    allowed.size === 0 ||
+    [...allowed].some((engine) => !(KEYLESS_ENGINES as readonly string[]).includes(engine))
+  ) {
+    throw new AppError(
+      'INVALID_ARGUMENT',
+      'Only the fixed keyless web engine allowlist is supported.',
+    )
+  }
+  if (!Number.isInteger(options.timeoutMs) || options.timeoutMs <= 0)
+    throw new AppError('INVALID_ARGUMENT', 'Search timeout must be positive.')
+  let closed = false
+  const active = new Map<AbortController, Promise<SearchPage>>()
+
+  function requestPage(
+    input: SearchPageRequest,
+    callerSignal: AbortSignal,
+    controller: AbortController,
+  ): Promise<SearchPage> {
+    const signal = AbortSignal.any([callerSignal, controller.signal])
+    throwIfAborted(signal)
+    validateSearchQuery(input.query)
+    const url = new URL(endpoint)
+    const site =
+      input.site === undefined ? undefined : resolveScope({ sites: [input.site] }).sites[0]
+    url.searchParams.set('q', site ? `${input.query} site:${site}` : input.query)
+    url.searchParams.set('format', 'json')
+    url.searchParams.set('engines', [...allowed].join(','))
+    // SearXNG unions explicit categories with engines; omitting categories preserves the exact allowlist.
+    url.searchParams.set('language', input.language)
+    url.searchParams.set('pageno', String(input.page))
+    if (input.timeRange !== 'any') url.searchParams.set('time_range', input.timeRange)
+    return new Promise<SearchPage>((resolve, reject) => {
+      let settled = false
+      const finish = (error?: Error, value?: SearchPage) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        if (error) reject(error)
+        else if (value) resolve(value)
+      }
+      const timer = setTimeout(
+        () => controller.abort(new AppError('TIMEOUT', 'Search endpoint timed out.', true)),
+        options.timeoutMs,
+      )
+      const transport = url.protocol === 'https:' ? httpsRequest : httpRequest
+      const request = transport(
+        url,
+        {
+          method: 'GET',
+          signal,
+          agent: false,
+          headers: {
+            accept: 'application/json',
+            'accept-encoding': 'identity',
+            'user-agent': 'web-research-mcp/0.1',
+          },
+        },
+        (response) => {
+          const status = response.statusCode ?? 0
+          const fail = (error: AppError) => {
+            response.destroy()
+            finish(error)
+          }
+          if (status === 403 || status === 429)
+            return fail(
+              new AppError(
+                'UPSTREAM_BLOCKED',
+                'Search endpoint denied the request or disabled JSON.',
+                false,
+                status,
+              ),
+            )
+          if (status < 200 || status >= 300)
+            return fail(
+              new AppError(
+                'UPSTREAM_UNAVAILABLE',
+                'Search endpoint returned an HTTP error; redirects are disabled.',
+                status >= 500,
+                status,
+              ),
+            )
+          if (
+            !/\bapplication\/(?:[a-z0-9.+-]+\+)?json\b/iu.test(
+              response.headers['content-type'] ?? '',
+            )
+          ) {
+            return fail(
+              new AppError(
+                'UPSTREAM_BLOCKED',
+                'Search endpoint returned a non-JSON page, possibly an access challenge.',
+              ),
+            )
+          }
+          const chunks: Buffer[] = []
+          let size = 0
+          response.on('data', (chunk: Buffer) => {
+            size += chunk.length
+            if (size > MAX_RESPONSE_BYTES)
+              return fail(
+                new AppError('UPSTREAM_UNAVAILABLE', 'Search response exceeded its byte limit.'),
+              )
+            chunks.push(chunk)
+          })
+          response.on('error', () => {
+            if (signal.aborted) {
+              try {
+                throwIfAborted(signal)
+              } catch (error) {
+                finish(
+                  error instanceof Error ? error : new AppError('CANCELLED', 'Search cancelled.'),
+                )
+              }
+            } else
+              finish(new AppError('UPSTREAM_UNAVAILABLE', 'Search response was interrupted.', true))
+          })
+          response.on('end', () => {
+            if (settled) return
+            try {
+              throwIfAborted(signal)
+              const payload: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+              finish(undefined, parsePage(payload, allowed))
+            } catch (error) {
+              finish(
+                error instanceof AppError
+                  ? error
+                  : new AppError(
+                      'UPSTREAM_UNAVAILABLE',
+                      'Search endpoint returned invalid JSON.',
+                      true,
+                    ),
+              )
+            }
+          })
+        },
+      )
+      request.on('error', () => {
+        if (signal.aborted) {
+          try {
+            throwIfAborted(signal)
+          } catch (error) {
+            finish(error instanceof Error ? error : new AppError('CANCELLED', 'Search cancelled.'))
+          }
+        } else
+          finish(
+            new AppError(
+              'UPSTREAM_UNAVAILABLE',
+              'Unable to connect to the configured search endpoint.',
+              true,
+            ),
+          )
+      })
+      request.end()
+    })
+  }
+
+  return {
+    async searchPage(input, signal) {
+      if (closed) throw new AppError('UPSTREAM_UNAVAILABLE', 'Search provider is closed.')
+      const controller = new AbortController()
+      const promise = requestPage(input, signal, controller)
+      active.set(controller, promise)
+      try {
+        return await promise
+      } finally {
+        active.delete(controller)
+      }
+    },
+    async close() {
+      closed = true
+      const pending = [...active]
+      for (const [controller] of pending)
+        controller.abort(new AppError('CANCELLED', 'Search provider closed.'))
+      await Promise.allSettled(pending.map(([, promise]) => promise))
+    },
+  }
+}
