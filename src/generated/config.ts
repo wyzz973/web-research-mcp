@@ -25,6 +25,8 @@ export interface RuntimeConfiguration {
       max_passages_per_result: number
       max_chars_per_passage: number
       total_deadline_ms: number
+      max_chars_per_result: number
+      max_candidate_passages: number
     }
     scope: {
       include_subdomains: boolean

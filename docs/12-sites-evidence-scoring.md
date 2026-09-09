@@ -44,7 +44,7 @@ max_upstream_requests 计量本项目到搜索适配器端点的 HTTP 调用，�
 
 ## 证据获取与原文定位
 
-`evidence_mode` 为 none 或 extract，默认 none；max_evidence_results 仅在 extract 时有效，省略默认 3、最多 5，也受部署上限和当前结果数约束。每次返回页只处理该页前 N 条已通过域过滤、去重后的结果，不因某条失败无限补抓后面的网页。同一页响应保存后重读复用证据状态，续页只处理下一页，不重跑整个池。每条最多两段，每段最多 800 Unicode code points，具体较小预算由部署配置决定。
+`evidence_mode` 为 none 或 extract，默认 none；max_evidence_results 仅在 extract 时有效，省略默认 3、最多 5，也受部署上限和当前结果数约束。每次返回页只处理该页前 N 条已通过域过滤、去重后的结果，不因某条失败无限补抓后面的网页。同一页响应保存后重读复用证据状态，续页只处理下一页，不重跑整个池。默认每条最多 3 段，每段最多 1,600 Unicode code points，合计最多 4,000；部署可在 Schema 上限内配置。更多相关段落通过 next_evidence_cursor 读取，完整规则见 [段落与展示](13-evidence-presentation.md)。
 
 证据由与 webfetch 共用的安全网络/解析/存储链路产生。固定使用 text 格式快照，在实际提取文本中选择与 query 相关的连续片段，并保留：id、quote、最终 url、snapshot_id、完整 content_sha256、segment_id、start_char/end_char、fetched_at/expires_at、extractor_version 和 snapshot_cursor。snapshot_cursor 从这份文本快照开头读取；同一结果的多个片段可以共用它。
 
@@ -94,7 +94,7 @@ fact_probability 必须为 null；不能用高相关性、域名白名单、多�
 
 ## 预算、缓存和验收
 
-none 模式保留原搜索 deadline；extract 模式采用部署配置中的独立总 deadline，包含搜索、受控补抓、存储、片段选择和返回，不对每条重置总预算。默认目标 3 条、最大 5 条；两段 × 800 字符的上限使证据最多 8,000 字符，其他元数据和 SERP 摘要单独受输出预算控制。
+none 模式保留原搜索 deadline；extract 模式采用部署配置中的独立总 deadline，包含搜索、受控补抓、存储、片段选择和返回，不对每条重置总预算。默认目标 3 条、最大 5 条；默认每结果 4,000 字符使 5 个结果的 quote 总量最多约 20,000 字符，其他元数据和 SERP 摘要单独受输出预算控制。
 
 搜索缓存与游标绑定规范化域范围、冻结的过滤后候选池、evidence 参数、词法评分版本和提取策略。续页只从冻结池读取，rank 为池内全局排名；上游不支持翻页时最多采集它已返回的一页，但若该页含超过 limit 的合格候选，仍可以本地分页。池内没有剩余候选才返回 next_cursor=null，并区分是否有采集范围警告。证据的 expires_at 不得超过所属正文快照保留期；搜索续页有效期也不能超过其已返回证据的最早有效期。
 

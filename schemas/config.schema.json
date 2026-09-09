@@ -73,7 +73,9 @@
             "max_results",
             "max_passages_per_result",
             "max_chars_per_passage",
-            "total_deadline_ms"
+            "total_deadline_ms",
+            "max_chars_per_result",
+            "max_candidate_passages"
           ],
           "properties": {
             "default_mode": {
@@ -92,16 +94,26 @@
             "max_passages_per_result": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 2
+              "maximum": 5
             },
             "max_chars_per_passage": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 800
+              "maximum": 2000
             },
             "total_deadline_ms": {
               "type": "integer",
               "minimum": 1
+            },
+            "max_chars_per_result": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 8000
+            },
+            "max_candidate_passages": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
             }
           }
         },

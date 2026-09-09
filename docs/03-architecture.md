@@ -44,7 +44,7 @@ flowchart TD
 
 MCP SDK 导入只在 mcp 与协议测试中出现；公开网页的 Undici/DNS 连接封装集中于 fetch/network；search/searxng 使用独立、禁重定向、限定操作员端点的 Node HTTP 客户端，作为不同信任目标的窄例外。check:boundaries 检查这些导入位置，禁止通过动态导入规避规则。
 
-Request 是来源校验后的输入，Spec 是 resolve 后包含默认值与有效上限的只读执行参数。deadline 使用单调时钟计算剩余时长，记录抓取时间使用 UTC 墙钟。所有可变阈值在配置解析时合并，执行层不得藏有另一套默认值。
+Request 是来源校验后的输入，Spec 是 resolve 后包含默认值与有效上限的只读执行参数。deadline 使用单调时钟计算剩余时长，记录抓取时间使用 UTC 墙钟。前端 source_metadata 在 HTML 提取前读取并随快照保存，shared/source-metadata 的 IP 检查是纯解析、不做出网的模块例外。所有可变阈值在配置解析时合并，执行层不得藏有另一套默认值。
 
 ## Search Provider 契约
 
@@ -95,7 +95,7 @@ none 模式只发现网页；extract 模式对前 N 条按受控并发获取 tex
 
 快照在一种确定输出格式上计算 Unicode code point offsets；markdown 和 text 使用不同快照/游标，不在续读时转换格式。每条观察记录保存请求 URL、最终 URL、HTTP 状态、抓取时间和提取版本，格式化快照保存 full content、hash、segments 和 expires_at。SQL 事务提交成功后才返回可续读 cursor。
 
-SQLite 当前使用带 kind/id/payload/expiry 的 records 表保存快照、冻结搜索池、页面响应和游标；PRAGMA user_version 标识格式版本。观察身份位于快照记录中；全文索引与独立 blob 去重表尚未加入。所有查询参数化，短事务内只做存储操作。WAL 模式仍有单写者约束；大语料索引不阻塞 MCP 主循环。
+SQLite 当前使用带 kind/id/payload/expiry 的 records 表保存快照、冻结搜索池、页面响应、相关证据计划和游标；PRAGMA user_version 标识格式版本。观察身份位于快照记录中；全文索引与独立 blob 去重表尚未加入。所有查询参数化，短事务内只做存储操作。WAL 模式仍有单写者约束；大语料索引不阻塞 MCP 主循环。
 
 存储配置包含磁盘上限与快照有效期。先回收过期且无引用的 blob，仍不足则拒绝新快照并返回 STORAGE_UNAVAILABLE；不静默驱逐尚承诺有效的 cursor。本版本直接实现 SQLite SnapshotStore，重启恢复已有真实数据库测试；不提供另一套内存生产存储。schema_version 不兼容明确报错，不自动清空数据。
 

@@ -1,6 +1,7 @@
 /** Author-owned JSON Schema validation at wire and durable JSON boundaries. */
 import { readFileSync } from 'node:fs'
 import { Ajv2020 } from 'ajv/dist/2020.js'
+import type { ErrorObject } from 'ajv'
 import addFormats from 'ajv-formats'
 import { AppError } from './errors.ts'
 
@@ -26,6 +27,25 @@ export function getSchema(name: string): Record<string, unknown> {
 /** Validate external JSON before assigning its generated wire type. */
 export function parseContract<T>(name: string, value: unknown): T {
   const validate = ajv.compile<T>(getSchema(name))
-  if (!validate(value)) throw new AppError('INVALID_ARGUMENT', ajv.errorsText(validate.errors))
+  if (!validate(value))
+    throw new AppError('INVALID_ARGUMENT', validationMessage(name, value, validate.errors))
   return value
+}
+
+/** Explain known cross-field constraints without weakening their schema validation. */
+export function validationMessage(
+  name: unknown,
+  value: unknown,
+  errors: ErrorObject[] | null | undefined,
+): string {
+  if (
+    name === 'websearch.input' &&
+    value &&
+    typeof value === 'object' &&
+    'sites' in value &&
+    'include_domains' in value
+  ) {
+    return 'Provide sites or include_domains, not both.'
+  }
+  return ajv.errorsText(errors)
 }

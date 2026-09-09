@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.2-draft",
+  "schema_version": "0.3-draft",
   "request_id": "example-search-budget",
   "status": "error",
   "query": "MCP tools",

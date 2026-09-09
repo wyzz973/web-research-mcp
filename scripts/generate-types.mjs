@@ -5,6 +5,30 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 const root = new URL('../', import.meta.url)
 await mkdir(new URL('src/generated/', root), { recursive: true })
 const check = process.argv.includes('--check')
+// Inline common schemas for clients that cannot resolve repository-relative $refs.
+const metadata = JSON.parse(
+  await readFile(new URL('schemas/source-metadata.schema.json', root), 'utf8'),
+)
+const search = JSON.parse(
+  await readFile(new URL('schemas/websearch.output.schema.json', root), 'utf8'),
+)
+for (const name of ['websearch.output', 'webfetch.output']) {
+  const target = new URL(`schemas/${name}.schema.json`, root)
+  const document = JSON.parse(await readFile(target, 'utf8'))
+  const definitions = {
+    source_metadata: metadata,
+    ...(name === 'webfetch.output'
+      ? { evidence: search.$defs.evidence, relevance: search.$defs.relevance }
+      : {}),
+  }
+  for (const [key, value] of Object.entries(definitions)) {
+    if (JSON.stringify(document.$defs[key]) !== JSON.stringify(value)) {
+      if (check) throw new Error(`Stale embedded ${key} schema: ${name}`)
+      document.$defs[key] = value
+    }
+  }
+  if (!check) await writeFile(target, JSON.stringify(document, null, 2) + '\n')
+}
 function normalizeReferences(value) {
   if (Array.isArray(value)) return value.map(normalizeReferences)
   if (!value || typeof value !== 'object') return value
@@ -24,6 +48,7 @@ for (const [filename, name] of [
   ['webfetch.input', 'WebFetchInput'],
   ['webfetch.output', 'WebFetchOutput'],
   ['config', 'RuntimeConfiguration'],
+  ['source-metadata', 'SourceMetadata'],
 ]) {
   const schema = JSON.parse(
     await readFile(new URL(`schemas/${filename}.schema.json`, root), 'utf8'),

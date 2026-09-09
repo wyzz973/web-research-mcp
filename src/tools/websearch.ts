@@ -10,6 +10,8 @@ import { parseContract } from '../shared/contracts.ts'
 import { canonicalUrl, matchesScope, resolveScope } from '../shared/domain-scope.ts'
 import { scoreRelevance } from '../ranking/lexical.ts'
 import { selectPassages } from '../ranking/passages.ts'
+import { createSourceMetadata } from '../shared/source-metadata.ts'
+import { prepareEvidence } from './evidence.ts'
 import { type SearchResult, toolError, wireRelevance, withDeadline } from './common.ts'
 
 interface SearchSpec {
@@ -23,7 +25,7 @@ interface SearchSpec {
 }
 
 interface SavedPool {
-  version: 1
+  version: 2
   fingerprint: string
   spec: SearchSpec
   sources: SearchResult[]
@@ -40,6 +42,7 @@ function fingerprint(spec: SearchSpec, config: RuntimeConfiguration): string {
         search: config.search,
         node: process.versions.node,
         icu: process.versions.icu,
+        evidencePolicy: 'paragraph_context_v2',
       }),
     )
     .digest('hex')
@@ -101,7 +104,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function savedPool(value: unknown, expected: string): SavedPool {
   if (
     !isRecord(value) ||
-    value.version !== 1 ||
+    value.version !== 2 ||
     value.fingerprint !== expected ||
     !Array.isArray(value.sources) ||
     !isRecord(value.spec) ||
@@ -113,7 +116,7 @@ function savedPool(value: unknown, expected: string): SavedPool {
   }
   // Validate all stored public results using the author-owned schema before using the internal envelope.
   parseContract<WebSearchOutput>('websearch.output', {
-    schema_version: '0.2-draft',
+    schema_version: '0.3-draft',
     request_id: 'durable-validation',
     status: value.sources.length ? 'ok' : 'empty',
     query: 'durable-validation',
@@ -221,6 +224,10 @@ async function collect(
             evidence_level: 'search_snippet',
             evidence_status: 'not_requested',
             evidence: [],
+            source_metadata: createSourceMetadata(url),
+            evidence_chars: 0,
+            has_more_evidence: false,
+            next_evidence_cursor: null,
             relevance: wireRelevance(
               scoreRelevance(
                 spec.query,
@@ -269,7 +276,7 @@ async function collect(
       'Inline site syntax is engine-dependent. Use structured sites for strict filtering.',
     )
   return {
-    version: 1,
+    version: 2,
     fingerprint: fingerprint(spec, config),
     spec,
     sources,
@@ -295,42 +302,30 @@ async function enrich(
     throwIfAborted(signal)
     const snapshot = store.saveDocument(document, 'text')
     const passages = selectPassages(spec.query, snapshot, {
-      maxPassages: config.search.evidence.max_passages_per_result,
+      maxPassages: config.search.evidence.max_candidate_passages,
       maxChars: config.search.evidence.max_chars_per_passage,
       language: spec.language,
     })
     row.warnings.push(...snapshot.warnings)
+    row.source_metadata =
+      snapshot.sourceMetadata ??
+      createSourceMetadata(snapshot.url, snapshot.finalUrl, snapshot.fetchedAt)
     if (!passages.length) {
       row.evidence_status = 'no_match'
       row.confidence = confidence('low', 'The fetched text contains no query-matching passage.')
       return
     }
-    const cursor = store.createCursor(
-      'fetch',
-      { snapshotId: snapshot.snapshotId, offset: 0 },
-      snapshot.expiresAt,
+    Object.assign(
+      row,
+      prepareEvidence(snapshot, passages, store, {
+        perPage: config.search.evidence.max_passages_per_result,
+        maxChars: config.search.evidence.max_chars_per_result,
+      }),
     )
-    row.evidence = passages.map((p) => {
-      if (Array.from(snapshot.content).slice(p.start_char, p.end_char).join('') !== p.quote)
-        throw new AppError('INTERNAL_ERROR', 'Passage failed exact snapshot verification.')
-      return {
-        id: `${snapshot.snapshotId}:${p.start_char}:${p.end_char}`,
-        quote: p.quote,
-        url: snapshot.finalUrl,
-        snapshot_id: snapshot.snapshotId,
-        snapshot_format: 'text',
-        content_sha256: snapshot.contentSha256,
-        segment_id: p.segment_id,
-        start_char: p.start_char,
-        end_char: p.end_char,
-        fetched_at: snapshot.fetchedAt,
-        expires_at: snapshot.expiresAt,
-        extractor_version: snapshot.extractorVersion,
-        snapshot_cursor: cursor,
-        verification: 'exact_match',
-        relevance: wireRelevance(p.relevance, 'quote'),
-      }
-    })
+    if (passages.length === config.search.evidence.max_candidate_passages)
+      row.warnings.push(
+        'Evidence selection reached its candidate cap; the complete snapshot may contain additional relevant text.',
+      )
     row.evidence_level = 'page_excerpt'
     row.evidence_status = 'verified'
     row.confidence = confidence(
@@ -436,7 +431,7 @@ export function createWebSearch(
         warnings.push(`Page evidence verified for ${verified} of ${target} targeted results.`)
       const nextOffset = offset + results.length
       const output: WebSearchOutput = {
-        schema_version: '0.2-draft',
+        schema_version: '0.3-draft',
         request_id: requestId,
         status: results.length ? (warnings.length ? 'partial' : 'ok') : 'empty',
         query: spec.query,
@@ -480,7 +475,7 @@ export function createWebSearch(
       return output
     } catch (error) {
       return {
-        schema_version: '0.2-draft',
+        schema_version: '0.3-draft',
         request_id: requestId,
         status: 'error',
         query:
@@ -530,7 +525,7 @@ export function createWebSearch(
         return { ...shared, request_id: randomUUID() }
       } catch (error) {
         return {
-          schema_version: '0.2-draft',
+          schema_version: '0.3-draft',
           request_id: randomUUID(),
           status: 'error',
           query: 'cancelled query',

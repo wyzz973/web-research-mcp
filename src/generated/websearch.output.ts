@@ -4,7 +4,7 @@
  * Versioned MCP business contract. Runtime validation is authoritative for external JSON.
  */
 export type WebSearchOutput = {
-  schema_version: '0.2-draft'
+  schema_version: '0.3-draft'
   request_id: string
   status: 'ok' | 'partial' | 'empty' | 'error'
   warnings: string[]
@@ -49,7 +49,7 @@ export type WebSearchOutput = {
     evidence_status:
       'not_requested' | 'verified' | 'unavailable' | 'no_match' | 'skipped_budget' | 'out_of_scope'
     /**
-     * @maxItems 2
+     * @maxItems 5
      */
     evidence: Evidence[]
     relevance: Relevance & {
@@ -58,6 +58,10 @@ export type WebSearchOutput = {
     }
     confidence: Confidence
     warnings: string[]
+    source_metadata: SourceMetadata
+    has_more_evidence: boolean
+    next_evidence_cursor: string | null
+    evidence_chars: number
   }[]
   providers: {
     id: string
@@ -104,6 +108,11 @@ export interface Evidence {
     basis?: 'quote'
     [k: string]: unknown
   }
+  /**
+   * @minItems 1
+   */
+  segment_ids: [string, ...string[]]
+  selection_method: 'paragraph_context_v2'
 }
 export interface Confidence {
   scope: 'evidence_traceability'
@@ -114,6 +123,37 @@ export interface Confidence {
    */
   reasons: [string, ...string[]]
   fact_probability: null
+}
+/**
+ * Display metadata from the actual page or an explicitly marked URL-only fallback. URLs are not downloaded or certified.
+ */
+export interface SourceMetadata {
+  source_url: string
+  final_url: string | null
+  canonical_url: string | null
+  hostname: string
+  domain: string
+  origin: string
+  display_url: string
+  site_name: string
+  description: string | null
+  language: string | null
+  favicon_url: string | null
+  logo_url: string | null
+  image_url: string | null
+  published_at: string | null
+  modified_at: string | null
+  retrieved_at: string | null
+  metadata_source: 'url_only' | 'html'
+  metadata_url: string | null
+  assets_verified: false
+  provenance: {
+    site_name: 'hostname' | 'opengraph' | 'application_name'
+    favicon_url: 'html_link' | 'origin_fallback' | 'none'
+    logo_url: 'json_ld' | 'none'
+    image_url: 'opengraph' | 'none'
+    canonical_url: 'html_link' | 'none'
+  }
 }
 export interface Scope {
   sites: string[]

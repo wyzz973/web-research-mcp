@@ -2,7 +2,7 @@
 
 工具名按需求固定为 `websearch`、`webfetch`。服务名提供命名空间，不另注册多个同义工具。JSON Schema 位于 `schemas/`，默认值须由服务端显式应用，JSON Schema 的 default 本身不会填值。
 
-当前业务输出版本为 0.2-draft，包含站点限定、原文证据与可解释评分；两个工具及全部构造响应同步使用该版本，本版本首次公开，后续变更按版本策略管理。
+当前业务输出版本为 0.3-draft，包含站点限定、原文证据与可解释评分；两个工具及全部构造响应同步使用该版本，本版本首次公开，后续变更按版本策略管理。
 
 ## MCP 与 SDK 边界
 
@@ -24,23 +24,23 @@ cursor 为可选不透明续页标识，只读取首次调用已采集、过滤�
 
 输出：schema_version、request_id、status（ok/partial/empty/error）、query、results、providers、scope、evidence_summary、warnings、next_cursor、error。scope 回显实际规范化筛选与执行策略；error 且无法解析范围时允许为 null。evidence_summary 记录模式、目标结果数与已取得证据的结果数。
 
-每条结果保留 source_id、title、url、snippet、rank、providers、published_at，并增加 evidence_status、evidence、relevance、confidence 和 warnings。有已校验原文时 evidence_level=page_excerpt，否则为 search_snippet；snippet 始终是上游摘要。confidence.scope 固定 evidence_traceability，fact_probability 必须 null。relevance 为解释查询匹配的分值，不是事实正确概率。
+每条结果保留 source_id、title、url、snippet、rank、providers、published_at，并增加 evidence_status、evidence、relevance、confidence 和 warnings。有已校验原文时 evidence_level=page_excerpt，否则为 search_snippet；snippet 始终是上游摘要。新增 source_metadata、evidence_chars、has_more_evidence 和 next_evidence_cursor；展示与续读语义见 [段落与展示](13-evidence-presentation.md)。confidence.scope 固定 evidence_traceability，fact_probability 必须 null。relevance 为解释查询匹配的分值，不是事实正确概率。
 
-每个 evidence 有精确 quote、snapshot_id、text 格式、完整哈希、segment_id、字符偏移、来源 URL、获取/过期时间、提取器版本与 snapshot_cursor；用 `webfetch({cursor: snapshot_cursor})` 可读取同一快照。关系校验、状态表和评分规则见 [设计](12-sites-evidence-scoring.md)，不能仅凭 Schema 合法就宣称证据真实。
+每个 evidence 有精确 quote、snapshot_id、text 格式、完整哈希、segment_id/segment_ids、selection_method、字符偏移、来源 URL、获取/过期时间、提取器版本与 snapshot_cursor；用 `webfetch({cursor: snapshot_cursor})` 可读取同一快照。关系校验、状态表和评分规则见 [设计](12-sites-evidence-scoring.md)，不能仅凭 Schema 合法就宣称证据真实。
 
 rank 是本次冻结候选池内的全局名次，续页不从 1 重新编号；调试级上游 rank 独立存储，不能与业务排序混用。published_at 来自上游时需在未来扩展中保留 provenance。不能用搜索结果数量推断搜索成功。
 
 ## webfetch
 
-输入为二选一：首次使用 url；续读使用 cursor。不同时接收两者。format 为 markdown/text；max_chars 默认 12,000、最大 50,000，单位为 Unicode code points。初版返回完整提取文档的连续页；query-focused 段落检索留到后续版本，避免“正文”和“选择性证据”混淆。
+输入为二选一：首次使用 url；续读使用 cursor。不同时接收两者。format 为 markdown/text；max_chars 默认 12,000、最大 50,000，单位为 Unicode code points。view=document 返回连续文档页；next_evidence_cursor 打开 view=evidence，返回非连续但精确引用的相关段落，不能把拼接 content 当整篇文档。
 
-输出：schema_version、request_id、status（ok/partial/error）、source_id、snapshot_id、url、final_url、title、fetched_at、content_type、content、content_sha256、segments、truncated、next_cursor、warnings、error。
+成功输出还包括 view、source_metadata、evidence、evidence_chars、has_more_evidence 和 next_evidence_cursor；完整字段：schema_version、request_id、status（ok/partial/error）、source_id、snapshot_id、url、final_url、title、fetched_at、content_type、content、content_sha256、segments、truncated、next_cursor、warnings、error。
 
 快照绑定输出 format；续读省略 format 时继承 cursor 的格式，显式指定不同格式返回 CURSOR_MISMATCH。首次读取未给 format 才应用 markdown 默认值。request_id 标识本次工具调用，fetched_at 保留该快照实际获取时间，不因续读变成当前时间。
 
 content_sha256 指完整规范化提取快照，不是本页片段；segments 含 id/text/start_char/end_char，对应完整快照内 Unicode code point 左闭右开偏移。展示时以结构边界分段，必要时拆长段，不能超过请求预算。游标必须覆盖剩余内容，不能重复或跳过。
 
-truncated=true 表示本页结束后仍有快照内容待续读，必须附非空 next_cursor；正常分页时 status 仍可为 ok。末页即使不是从文档开头开始，也返回 truncated=false、next_cursor=null。partial 表示提取完整性或资源处理存在额外限制，必须有 warning，不能用 truncated 替代。下载超限返回 RESPONSE_TOO_LARGE，不把半份 HTML 当完整网页。初版不支持的 PDF/图片返回 UNSUPPORTED_CONTENT_TYPE。
+document 视图的 truncated=true 表示本页结束后仍有快照内容待续读，必须附非空 next_cursor；正常分页时 status 仍可为 ok。末页即使不是从文档开头开始，也返回 truncated=false、next_cursor=null。partial 表示提取完整性或资源处理存在额外限制，必须有 warning，不能用 truncated 替代。下载超限返回 RESPONSE_TOO_LARGE，不把半份 HTML 当完整网页。不支持的 PDF/图片返回 UNSUPPORTED_CONTENT_TYPE。evidence 视图中 truncated/next_cursor 与 has_more_evidence/next_evidence_cursor 对应；max_chars 同时约束段落和拼接分隔符，完整段无法放入时明确报错。
 
 ## 错误与部分成功
 

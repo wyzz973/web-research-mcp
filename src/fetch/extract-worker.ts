@@ -3,6 +3,7 @@ import { JSDOM, VirtualConsole } from 'jsdom'
 import { Readability } from '@mozilla/readability'
 import TurndownService from 'turndown'
 import { gfm } from '@joplin/turndown-plugin-gfm'
+import { extractSourceMetadata } from './metadata.ts'
 
 interface Input {
   html: Uint8Array
@@ -56,6 +57,7 @@ function extract(input: Input) {
         parent = parent.parentElement
       }
     }
+    const sourceMetadata = extractSourceMetadata(document, input.url)
     document
       .querySelectorAll('script,style,noscript,iframe,object,embed,form,input,button,svg,canvas')
       .forEach((element) => element.remove())
@@ -126,7 +128,7 @@ function extract(input: Input) {
     turndown.remove(['script', 'style', 'iframe'])
     const markdown = turndown.turndown(content.innerHTML).trim()
     if (!markdown || !text) throw new Error('Article extraction produced empty content.')
-    return { title: article.title ?? '', text, markdown, warnings: [...warnings] }
+    return { title: article.title ?? '', text, markdown, warnings: [...warnings], sourceMetadata }
   } finally {
     dom.window.close()
   }

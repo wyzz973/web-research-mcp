@@ -1,11 +1,16 @@
 import { Worker } from 'node:worker_threads'
 import { AppError, throwIfAborted } from '../shared/errors.ts'
+import type { SourceMetadata } from '../generated/source-metadata.ts'
+import { ajv, getSchema } from '../shared/contracts.ts'
+
+const validMetadata = ajv.compile<SourceMetadata>(getSchema('source-metadata'))
 
 export interface Extracted {
   title: string
   text: string
   markdown: string
   warnings: string[]
+  sourceMetadata: SourceMetadata
 }
 function isExtracted(value: unknown): value is Extracted {
   return (
@@ -19,7 +24,9 @@ function isExtracted(value: unknown): value is Extracted {
     typeof value.markdown === 'string' &&
     'warnings' in value &&
     Array.isArray(value.warnings) &&
-    value.warnings.every((entry: unknown) => typeof entry === 'string')
+    value.warnings.every((entry: unknown) => typeof entry === 'string') &&
+    'sourceMetadata' in value &&
+    validMetadata(value.sourceMetadata)
   )
 }
 

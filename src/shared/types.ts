@@ -1,5 +1,6 @@
 /** Domain interfaces shared by replaceable infrastructure and tool orchestration. */
 import type { CursorToken, SnapshotId, SourceId } from './ids.ts'
+import type { SourceMetadata } from '../generated/source-metadata.ts'
 export interface DomainScope {
   readonly sites: readonly string[]
   readonly exclude_domains: readonly string[]
@@ -34,6 +35,7 @@ export interface SearchProvider {
 }
 
 export interface LoadedDocument {
+  readonly sourceMetadata?: SourceMetadata
   readonly url: string
   readonly finalUrl: string
   readonly title: string
@@ -58,6 +60,7 @@ export interface Segment {
 }
 
 export interface DocumentSnapshot {
+  readonly sourceMetadata?: SourceMetadata
   readonly sourceId: SourceId
   readonly snapshotId: SnapshotId
   readonly url: string
@@ -87,6 +90,8 @@ export interface SnapshotStore {
   getCursor(token: string, kind: 'fetch' | 'search'): CursorRecord
   putSearch(id: string, payload: unknown, expiresAt: string): void
   getSearch(id: string): unknown
+  putEvidence(id: string, payload: unknown, expiresAt: string): void
+  getEvidence(id: string): unknown
   close(): void
 }
 
@@ -104,5 +109,6 @@ export interface Passage {
   readonly start_char: number
   readonly end_char: number
   readonly segment_id: string
+  readonly segment_ids: readonly string[]
   readonly relevance: Relevance
 }

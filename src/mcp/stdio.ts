@@ -19,7 +19,7 @@ async function main(): Promise<void> {
     return
   }
   if (args.includes('--version')) {
-    process.stdout.write('0.1.0\n')
+    process.stdout.write('0.2.0\n')
     return
   }
   if (args.length && !(args.length === 2 && args[0] === '--config' && args[1]))
@@ -104,7 +104,7 @@ async function main(): Promise<void> {
       level: 'info',
       event: 'ready',
       search_configured: Boolean(provider),
-      version: '0.1.0',
+      version: '0.2.0',
     }) + '\n',
   )
 }

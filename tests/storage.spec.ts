@@ -8,6 +8,7 @@ import { createSnapshotStore } from '../src/storage/index.ts'
 import type { LoadedDocument, SnapshotStore } from '../src/shared/types.ts'
 import { makeSourceId, parseSnapshotId } from '../src/shared/ids.ts'
 import type { CursorToken, SnapshotId, SourceId } from '../src/shared/ids.ts'
+import type { SourceMetadata } from '../src/generated/source-metadata.ts'
 
 const directories: string[] = []
 const stores: SnapshotStore[] = []
@@ -42,6 +43,37 @@ function deadline(): string {
   return new Date(Date.now() + 60_000).toISOString()
 }
 
+function metadata(): SourceMetadata {
+  return {
+    source_url: 'https://example.org/article#fragment',
+    final_url: 'https://example.org/article',
+    canonical_url: 'https://example.org/canonical',
+    hostname: 'example.org',
+    domain: 'example.org',
+    origin: 'https://example.org',
+    display_url: 'example.org/article',
+    site_name: '示例研究站',
+    description: '研究与证据🙂',
+    language: 'zh-CN',
+    favicon_url: 'https://example.org/favicon.svg',
+    logo_url: 'https://example.org/logo.png',
+    image_url: 'https://example.org/preview.png',
+    published_at: '2026-09-01T00:00:00.000Z',
+    modified_at: null,
+    retrieved_at: '2026-09-08T08:00:00.000Z',
+    metadata_source: 'html',
+    metadata_url: 'https://example.org/article',
+    assets_verified: false,
+    provenance: {
+      site_name: 'opengraph',
+      favicon_url: 'html_link',
+      logo_url: 'json_ld',
+      image_url: 'opengraph',
+      canonical_url: 'html_link',
+    },
+  }
+}
+
 afterEach(() => {
   vi.useRealTimers()
   for (const store of stores.splice(0)) store.close()
@@ -49,6 +81,134 @@ afterEach(() => {
 })
 
 describe('durable snapshots', () => {
+  it('persists an immutable evidence plan across restart independently from a same-ID search pool', () => {
+    const directory = tempDirectory()
+    const store = open(directory)
+    const plan = {
+      snapshotId: 'fixture-snapshot',
+      passages: [{ start_char: 0, end_char: 3 }],
+      version: 1,
+    }
+    const search = { results: ['https://example.org/'] }
+    store.putEvidence('same-id', plan, deadline())
+    store.putSearch('same-id', search, deadline())
+    expect(store.getEvidence('same-id')).toEqual(plan)
+    expect(store.getSearch('same-id')).toEqual(search)
+    expect(() => store.putEvidence('same-id', { changed: true }, deadline())).toThrow(
+      expect.objectContaining({ code: 'STORAGE_UNAVAILABLE' }),
+    )
+    store.close()
+    const reopened = open(directory)
+    expect(reopened.getEvidence('same-id')).toEqual(plan)
+    expect(reopened.getSearch('same-id')).toEqual(search)
+    expect(() => reopened.getEvidence('unknown')).toThrow(
+      expect.objectContaining({ code: 'CURSOR_EXPIRED' }),
+    )
+  })
+
+  it('applies retention and JSON validation to evidence plans', () => {
+    vi.useFakeTimers()
+    const store = open()
+    expect(() => store.putEvidence('invalid', { value: undefined }, deadline())).toThrow(
+      expect.objectContaining({ code: 'STORAGE_UNAVAILABLE' }),
+    )
+    store.putEvidence('short', { passages: [] }, new Date(Date.now() + 1000).toISOString())
+    vi.advanceTimersByTime(1001)
+    expect(() => store.getEvidence('short')).toThrow(
+      expect.objectContaining({ code: 'CURSOR_EXPIRED' }),
+    )
+  })
+
+  it('retains all source metadata across serialization and restart without aliasing caller objects', () => {
+    const directory = tempDirectory()
+    const store = open(directory)
+    const original = metadata()
+    const snapshot = store.saveDocument({ ...loaded(), sourceMetadata: original }, 'text')
+    expect(snapshot.sourceMetadata).toEqual(metadata())
+    original.site_name = 'Caller changed its object'
+    original.provenance.site_name = 'hostname'
+    expect(snapshot.sourceMetadata).toEqual(metadata())
+    store.close()
+    const reopened = open(directory)
+    expect(reopened.getDocument(snapshot.snapshotId)).toEqual(snapshot)
+    expect(reopened.getDocument(snapshot.snapshotId).sourceMetadata).toEqual(metadata())
+    const database = new Database(join(directory, 'snapshots.sqlite'))
+    expect(database.pragma('user_version', { simple: true })).toBe(1)
+    database.close()
+  })
+
+  it.each([
+    null,
+    { assets_verified: true },
+    { ...metadata(), favicon_url: 'javascript:alert(1)' },
+    { ...metadata(), assets_verified: true },
+    { ...metadata(), provenance: { ...metadata().provenance, logo_url: 'certified' } },
+    { ...metadata(), published_at: 'not-a-date' },
+    { ...metadata(), injected_field: 'discard-me?' },
+  ])(
+    'rejects invalid persisted source metadata rather than silently dropping it: %j',
+    (sourceMetadata) => {
+      const directory = tempDirectory()
+      const store = open(directory)
+      const snapshot = store.saveDocument(loaded(), 'text')
+      const database = new Database(join(directory, 'snapshots.sqlite'))
+      database
+        .prepare('UPDATE records SET payload = ? WHERE kind = ? AND id = ?')
+        .run(JSON.stringify({ ...snapshot, sourceMetadata }), 'snapshot', snapshot.snapshotId)
+      database.close()
+      expect(() => store.getDocument(snapshot.snapshotId)).toThrow(
+        expect.objectContaining({ code: 'STORAGE_UNAVAILABLE' }),
+      )
+    },
+  )
+
+  it.each([
+    { source_url: 'https://other.example.org/article' },
+    { final_url: 'https://other.example.org/article' },
+    { final_url: null },
+    { retrieved_at: '2026-09-08T09:00:00.000Z' },
+    { retrieved_at: null },
+    { metadata_url: 'https://other.example.org/article' },
+    { metadata_url: null },
+  ])(
+    'rejects schema-valid metadata attributed to a different snapshot observation: %j',
+    (patch) => {
+      const directory = tempDirectory()
+      const store = open(directory)
+      const snapshot = store.saveDocument({ ...loaded(), sourceMetadata: metadata() }, 'text')
+      const database = new Database(join(directory, 'snapshots.sqlite'))
+      database
+        .prepare('UPDATE records SET payload = ? WHERE kind = ? AND id = ?')
+        .run(
+          JSON.stringify({ ...snapshot, sourceMetadata: { ...metadata(), ...patch } }),
+          'snapshot',
+          snapshot.snapshotId,
+        )
+      database.close()
+      expect(() => store.getDocument(snapshot.snapshotId)).toThrow(
+        expect.objectContaining({
+          code: 'STORAGE_UNAVAILABLE',
+          message: 'Stored source metadata does not match its snapshot observation.',
+        }),
+      )
+    },
+  )
+
+  it('continues reading a schema-v1 snapshot that predates optional source metadata', () => {
+    const directory = tempDirectory()
+    const store = open(directory)
+    const snapshot = store.saveDocument(loaded(), 'text')
+    expect(snapshot).not.toHaveProperty('sourceMetadata')
+    store.close()
+    const reopened = open(directory)
+    const restored = reopened.getDocument(snapshot.snapshotId)
+    expect(restored).toEqual(snapshot)
+    expect(restored).not.toHaveProperty('sourceMetadata')
+    expect(restored.contentSha256).toBe(
+      createHash('sha256').update(loaded().text, 'utf8').digest('hex'),
+    )
+  })
+
   it('keeps domain identities distinct while preserving the stored schema-v1 strings', () => {
     expectTypeOf<SourceId>().not.toEqualTypeOf<SnapshotId>()
     expectTypeOf<CursorToken>().not.toEqualTypeOf<SnapshotId>()

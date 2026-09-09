@@ -7,6 +7,8 @@ import type { DocumentLoader, DocumentSnapshot, SnapshotStore } from '../shared/
 import { AppError, throwIfAborted } from '../shared/errors.ts'
 import { parseContract } from '../shared/contracts.ts'
 import { toolError, withDeadline } from './common.ts'
+import { createSourceMetadata } from '../shared/source-metadata.ts'
+import { readEvidencePage } from './evidence.ts'
 
 interface FetchCursor {
   snapshotId: string
@@ -56,10 +58,18 @@ export function snapshotPage(
     })
   const more = end < chars.length
   return {
-    schema_version: '0.2-draft',
+    schema_version: '0.3-draft',
     request_id: requestId,
     status: snapshot.warnings.length ? 'partial' : 'ok',
     error: null,
+    view: 'document',
+    source_metadata:
+      snapshot.sourceMetadata ??
+      createSourceMetadata(snapshot.url, snapshot.finalUrl, snapshot.fetchedAt),
+    evidence: [],
+    has_more_evidence: false,
+    next_evidence_cursor: null,
+    evidence_chars: 0,
     source_id: snapshot.sourceId,
     snapshot_id: snapshot.snapshotId,
     url: snapshot.url,
@@ -102,7 +112,54 @@ export function createWebFetch(
       let snapshot: DocumentSnapshot
       let offset = 0
       if (args.cursor) {
-        const cursor = readCursor(store.getCursor(args.cursor, 'fetch').payload)
+        const payload = store.getCursor(args.cursor, 'fetch').payload
+        if (
+          payload &&
+          typeof payload === 'object' &&
+          'view' in payload &&
+          payload.view === 'evidence'
+        ) {
+          if (args.format && args.format !== 'text')
+            throw new AppError(
+              'CURSOR_MISMATCH',
+              'Evidence cursors read original text; use the snapshot cursor for another document view.',
+            )
+          const { snapshot: evidenceSnapshot, page } = readEvidencePage(payload, store, maxChars)
+          return {
+            schema_version: '0.3-draft',
+            request_id: requestId,
+            status: evidenceSnapshot.warnings.length ? 'partial' : 'ok',
+            error: null,
+            source_id: evidenceSnapshot.sourceId,
+            snapshot_id: evidenceSnapshot.snapshotId,
+            url: evidenceSnapshot.url,
+            final_url: evidenceSnapshot.finalUrl,
+            title: evidenceSnapshot.title,
+            fetched_at: evidenceSnapshot.fetchedAt,
+            content_type: evidenceSnapshot.contentType,
+            content: page.evidence.map((e) => e.quote).join('\n\n'),
+            content_sha256: evidenceSnapshot.contentSha256,
+            segments: page.evidence.map((e) => ({
+              id: e.id,
+              text: e.quote,
+              start_char: e.start_char,
+              end_char: e.end_char,
+            })),
+            warnings: [...evidenceSnapshot.warnings],
+            truncated: page.has_more_evidence,
+            next_cursor: page.next_evidence_cursor,
+            view: 'evidence',
+            source_metadata:
+              evidenceSnapshot.sourceMetadata ??
+              createSourceMetadata(
+                evidenceSnapshot.url,
+                evidenceSnapshot.finalUrl,
+                evidenceSnapshot.fetchedAt,
+              ),
+            ...page,
+          }
+        }
+        const cursor = readCursor(payload)
         snapshot = store.getDocument(cursor.snapshotId)
         offset = cursor.offset
         if (args.format && args.format !== snapshot.format)
@@ -116,7 +173,7 @@ export function createWebFetch(
       return snapshotPage(snapshot, offset, maxChars, store, requestId)
     } catch (error) {
       return {
-        schema_version: '0.2-draft',
+        schema_version: '0.3-draft',
         request_id: requestId,
         status: 'error',
         warnings: [],

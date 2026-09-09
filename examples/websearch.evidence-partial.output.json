@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.2-draft",
+  "schema_version": "0.3-draft",
   "request_id": "example-partial-evidence",
   "status": "partial",
   "query": "MCP tools structuredContent",
@@ -21,7 +21,7 @@
           "url": "https://docs.example.com/guide",
           "snapshot_id": "example-evidence-snapshot",
           "snapshot_format": "text",
-          "content_sha256": "7daabc2a83acdfe99116086566ee21604cf0b8253f953f3d974b231fc50e9be2",
+          "content_sha256": "399fdab436cb9f176d155026863275cb2cbdaa0f10d7fd4e5db7bb8e69e508cb",
           "segment_id": "example-evidence-segment",
           "start_char": 0,
           "end_char": 35,
@@ -37,7 +37,9 @@
             "basis": "quote",
             "matched_terms": ["mcp", "tools", "structuredcontent"],
             "reasons": ["Constructed token coverage example; not a probability."]
-          }
+          },
+          "segment_ids": ["example-evidence-segment"],
+          "selection_method": "paragraph_context_v2"
         }
       ],
       "relevance": {
@@ -57,7 +59,38 @@
         ],
         "fact_probability": null
       },
-      "warnings": []
+      "warnings": [],
+      "source_metadata": {
+        "source_url": "https://docs.example.com/guide",
+        "final_url": "https://docs.example.com/guide",
+        "canonical_url": "https://docs.example.com/guide",
+        "hostname": "docs.example.com",
+        "domain": "example.com",
+        "origin": "https://docs.example.com",
+        "display_url": "docs.example.com/guide",
+        "site_name": "Example Research",
+        "description": "Constructed website metadata for frontend rendering.",
+        "language": "en",
+        "favicon_url": "https://docs.example.com/icon.svg",
+        "logo_url": "https://cdn.example.com/logo.png",
+        "image_url": "https://cdn.example.com/article-card.png",
+        "published_at": null,
+        "modified_at": null,
+        "retrieved_at": "2026-09-08T00:00:00Z",
+        "metadata_source": "html",
+        "metadata_url": "https://docs.example.com/guide",
+        "assets_verified": false,
+        "provenance": {
+          "site_name": "opengraph",
+          "favicon_url": "html_link",
+          "logo_url": "json_ld",
+          "image_url": "opengraph",
+          "canonical_url": "html_link"
+        }
+      },
+      "has_more_evidence": true,
+      "next_evidence_cursor": "EXAMPLE_MORE_EVIDENCE_CURSOR",
+      "evidence_chars": 35
     },
     {
       "source_id": "example-out-of-scope",
@@ -85,7 +118,38 @@
         "reasons": ["The redirect leaves the requested sites; no page excerpt was acquired."],
         "fact_probability": null
       },
-      "warnings": ["Redirect target outside requested sites was not contacted."]
+      "warnings": ["Redirect target outside requested sites was not contacted."],
+      "source_metadata": {
+        "source_url": "https://docs.example.com/redirect",
+        "final_url": null,
+        "canonical_url": null,
+        "hostname": "docs.example.com",
+        "domain": "example.com",
+        "origin": "https://docs.example.com",
+        "display_url": "docs.example.com/redirect",
+        "site_name": "docs.example.com",
+        "description": null,
+        "language": null,
+        "favicon_url": "https://docs.example.com/favicon.ico",
+        "logo_url": null,
+        "image_url": null,
+        "published_at": null,
+        "modified_at": null,
+        "retrieved_at": null,
+        "metadata_source": "url_only",
+        "metadata_url": null,
+        "assets_verified": false,
+        "provenance": {
+          "site_name": "hostname",
+          "favicon_url": "origin_fallback",
+          "logo_url": "none",
+          "image_url": "none",
+          "canonical_url": "none"
+        }
+      },
+      "has_more_evidence": false,
+      "next_evidence_cursor": null,
+      "evidence_chars": 0
     }
   ],
   "providers": [

@@ -164,6 +164,57 @@ describe('public-web network policy', () => {
 })
 
 describe('bounded extraction', () => {
+  it('returns HTML metadata after redirects without requesting icon, logo or preview assets', async () => {
+    const html = article.replace(
+      '</head>',
+      `
+      <meta property="og:site_name" content="Public protocol docs">
+      <meta property="og:image" content="https://cdn.example.net/preview.jpg">
+      <link rel="icon" href="/site.svg">
+      <script type="application/ld+json">{"@type":"Organization","logo":"https://cdn.example.net/logo.png"}</script>
+      </head>`,
+    )
+    const { loader, calls } = fixture(async (url) => {
+      if (url.pathname === '/robots.txt') return response('', 404)
+      if (url.pathname === '/start') return response('', 302, { location: '/article' })
+      return response(html)
+    })
+    const result = await loader.load('https://example.com/start', { signal: signal() })
+    expect(result.sourceMetadata).toMatchObject({
+      source_url: 'https://example.com/start',
+      final_url: 'https://example.com/article',
+      metadata_url: 'https://example.com/article',
+      retrieved_at: result.fetchedAt,
+      site_name: 'Public protocol docs',
+      favicon_url: 'https://example.com/site.svg',
+      image_url: 'https://cdn.example.net/preview.jpg',
+      logo_url: 'https://cdn.example.net/logo.png',
+      assets_verified: false,
+      metadata_source: 'html',
+    })
+    expect(calls).toEqual([
+      'https://example.com/robots.txt',
+      'https://example.com/start',
+      'https://example.com/article',
+    ])
+  })
+
+  it('labels plain text metadata as a URL fallback while recording its actual retrieval time', async () => {
+    const { loader } = fixture(async (url) =>
+      url.pathname === '/robots.txt'
+        ? response('', 404)
+        : response('Plain public article.', 200, { 'content-type': 'text/plain' }),
+    )
+    const result = await loader.load('https://example.com/readme.txt', { signal: signal() })
+    expect(result.sourceMetadata).toMatchObject({
+      metadata_source: 'url_only',
+      metadata_url: 'https://example.com/readme.txt',
+      retrieved_at: result.fetchedAt,
+      favicon_url: 'https://example.com/favicon.ico',
+      provenance: { favicon_url: 'origin_fallback' },
+    })
+  })
+
   it('extracts malformed-CSS pages without emitting DOM noise to worker stdout or stderr', async () => {
     const html = article.replace('</head>', '<style>@layer x { broken</style></head>')
     const worker = new Worker(new URL('../src/fetch/extract-worker.ts', import.meta.url), {

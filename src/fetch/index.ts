@@ -11,6 +11,7 @@ import {
 } from './network.ts'
 import { extractHtml } from './extractor.ts'
 import { Limiter } from './limiter.ts'
+import { createSourceMetadata } from '../shared/source-metadata.ts'
 
 export type { FetchDependencies } from './network.ts'
 export interface FetchOptions {
@@ -255,7 +256,13 @@ export function createDocumentLoader(
           // Text/Markdown input is rendered literally: no raw HTML or reference
           // links can sneak executable URL schemes into the rendered output.
           const markdown = text.replace(/[\\`*_{}[\]()<>#+.!|~-]/g, '\\$&')
-          extracted = { title: '', text, markdown, warnings: [] }
+          extracted = {
+            title: '',
+            text,
+            markdown,
+            warnings: [],
+            sourceMetadata: createSourceMetadata(initial.href, target.href, fetchedAt),
+          }
         } else
           throw new AppError(
             'UNSUPPORTED_CONTENT_TYPE',
@@ -269,6 +276,11 @@ export function createDocumentLoader(
           fetchedAt,
           extractorVersion: 'readability-0.6.0+gfm-v1',
           ...extracted,
+          sourceMetadata: {
+            ...extracted.sourceMetadata,
+            source_url: initial.href,
+            retrieved_at: fetchedAt,
+          },
         }
       }
     } finally {

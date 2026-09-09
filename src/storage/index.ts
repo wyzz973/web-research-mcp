@@ -193,6 +193,9 @@ export function createSnapshotStore(options: {
             extractorVersion: document.extractorVersion,
             segments: segmentContent(content),
             warnings: [...document.warnings],
+            ...(document.sourceMetadata === undefined
+              ? {}
+              : { sourceMetadata: structuredClone(document.sourceMetadata) }),
           }
           write('snapshot', snapshotId, snapshot, snapshot.expiresAt)
           return snapshot
@@ -237,6 +240,12 @@ export function createSnapshotStore(options: {
       },
       getSearch(id) {
         return guard(() => decodeJson(read('search', id).payload))
+      },
+      putEvidence(id, payload, expiresAt) {
+        guard(() => write('evidence', id, payload, expiresAt))
+      },
+      getEvidence(id) {
+        return guard(() => decodeJson(read('evidence', id).payload))
       },
       close() {
         if (db.open) db.close()

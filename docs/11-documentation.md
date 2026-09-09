@@ -14,6 +14,7 @@
 | docs/06-upstream-policy.md | 用户确定的搜索准入要求 |
 | docs/07–11 文档 | 技术栈、编码、工程、测试、文档规范 |
 | docs/12-sites-evidence-scoring.md | 站点限定、原文证据、相关性和置信等级 |
+| docs/13-evidence-presentation.md | 段落证据续读、前端元数据与溯源语义 |
 | docs/decisions | 决策、替代方案和取舍；不代替执行结果 |
 | docs/verification | 执行环境、实际命令和结果、未验证项 |
 | docs/references | 外部项目及论文的核查记录，不是运行依赖 |

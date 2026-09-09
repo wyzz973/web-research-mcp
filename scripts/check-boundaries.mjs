@@ -73,7 +73,8 @@ for (const file of files) {
           ].includes(spec) &&
           owner !== 'fetch' &&
           relative !== 'search/searxng.ts' &&
-          relative !== 'shared/domain-scope.ts'
+          relative !== 'shared/domain-scope.ts' &&
+          relative !== 'shared/source-metadata.ts'
         )
           issues.push(`${relative}: network import outside approved boundary`)
         if (spec === 'better-sqlite3' && owner !== 'storage')

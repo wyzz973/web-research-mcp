@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.2-draft",
+  "schema_version": "0.3-draft",
   "request_id": "example-search",
   "status": "ok",
   "query": "MCP tools structuredContent",
@@ -30,7 +30,38 @@
         "reasons": ["Page evidence was not requested."],
         "fact_probability": null
       },
-      "warnings": []
+      "warnings": [],
+      "source_metadata": {
+        "source_url": "https://example.com/",
+        "final_url": null,
+        "canonical_url": null,
+        "hostname": "example.com",
+        "domain": "example.com",
+        "origin": "https://example.com",
+        "display_url": "example.com/",
+        "site_name": "example.com",
+        "description": null,
+        "language": null,
+        "favicon_url": "https://example.com/favicon.ico",
+        "logo_url": null,
+        "image_url": null,
+        "published_at": null,
+        "modified_at": null,
+        "retrieved_at": null,
+        "metadata_source": "url_only",
+        "metadata_url": null,
+        "assets_verified": false,
+        "provenance": {
+          "site_name": "hostname",
+          "favicon_url": "origin_fallback",
+          "logo_url": "none",
+          "image_url": "none",
+          "canonical_url": "none"
+        }
+      },
+      "has_more_evidence": false,
+      "next_evidence_cursor": null,
+      "evidence_chars": 0
     }
   ],
   "providers": [

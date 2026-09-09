@@ -7,13 +7,14 @@
 ## 已实现
 
 - **指定站点**：sites、exclude_domains、子域开关、IDNA/PSL 校验；返回结果和证据跳转都检查范围。
-- **原文证据**：显式 evidence_mode=extract 有界补抓；返回连续 quote、来源、完整文本哈希、Unicode 偏移和 snapshot cursor。
+- **原文证据**：显式 evidence_mode=extract 有界补抓；默认每结果最多 3 段完整上下文、合计 4,000 字符，返回精确定位及更多相关证据游标。
+- **前端来源展示**：source_metadata 返回站名、域名、实际 URL、favicon/logo/预览图、日期和逐字段来源；未抓取时明确使用 URL 后备。
 - **可解释评分**：词法相关性记录方法、版本与依据；confidence 表示证据可追溯性，fact_probability 固定为 null。
 - **持久化续读**：SQLite 保存冻结候选池、网页快照与随机游标，重启后在有效期内仍可读取。
 - **受控抓取**：DNS 固定连接、SSRF/跳转检查、robots、压缩/输出上限、取消、独立解析 worker 与资源清理。
 - **真实 MCP 入口**：SDK 2、stdio 和旧版初始化兼容路径；结构化输出与文本输出一致。
 
-版本为 0.1.0，业务契约为 0.2-draft。默认评分是词法基线；PDF、动态浏览器、向量召回、BM25/RRF 实验和神经精排不属于本版本。high 证据等级不表示事实一定正确。
+版本为 0.2.0，业务契约为 0.3-draft。默认评分是词法基线；PDF、动态浏览器、向量召回、BM25/RRF 实验和神经精排不属于本版本。high 证据等级不表示事实一定正确。
 
 ## 快速开始
 
@@ -42,7 +43,7 @@ pnpm call websearch '{"query":"MCP tools structuredContent","sites":["modelconte
 pnpm call webfetch '{"url":"https://www.sqlite.org/fts5.html","format":"text","max_chars":3000}'
 ```
 
-把搜索返回的 evidence[].snapshot_cursor 或抓取返回的 next_cursor 原样传入，即可读取已保存文本。以下占位值要替换为实际响应：
+把搜索返回的 evidence[].snapshot_cursor 传给 webfetch 可读完整原文；next_evidence_cursor 可读更多相关段落（view=evidence）。普通文档分页使用 next_cursor。以下占位值要替换为实际响应：
 
 ```sh
 pnpm call webfetch '{"cursor":"ACTUAL_CURSOR","max_chars":3000}'
@@ -83,14 +84,14 @@ SEARXNG_URL=http://127.0.0.1:18888 SEARXNG_ENGINES=brave,google pnpm test:live
 
 check 包括类型、类型感知 lint、格式、生成类型、Schema、模块边界、文档、离线行为与 MCP 测试。test:built 将真实 tarball 安装到干净目录，验证 SQLite、MCP 入口和解析 worker。test:live 明确访问上游，不放入普通 CI；失败会保存到被 Git 忽略的 artifacts/live/result.json，不自动绕过封锁。
 
-执行证据见 [实施验收记录](docs/verification/2026-09-08-implementation.md)。离线测试不能保证所有网站随时可抓取。
+执行证据见 [0.2.0 段落与展示验收](docs/verification/2026-09-09-paragraph-evidence.md) 和 [初版实施记录](docs/verification/2026-09-08-implementation.md)。离线测试不能保证所有网站随时可抓取。
 
 ## 文档
 
 | 入口 | 内容 |
 | --- | --- |
 | [设计](DESIGN.md) / [架构](docs/03-architecture.md) | 不变量、模块、生命周期与存储 |
-| [工具契约](docs/04-tool-contracts.md) / [站点与证据](docs/12-sites-evidence-scoring.md) | 参数、错误、分页、原文与评分 |
+| [工具契约](docs/04-tool-contracts.md) / [站点与证据](docs/12-sites-evidence-scoring.md) / [段落与展示](docs/13-evidence-presentation.md) | 参数、错误、续读、原文与来源字段 |
 | [AGENTS](AGENTS.md) / [CONTRIBUTING](CONTRIBUTING.md) | Agent 与开发者入口 |
 | [技术栈](docs/07-technology-stack.md) / [编码规范](docs/08-coding-standards.md) | 依赖、类型、风格与资源 |
 | [项目规范](docs/09-development.md) / [测试规范](docs/10-testing.md) / [文档规范](docs/11-documentation.md) | 开发、验证、发布和文档归属 |

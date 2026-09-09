@@ -116,6 +116,15 @@ describe('built MCP stdio executable', () => {
     expect(first.results.map((item) => item.url)).toEqual(['https://example.org/a'])
     expect(first.scope?.removed_count).toBe(2)
     expect(first.results[0]?.confidence.fact_probability).toBeNull()
+    expect(first.results[0]?.source_metadata).toMatchObject({
+      source_url: 'https://example.org/a',
+      hostname: 'example.org',
+      favicon_url: 'https://example.org/favicon.ico',
+      logo_url: null,
+      metadata_source: 'url_only',
+      assets_verified: false,
+      provenance: { favicon_url: 'origin_fallback' },
+    })
     expect(typeof first.next_cursor).toBe('string')
     expect(query).toContain('site:example.org')
     expect(requests).toBe(1)
@@ -159,6 +168,15 @@ describe('built MCP stdio executable', () => {
       'Invalid arguments for tool webfetch',
     )
     expect(result.structuredContent).toBeUndefined()
+    const conflict = await client.callTool({
+      name: 'websearch',
+      arguments: { query: 'MCP', sites: ['example.org'], include_domains: ['example.org'] },
+    })
+    expect(conflict.isError).toBe(true)
+    const conflictMessage = conflict.content.find((item) => item.type === 'text')
+    expect(conflictMessage?.type === 'text' ? conflictMessage.text : '').toContain(
+      'Provide sites or include_domains, not both.',
+    )
   })
 
   it('fails startup with a nonzero exit and protocol-clean stdout for invalid configuration', async () => {

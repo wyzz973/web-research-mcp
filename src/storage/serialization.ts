@@ -2,6 +2,8 @@ import { AppError } from '../shared/errors.ts'
 import type { DocumentSnapshot, Segment } from '../shared/types.ts'
 import { createHash } from 'node:crypto'
 import { makeSourceId, parseSnapshotId, parseSourceId } from '../shared/ids.ts'
+import { parseContract } from '../shared/contracts.ts'
+import type { SourceMetadata } from '../generated/source-metadata.ts'
 
 export function sha256(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex')
@@ -55,6 +57,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+function decodeSourceMetadata(value: unknown): SourceMetadata {
+  try {
+    return parseContract<SourceMetadata>('source-metadata', value)
+  } catch {
+    throw new AppError('STORAGE_UNAVAILABLE', 'Stored source metadata failed schema validation.')
+  }
+}
+
 export function decodeSnapshot(value: unknown): DocumentSnapshot {
   if (!isRecord(value)) throw new AppError('STORAGE_UNAVAILABLE', 'Invalid stored snapshot.')
   function stringField(key: string): string {
@@ -97,6 +107,22 @@ export function decodeSnapshot(value: unknown): DocumentSnapshot {
     extractorVersion: stringField('extractorVersion'),
     segments,
     warnings: value.warnings,
+    ...(Object.hasOwn(value, 'sourceMetadata')
+      ? { sourceMetadata: decodeSourceMetadata(value.sourceMetadata) }
+      : {}),
+  }
+  const metadata = snapshot.sourceMetadata
+  if (
+    metadata !== undefined &&
+    (metadata.source_url !== snapshot.url ||
+      metadata.final_url !== snapshot.finalUrl ||
+      metadata.retrieved_at !== snapshot.fetchedAt ||
+      metadata.metadata_url !== snapshot.finalUrl)
+  ) {
+    throw new AppError(
+      'STORAGE_UNAVAILABLE',
+      'Stored source metadata does not match its snapshot observation.',
+    )
   }
   if (
     !Number.isFinite(Date.parse(snapshot.fetchedAt)) ||

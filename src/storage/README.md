@@ -2,6 +2,8 @@
 
 已实现 SQLite 不可变文档快照、冻结搜索候选池与持久化 opaque 游标。
 
+`putEvidence` / `getEvidence` 持久化有界选段计划，使用同一 `records` 表的独立 `kind=evidence` 命名空间；与同 ID 的搜索池隔离。计划只写一次、禁止覆盖有效记录，沿用 JSON 校验、事务容量和过期规则；具体计划 Schema 由工具层校验。游标仍使用 fetch/search 两类，选段续读只需保存计划 ID 与偏移，不在每页重复保存全文。该命名空间无需 SQL 版本迁移。
+
 `createSnapshotStore({ directory, ttlSeconds, maxBytes })` 返回共享 `SnapshotStore` 接口；调用方拥有实例并在关停时调用 `close()`。每个调用同步执行短事务，不执行网络请求。
 
 - `snapshots.sqlite` 使用 WAL、FULL 同步、参数化语句。目录权限 0700，数据库权限 0600；不接受数据库或目录本身为符号链接。
@@ -9,6 +11,7 @@
 - URL（去除 fragment，保留查询参数）产生稳定 `sourceId`；每个 LoadedDocument 对象产生随机观察 UUID，再与格式组合为 `snapshotId`。同一次观察的 text/markdown 各自具有完整 UTF-8 SHA-256、正文和 Unicode code point 段落偏移。段落保留所有换行、空白和组合字符，不更改正文。
 - 32 字节随机游标使用 base64url 输出，数据库只存游标 SHA-256。fetch/search 互相隔离；未知或过期记录返回 `CURSOR_EXPIRED`，有效的其他工具游标返回 `CURSOR_MISMATCH`。
 - 内部 SourceId、SnapshotId、CursorToken 使用共享品牌类型及工厂；持久化读取先验证身份格式、来源 URL 和快照格式关系再恢复类型。JSON/MCP 字符串与已有 schema-v1 存储表示保持不变。
+- 快照 JSON payload 可选保存完整 `sourceMetadata`，读取时按 [source-metadata.schema.json](../../schemas/source-metadata.schema.json) 校验；字段存在但不合法时返回 `STORAGE_UNAVAILABLE`，不得静默丢弃。旧快照缺少该字段时仍正常返回，展示层负责后备元数据。这是 schema-v1 JSON payload 的向后兼容可选字段扩展，不修改 SQL 表或 `user_version`。
 - 搜索池仅允许首次插入，拒绝覆盖有效记录。JSON 写入拒绝 undefined、非有限数字、循环对象和非 JSON 实例；读取边界解析 JSON，文档读取额外验证类型、完整哈希和全部段落位置。业务游标和候选池的具体 payload schema 由工具模块校验。
 - 每次写入事务先清理过期记录，再写新记录。数据库容量不足整笔回滚，有效记录不会提前驱逐。`maxBytes` 为保守磁盘预算：预留 WAL 共享内存及事务空间后，仅约三分之一用于 SQLite 主文件页数；预算不是可保存正文的净字节数。每次事务前后 checkpoint 并截断 WAL；不能回收被外部读取锁定的 WAL 时拒绝新写入。
 

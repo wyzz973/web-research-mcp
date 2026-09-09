@@ -49,6 +49,23 @@ try {
     throw new Error(`Live search failed: ${JSON.stringify(data)}`)
   const evidence = data.results.flatMap((row) => row.evidence)
   if (!evidence.length) throw new Error('No exact page evidence obtained during real search.')
+  for (const row of data.results) {
+    if (
+      !row.source_metadata ||
+      row.source_metadata.source_url !== row.url ||
+      row.source_metadata.assets_verified !== false
+    )
+      throw new Error('Missing or incorrectly attributed frontend source metadata.')
+    if (row.evidence.length > 3 || row.evidence_chars > 4000)
+      throw new Error('Default evidence response exceeded its paragraph budget.')
+  }
+  if (
+    !evidence.some(
+      (entry) =>
+        entry.quote.length > 300 && entry.quote.toLowerCase().includes('structuredcontent'),
+    )
+  )
+    throw new Error('Paragraph evidence did not include sufficient query-focused context.')
   const first = evidence[0]
   const read = await client.callTool({
     name: 'webfetch',
@@ -60,6 +77,31 @@ try {
     read.structuredContent?.content_sha256 !== first.content_sha256
   )
     throw new Error('Evidence cursor did not resolve the same snapshot.')
+  const expandable = data.results.find((row) => row.next_evidence_cursor)
+  if (expandable) {
+    const more = await client.callTool({
+      name: 'webfetch',
+      arguments: { cursor: expandable.next_evidence_cursor, format: 'text' },
+    })
+    const next = more.structuredContent
+    records.push({ stage: 'more-related-evidence', output: next })
+    if (
+      !next ||
+      next.view !== 'evidence' ||
+      !next.evidence.length ||
+      next.snapshot_id !== expandable.evidence[0].snapshot_id ||
+      next.content.length > 4000
+    )
+      throw new Error('Related evidence continuation failed.')
+    if (
+      next.evidence.some((e) =>
+        expandable.evidence.some(
+          (initial) => e.start_char < initial.end_char && e.end_char > initial.start_char,
+        ),
+      )
+    )
+      throw new Error('Related evidence continuation repeated an original range.')
+  }
   const chinese = await client.callTool(
     {
       name: 'websearch',

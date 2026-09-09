@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.2-draft",
+  "schema_version": "0.3-draft",
   "request_id": "example-first-page",
   "status": "ok",
   "source_id": "example-paged-source",
@@ -22,5 +22,38 @@
   "truncated": true,
   "next_cursor": "EXAMPLE_OPAQUE_CURSOR",
   "warnings": [],
-  "error": null
+  "error": null,
+  "view": "document",
+  "source_metadata": {
+    "source_url": "https://example.com/paged",
+    "final_url": "https://example.com/paged",
+    "canonical_url": null,
+    "hostname": "example.com",
+    "domain": "example.com",
+    "origin": "https://example.com",
+    "display_url": "example.com/paged",
+    "site_name": "example.com",
+    "description": null,
+    "language": null,
+    "favicon_url": "https://example.com/favicon.ico",
+    "logo_url": null,
+    "image_url": null,
+    "published_at": null,
+    "modified_at": null,
+    "retrieved_at": "2026-09-08T00:00:00Z",
+    "metadata_source": "url_only",
+    "metadata_url": "https://example.com/paged",
+    "assets_verified": false,
+    "provenance": {
+      "site_name": "hostname",
+      "favicon_url": "origin_fallback",
+      "logo_url": "none",
+      "image_url": "none",
+      "canonical_url": "none"
+    }
+  },
+  "evidence": [],
+  "has_more_evidence": false,
+  "next_evidence_cursor": null,
+  "evidence_chars": 0
 }

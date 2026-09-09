@@ -60,7 +60,9 @@ export function loadConfiguration(
       : path.join(homedir(), '.local', 'share', 'web-research-mcp'))
   if (
     config.fetch.max_chars > config.fetch.max_output_chars ||
-    config.search.evidence.default_max_results > config.search.evidence.max_results
+    config.search.evidence.default_max_results > config.search.evidence.max_results ||
+    config.search.evidence.max_chars_per_passage > config.search.evidence.max_chars_per_result ||
+    config.search.evidence.max_passages_per_result > config.search.evidence.max_candidate_passages
   ) {
     throw new AppError(
       'INVALID_ARGUMENT',
