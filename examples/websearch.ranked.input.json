@@ -1,0 +1,8 @@
+{
+  "query": "SQLite SQLITE_BUSY timeout",
+  "sites": ["sqlite.org"],
+  "ranking_mode": "bm25_mmr",
+  "limit": 3,
+  "evidence_mode": "extract",
+  "max_evidence_results": 2
+}

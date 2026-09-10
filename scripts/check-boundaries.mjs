@@ -16,6 +16,7 @@ async function walk(dir) {
 await walk(root)
 const allowed = {
   mcp: ['mcp', 'tools', 'shared', 'generated'],
+  workbench: ['workbench', 'tools', 'shared', 'generated'],
   tools: ['tools', 'search', 'fetch', 'ranking', 'storage', 'shared', 'generated'],
   search: ['search', 'shared', 'generated'],
   fetch: ['fetch', 'shared', 'generated'],
@@ -73,6 +74,7 @@ for (const file of files) {
           ].includes(spec) &&
           owner !== 'fetch' &&
           relative !== 'search/searxng.ts' &&
+          relative !== 'workbench/server.ts' &&
           relative !== 'shared/domain-scope.ts' &&
           relative !== 'shared/source-metadata.ts'
         )

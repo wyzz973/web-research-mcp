@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q037",
+  "pool_sha256": "4d8341c69edc68cfc05ce4337e0c1d402c85c9c1ff57047468b31aa9bfe4a06c",
+  "assessor": {
+    "kind": "agent",
+    "id": "quality_ranking"
+  },
+  "judged_at": "2026-09-10T13:20:01.486Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_f1b89fa72ac3473232994a9d5439e21f4b38e6d0d691296c7a71d46f6766fece",
+      "grade": 2,
+      "reason": "直接定义asyncio.timeout异步上下文"
+    },
+    {
+      "id": "source_7bd24ea08dfc9a3dd9e68c2089e8fa71073206273f719c4b231098ddf9dc7322",
+      "grade": 2,
+      "reason": "直接定义asyncio.timeout等待预算"
+    },
+    {
+      "id": "source_5d5addbc923edfefa15ee8fc51c93f879e22d5e78c0f149501466d0d659542ac",
+      "grade": 2,
+      "reason": "直接解释超时取消及等待完成"
+    },
+    {
+      "id": "source_3e5a6db70bfe279ca0c48a3713dc6cdd31b1dc4513c057996b2cff9a420b487f",
+      "grade": 2,
+      "reason": "直接解释timeout参数与异常"
+    },
+    {
+      "id": "source_a7e713ddf31c289741f4befae3c134d04cb5f068794aa83f6a50ec3a449e7c9d",
+      "grade": 2,
+      "reason": "直接定义asyncio.timeout"
+    },
+    {
+      "id": "source_7d6ea393db278bef1dd791ffaee15ccc2903899d8da9dd14121b11ef308cea17",
+      "grade": 1,
+      "reason": "高层API目录仅概述超时"
+    },
+    {
+      "id": "source_dedc3d07cf9b0fdd39a56f00d5cff8ee6df14d1026b8594bec42e1df5d9bd6df",
+      "grade": 2,
+      "reason": "直接给队列使用wait_for的超时方法"
+    },
+    {
+      "id": "source_b50a588785ba3dcfeadb3905583d15a74b9914851f1709c5e886fbbfdddc0b2c",
+      "grade": 2,
+      "reason": "直接给同步原语wait_for超时方法"
+    },
+    {
+      "id": "source_0e57441e35db2cd160ef7a29fe9ba6cec7247a7343ab5b37d03ad65fd76f2440",
+      "grade": 2,
+      "reason": "直接给队列wait_for超时方法"
+    },
+    {
+      "id": "source_44d9de2e0dc3603744cd1cce0d49227561b1ea0f054b8e4e0d3845e07fd78ff3",
+      "grade": 1,
+      "reason": "高层API目录未展示具体方法"
+    }
+  ]
+}

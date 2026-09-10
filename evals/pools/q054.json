@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q054",
+    "query": "document deduplication",
+    "language": "en",
+    "category": "short",
+    "sites": []
+  },
+  "captured_at": "2026-09-10T13:24:04.418Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 3848,
+  "response_sha256": "2f53be1c9d1b144de63d32e350906c8d7dcebbb92bd4bb3b44cdd8efdc517c3e",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_c64d723fcd870f9d85faa2f316cb23d5283dbb573f185655e4977bdbaf87b612",
+      "url": "https://www.llamaindex.ai/glossary/document-deduplication",
+      "title": "What is Document Deduplication? - LlamaIndex",
+      "snippet": "Document deduplication is the process of identifying and removing duplicate or near-duplicate documents within a dataset, storage system, or content repository.",
+      "original_rank": 1
+    },
+    {
+      "id": "source_260c02529d56dc6b624b388e6952ca83a78cbff04c5ab9e8ffb481edd257021a",
+      "url": "https://learn.microsoft.com/en-us/windows-server/storage/data-deduplication/overview",
+      "title": "Data Deduplication Overview - Microsoft Learn",
+      "snippet": "Jun 20, 2025 · Data Deduplication, often called \"dedupe\" for short, is a feature that can help reduce the impact of redundant data on storage costs.",
+      "original_rank": 2
+    },
+    {
+      "id": "source_8724fd463b74793fc9426b11b682f275924a943ea940ca696207f9e34fca71d7",
+      "url": "https://www.oracle.com/data-deduplication/",
+      "title": "What Is Data Deduplication? Methods and Benefits - Oracle",
+      "snippet": "Feb 14, 2024 · The data deduplication process systematically eliminates redundant copies of data and files, which can help reduce storage costs and improve ...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_e05c2d8eb359a5eddc9680dced0191bf3436a5183b0725351444bdf3565541ff",
+      "url": "https://medium.com/@dustinboswell/real-time-document-deduplication-d5fb5982812",
+      "title": "Real-Time Document DeDuplication - Medium",
+      "snippet": "Nov 2, 2018 · Detecting/removing exact duplicates is easy enough: just see if the hash() of the document text is the same as a previous result. Dealing with ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_008a1bd1ace5a50d7c610a567e56137c4f97d47c4444bc5916cacdc69e33da8a",
+      "url": "https://docs.revealdata.com/logikcull/docs/what-is-deduplication-and-how-does-it-work",
+      "title": "What is deduplication and how does it work? - Reveal",
+      "snippet": "Jul 10, 2025 · Deduplication works by comparing file content and metadata to identify duplicates, using specific fields for email, non-email, and calendar ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_523dcc92bcba79a093fe2490fa5b0e6eeb818890820a1e9f090dab332b2b44e4",
+      "url": "https://www.folderit.com/glossary/content-de-duplication/",
+      "title": "Content De-duplication - Document Management System Folderit",
+      "snippet": "Content de-duplication refers to the process of identifying and eliminating duplicate copies of the same document within a system.",
+      "original_rank": 6
+    },
+    {
+      "id": "source_1b44fdb58b7dd76d76f7e5e2ca3a40a14c097898252b96b2eff0780ef9d4ff46",
+      "url": "https://goldfynch.com/blog/2024/04/23/what-is-deduplication-and-why-is-it-important-for-ediscovery-learn-with-goldfynch.html",
+      "title": "What is Deduplication, and Why is it Important for eDiscovery ...",
+      "snippet": "Apr 23, 2024 · Deduplication is the process of identifying and eliminating duplicate documents within a dataset. In eDiscovery, where data sets can be massive ...",
+      "original_rank": 7
+    },
+    {
+      "id": "source_827f6b577ad4847b190df27729fe2956ba466fdae5a58d6343161827cc6cadd1",
+      "url": "https://support.everlaw.com/hc/en-us/articles/204771559-Types-of-Duplicates-and-Deduplication-Options",
+      "title": "Types of Duplicates and Deduplication Options",
+      "snippet": "Mar 17, 2026 · Deduplication is the process of removing duplicates from the action you're taking. For example, you can deduplicate upon uploading and/or ...",
+      "original_rank": 8
+    },
+    {
+      "id": "source_aa647208eadb5e6e07d40278a4c9126dbda7b5a157252eb0d93d91dafb29d7b2",
+      "url": "https://www.reddit.com/r/sysadmin/comments/gw504e/deduplication_aka_dedup/",
+      "title": "De-duplication aka dedup : r/sysadmin - Reddit",
+      "snippet": "Jun 3, 2020 · On a basic level, the duplicate files are replaced in the file system with a link to a single 'master' copy of the original file. The links are ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_4a131e7b6831e09787ef4bb86ea7b65f951b32c97ab35511a32b35aa900e093f",
+      "url": "https://www.coursera.org/articles/deduplication",
+      "title": "Understanding Deduplication: Improving Efficiency with Data ...",
+      "snippet": "May 29, 2026 · Deduplication is a data management strategy that removes duplicate data points to improve storage efficiency and program performance. Two common ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

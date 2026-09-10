@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q011",
+    "query": "MCP structuredContent 返回格式",
+    "language": "zh",
+    "category": "exact",
+    "sites": ["modelcontextprotocol.io"]
+  },
+  "captured_at": "2026-09-10T13:10:42.832Z",
+  "node": "v24.20.0",
+  "status": "error",
+  "elapsed_ms": 1233,
+  "response_sha256": "8029cde3dec44b2a9dc70e59a120a19e95ff7d65f9e41af9cae86786db162b7d",
+  "error_code": "UPSTREAM_BLOCKED",
+  "candidates": [],
+  "evidence": {
+    "target_results": 0,
+    "verified_results": 0
+  }
+}

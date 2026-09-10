@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q008",
+    "query": "SQLite WAL versus rollback journal",
+    "language": "en",
+    "category": "comparison",
+    "sites": ["sqlite.org"]
+  },
+  "captured_at": "2026-09-10T13:09:46.703Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 5967,
+  "response_sha256": "983aca7e5e80f393319d30d4c175dd0678ea68fd8b9442c732fc61d3fb87fe9c",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_d6f43ae05df1743ec9dc47f73aef8701a56fd8d7268a9b4869611af11c6bc10a",
+      "url": "https://www.sqlite.org/wal.html",
+      "title": "Write-Ahead Logging - SQLite",
+      "snippet": "WAL is significantly faster in most scenarios. WAL provides more concurrency as readers do not block writers and a writer does not block readers.Checkpointing · Performance Considerations",
+      "original_rank": 1
+    },
+    {
+      "id": "source_0d5850a89cbcb05393a18531de41b470753b7335a3f3edc13d702ca9f612318f",
+      "url": "https://www.sqlite.org/search?q=journal",
+      "title": "Search SQLite Documentation",
+      "snippet": "2. How WAL Works The traditional rollback journal works by writing a copy of the original unchanged database content into a separate rollback journal file and ...",
+      "original_rank": 2
+    },
+    {
+      "id": "source_c6d93d0f0a7676811b45a6c64072452eedf77ce72425625606a10af32d1eb8d6",
+      "url": "https://sqlite.org/tempfiles.html",
+      "title": "Temporary Files Used By SQLite",
+      "snippet": "Jun 12, 2025 · A write-ahead log or WAL file is used in place of a rollback journal when SQLite is operating in WAL mode. As with the rollback journal, the ...Rollback Journals · Super-Journal Files",
+      "original_rank": 3
+    },
+    {
+      "id": "source_5ecbdbad2189d02cdd78ebcbed7b4868dc1058641868f813f949a1a91918fd7e",
+      "url": "https://sqlite.org/forum/forumpost/3fec19a873?t=h",
+      "title": "Exclusive write-only lock? (Allow only one ... - SQLite User Forum",
+      "snippet": "Sep 10, 2020 · In the normal journaling modes, SQLite will \"wait\" for writers to finish transactions before readers can read. Only in WAL mode can you have ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_39e549cc2e81b8c598d8ba03c7df1b131f03667059a42c467404239a8258c561",
+      "url": "https://www.sqlite.org/walformat.html",
+      "title": "WAL-mode File Format - SQLite",
+      "snippet": "May 10, 2025 · The write-ahead log or \"wal\" file is a roll-forward journal that records transactions that have been committed but not yet applied to the main ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_6f943ee7b3307cc13df7db4d9a8b0e7f8cb2ea11403430135b6c530de3ffc5b1",
+      "url": "https://sqlite.org/forum/forumpost/c4dbf6ca17",
+      "title": "Using WAL mode with multiple processes - SQLite User Forum",
+      "snippet": "Aug 10, 2020 · The WAL journaling mode uses a write-ahead log instead of a rollback journal to implement transactions. The WAL journaling mode is persistent;",
+      "original_rank": 6
+    },
+    {
+      "id": "source_6d66aad27b8b62937098a1a835117252a0b6e7a97b4f78e653e245ff16c430af",
+      "url": "https://sqlite.org/forum/info/9fcd774b387a002c61096be3b6b4562cb2cb9ce147356f370bf8c5538a460a3d",
+      "title": "SQLITE_READONLY for WAL Mode - SQLite User Forum",
+      "snippet": "Oct 24, 2022 · With the rollback journal, I can detect open(2) with O_CREAT for the journal file and return EACCES which eventually turns into a SQLITE_ ...",
+      "original_rank": 7
+    },
+    {
+      "id": "source_f0e218c267154402fb3fd466367f04045d0a3598e6f030ec7d1d5f121272fceb",
+      "url": "https://sqlite.org/forum/info/bfa64b55aca38e00c254d4ba9541fc7ef296452d5ae920ef9c68d079184b042c",
+      "title": "Running .dump on active DB in WAL mode removes the - SQLite",
+      "snippet": "Apr 29, 2025 · If two or more processes open the database using different names, then they will use different rollback journals and WAL files.",
+      "original_rank": 8
+    },
+    {
+      "id": "source_a06152dea5e9a9e1113bf84117b3e06a2642e00246b8a1cf38cd4afb6760b9cd",
+      "url": "https://sqlite.org/forum/forumpost/4d93f49a04",
+      "title": "Avoiding SQLITE_BUSY during recovery - SQLite User Forum",
+      "snippet": "Feb 22, 2021 · However, there is an annoying thing: SQLite locks the database during crash-recovery, both in rollback-journal mode and WAL mode, and I'm not ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_96eb1bb542b6d26ada09656788d362774fe2d54df53725c74a438438c708d592",
+      "url": "https://sqlite.org/search?s=d&q=hot+journal",
+      "title": "Search SQLite Documentation",
+      "snippet": "When a rollback journal or write-ahead log contains information necessary for recovering the state of the database, they are called a \"hot journal\" or \"hot WAL ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

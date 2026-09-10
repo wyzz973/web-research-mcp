@@ -14,7 +14,24 @@
 - **受控抓取**：DNS 固定连接、SSRF/跳转检查、robots、压缩/输出上限、取消、独立解析 worker 与资源清理。
 - **真实 MCP 入口**：SDK 2、stdio 和旧版初始化兼容路径；结构化输出与文本输出一致。
 
-版本为 0.2.1，业务契约为 0.3-draft。默认评分是词法基线；PDF、动态浏览器、向量召回、BM25/RRF 实验和神经精排不属于本版本。high 证据等级不表示事实一定正确。
+版本为 0.3.0，业务契约为 0.3-draft。新增引擎冷却/恢复诊断、56 条中英文查询的评估工具、可选 BM25/MMR 候选排序与本地验收页面。默认保留上游顺序；PDF、动态浏览器、向量召回和神经精排不属于本版本。RRF 仅有离线函数，在线没有独立引擎排名，不伪造融合结果。high 证据等级不表示事实一定正确。
+
+## 在浏览器里验收
+
+```sh
+pnpm searxng:start
+pnpm workbench
+```
+
+打开 [本地工作台](http://127.0.0.1:18900)：输入查询与 sites，切换排序，检查原文片段、完整快照、来源图标及逐引擎观察。界面复用真实业务服务，不展示伪造结果。详见 [工作台使用指南](ui/README.md)。
+
+```sh
+pnpm search:doctor  # 主动执行一次查询，退出 2 表示有可用结果但部分引擎降级
+pnpm eval           # 离线比较冻结候选，不出网
+pnpm eval:collect   # 显式低频采集，默认仅 3 条，不自动标注
+```
+
+评估框架区分失败、未标注与实际测量；本版标签为 Agent 审阅，不能当成人工金标。评估范围、数据与复现方法见 [评估指南](evals/README.md)。
 
 ## 快速开始
 
@@ -83,6 +100,8 @@ SEARXNG_URL=http://127.0.0.1:18888 SEARXNG_ENGINES=brave,google pnpm test:live
 ```
 
 check 包括类型、类型感知 lint、格式、生成类型、Schema、模块边界、文档、离线行为与 MCP 测试。test:built 将真实 tarball 安装到干净目录，验证 SQLite、MCP 入口和解析 worker。test:live 明确访问上游，不放入普通 CI；失败会保存到被 Git 忽略的 artifacts/live/result.json，不自动绕过封锁。
+
+0.3.0 的完整测试、浏览器链路与 56 条查询结论见 [本版验收报告](docs/verification/2026-09-10-search-quality-workbench.md)。
 
 原生部署实测见 [无 Docker 验证](docs/verification/2026-09-10-native-searxng.md)。其他执行证据见 [0.2.0 段落与展示验收](docs/verification/2026-09-09-paragraph-evidence.md) 和 [初版实施记录](docs/verification/2026-09-08-implementation.md)。离线测试不能保证所有网站随时可抓取。
 

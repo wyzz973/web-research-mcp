@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q020",
+    "query": "reciprocal rank fusion",
+    "language": "en",
+    "category": "short",
+    "sites": []
+  },
+  "captured_at": "2026-09-10T13:13:21.841Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 3039,
+  "response_sha256": "3d03f8190de9dde7dc4275d0dccc66a7c46c07c4a8b94647666591b497dad761",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_395c301f4af55d0d1faa5d960001d804e9d6c7e64574a442ce3882a0225dace9",
+      "url": "https://medium.com/@devalshah1619/mathematical-intuition-behind-reciprocal-rank-fusion-rrf-explained-in-2-mins-002df0cc5e2a",
+      "title": "Reciprocal Rank Fusion (RRF) explained in 4 mins - Medium",
+      "snippet": "Jul 4, 2024 · Reciprocal Rank Fusion is a rank aggregation method that combines rankings from multiple sources into a single, unified ranking.How RRF Works in RAG · Mathematical Intuition Behind...",
+      "original_rank": 1
+    },
+    {
+      "id": "source_2b7c5bc63df4a1f46a6fcd20ce4f604506cc986f32f4fa88ea8393ebee56890f",
+      "url": "https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion",
+      "title": "Reciprocal rank fusion | Elasticsearch Reference",
+      "snippet": "Reciprocal rank fusion (RRF) is a method for combining multiple result sets with different relevance indicators into a single result set.",
+      "original_rank": 2
+    },
+    {
+      "id": "source_a1dbfa996f6122e77871531cacbcf5ed93d0139cd7acd71420b59f2d5dd1c381",
+      "url": "https://www.mongodb.com/resources/basics/reciprocal-rank-fusion",
+      "title": "Better RAG Results With Reciprocal Rank Fusion - MongoDB",
+      "snippet": "Reciprocal rank fusion (RRF) is a popular algorithm to implement hybrid search. It aggregates rankings from multiple searches—for example, a keyword search, ...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_4c18af154f61c77cd6abbe13ba1c5d7c02ca41f4f398c15d7acd2a56bd999d1c",
+      "url": "https://glaforge.dev/posts/2026/02/10/advanced-rag-understanding-reciprocal-rank-fusion-in-hybrid-search/",
+      "title": "Advanced RAG — Understanding Reciprocal Rank Fusion in ...",
+      "snippet": "Feb 10, 2026 · RRF is a robust, “zero-shot” algorithm for merging search results from different retrieval methods. entirely and focuses on rank.",
+      "original_rank": 4
+    },
+    {
+      "id": "source_dbe35b4cf093df52bcca9e8277f1bfacb71f5597e1710ac28430f7814feb189c",
+      "url": "https://www.paradedb.com/learn/search-concepts/reciprocal-rank-fusion",
+      "title": "What is Reciprocal Rank Fusion? - ParadeDB",
+      "snippet": "Reciprocal Rank Fusion (RRF) is a technique for combining multiple ranked lists of search results into a single ranking.",
+      "original_rank": 5
+    },
+    {
+      "id": "source_11e5a709a5da50da173987795523b7a93ab97c88b2e906e5069fe53ff27bb7e3",
+      "url": "https://dl.acm.org/doi/10.1145/1571941.1572114",
+      "title": "Reciprocal rank fusion outperforms condorcet and individual ...",
+      "snippet": "Reciprocal Rank Fusion (RRF), a simple method for combining the document rankings from multiple IR systems, consistently yields better results than any ...",
+      "original_rank": 6
+    },
+    {
+      "id": "source_ba2b39e0ede363d48fc0c80ff82c78656bb5bd51040c7afe466a9cd5ce8fdcea",
+      "url": "https://opensearch.org/blog/introducing-reciprocal-rank-fusion-hybrid-search/",
+      "title": "Introducing reciprocal rank fusion for hybrid search - OpenSearch",
+      "snippet": "Feb 12, 2025 · RRF merges ranked results from multiple query sources, such as neural search, k-NN, and Boolean queries, into a single relevance-optimized list.",
+      "original_rank": 7
+    },
+    {
+      "id": "source_af7bf55b4a29de071d4ca219f889ab75a09730d2e31fb04a19415e43e64c94c0",
+      "url": "https://www.youtube.com/watch?v=2uBcjEecr38&vl=en",
+      "title": "What is reciprocal rank fusion in hybrid search? - YouTube",
+      "snippet": "Nov 27, 2025 · What you will learn: ✔️ What reciprocal rank fusion means ✔️ How to calculate reciprocal rank ✔️ How to combine different ranking ...",
+      "original_rank": 8
+    },
+    {
+      "id": "source_9ea0491938093f79fda0863eb1d67f54044dd4ea83f0362dd80b1da67925f208",
+      "url": "https://www.singlestore.com/blog/hybrid-search-using-reciprocal-rank-fusion-in-sql/",
+      "title": "Hybrid Search Using Reciprocal Rank Fusion in SQL",
+      "snippet": "Aug 8, 2025 · Reciprocal rank fusion (RRF) is a popular approach to blend results from two or more different rankings. This tends to be superior to ad-hoc ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_d3a0b69ee685764a2261f0d5bef69c809776fce18f6f30ba27431d270fb3cb15",
+      "url": "https://milvus.io/docs/rrf-ranker.md",
+      "title": "RRF Ranker | Milvus Documentation",
+      "snippet": "Reciprocal Rank Fusion (RRF) Ranker is a reranking strategy for Milvus hybrid search that balances results from multiple vector search paths based on their ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 0
+  }
+}

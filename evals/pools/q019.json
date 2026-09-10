@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q019",
+    "query": "TypeScript TS2322 类型错误",
+    "language": "zh",
+    "category": "error",
+    "sites": []
+  },
+  "captured_at": "2026-09-10T13:13:04.521Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 2318,
+  "response_sha256": "098ec6a7e1919cdb8959a75907223eb22b05e4c7ec494ac1f4056f332d382613",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_696aae3db042a074040c703f57fb58eb703de25b66cdd714b8afad41d0c51edf",
+      "url": "https://cloud.baidu.com/article/2835184",
+      "title": "解决TypeScript中的TS2322错误 - 百度智能云",
+      "snippet": "2024年1月17日 · 简介：TypeScript的TS2322错误通常出现在尝试将类型不匹配的代码赋值给变量时。本文将介绍解决此错误的常见方法，包括检查类型定义、使用类型断言和 ...",
+      "original_rank": 1
+    },
+    {
+      "id": "source_35b306010392dd2f654ae03a80c1e1bbcb49f53828fc1ba1b67b677d7a856241",
+      "url": "https://developer.cloud.tencent.com/ask/sof/106368885",
+      "title": "在构建过程中，突然出现Typescript错误TS2322，类型不可分配错误 ...",
+      "snippet": "如何解决TypeScript 错误TS2322 类型不可分配错误？ TypeScript 错误TS2322 的常见原因有哪些？ 如何检查TypeScript 中的类型兼容性以避免TS2322 错误？",
+      "original_rank": 2
+    },
+    {
+      "id": "source_17b2673bc9b29d1a97a84a8bae4e04363e6d494c4b04d3a75ec4e0dbf6c4886c",
+      "url": "https://zhuanlan.zhihu.com/p/482383288",
+      "title": "项目中常见的TypeScript错误汇总 - 知乎专栏",
+      "snippet": "2022年3月17日 · ... 类型完全兼容，但是TypeScript 提示了TS2322 类型不兼容的错误。这是因为变量style 的类型被自动推断成了{ display: string }，string 类型自然无法 ...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_b8dad7647c155e486194249c7d1f252277ea0404de94413b934458a12fb08284",
+      "url": "https://blog.csdn.net/w1003jpeng/article/details/130482642",
+      "title": "TS2322错误解决方案 - CSDN博客",
+      "snippet": "2023年5月4日 · 在TypeScript 中消费无类型JS 模块，TS2322 类型不匹配错误：三种核心解决方案的深度解析 ... TypeScript类型错误解决方案当遇到\"不能将类型ComputedRef< ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_fa597e32e50409053ad305edb6190bbcebd4916c16e7d8169a5ca47d145993a2",
+      "url": "https://juejin.cn/post/7450021642375708699",
+      "title": "解决报错：不能将类型“{ children: Element……}\"分配给类型“xxx ...",
+      "snippet": "2024年12月19日 · TypeScript · 类型“Element”上不存在属性“offsetTop” · 记录一次类型错误的解决方案，ts报错类型“Element”上不存在属性“offsetTop”。 因为ts默认用的是 ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_c866ffe392349f1153cc811756d871f7765652c11236bcce252609e749777838",
+      "url": "https://ts.xcatliu.com/basics/type-inference.html",
+      "title": "类型推论 - TypeScript 入门教程",
+      "snippet": "ts(2,1): error TS2322: Type 'number' is not assignable to type 'string'. TypeScript 会在没有明确的指定类型的时候推测出一个类型，这就是类型推论。 如果定义的 ...",
+      "original_rank": 6
+    },
+    {
+      "id": "source_b11e7ec2813f293bdad94d1b2a174d402925bce970792026a5e2a264088cef39",
+      "url": "https://tsejx.github.io/typescript-guidebook/syntax/advanced/union-types/",
+      "title": "联合类型",
+      "snippet": "2020年8月24日 · 上述示例代码表示 val 值可以是 number 类型或者 string 类型的其中一种，联合类型使用 | 分隔每个类型。 val = true;. // index.ts(2,1): error TS2322 ...",
+      "original_rank": 7
+    },
+    {
+      "id": "source_7abf4ab4b1eb9e1836bdc95c6dba51b2958ed5a2a64908dc64404960f4a970e9",
+      "url": "https://www.cnblogs.com/everlose/p/16738357.html",
+      "title": "在TS 里简单区分any, unknown, never 的差别- Ever-Lose - 博客园",
+      "snippet": "2022年9月28日 · never 是所有类型的子类型，可以给所有类型赋值，但前提是tsconfig 里开启 \"strictNullChecks\": false; 不允许执行变量的方法以及访问内部属性.",
+      "original_rank": 8
+    },
+    {
+      "id": "source_a1d9108fbe32370edbc9953fe31324581bdea12cec60598d0ce9f3810aef489d",
+      "url": "https://webdriver.io/zh/docs/typescript/",
+      "title": "TypeScript 设置| WebdriverIO",
+      "snippet": "根据您使用的框架，您需要将该框架的类型添加到 tsconfig.json 的types 属性中，并安装其类型定义。如果您想要内置断言库 expect-webdriverio 的类型支持，这一点尤为重要 ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_87112d4640ff354691ec4afc80d7105551257a542a8506b15d84feab9781e444",
+      "url": "https://www.sohu.com/a/990226425_122426260",
+      "title": "凌晨三点拯救PR危机：自动修复TS类型错误并解释的陌讯Skill",
+      "snippet": "2026年2月26日 · 这正是很多开发者最近开始习惯的一种新工作节奏：遇到TS类型错误，不再先打开搜索引擎，而是唤出一个叫“自动修复TS类型错误并解释”的Skill，在几秒内拿到 ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

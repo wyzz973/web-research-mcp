@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q002",
+    "query": "SQLite SQLITE_BUSY error",
+    "language": "en",
+    "category": "error",
+    "sites": ["sqlite.org"]
+  },
+  "captured_at": "2026-09-10T13:07:57.961Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 4580,
+  "response_sha256": "e9af1bc5ef07d21b3f365ffc7d172edd195a1a8db007bfd320c5a80acdeb3e22",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_96f655205f48e4d2f6c21e02e98b150c2ad6ec9e3e5f832bbc60edce6b96331a",
+      "url": "https://sqlite.org/rescode.html",
+      "title": "Result and Error Codes - SQLite",
+      "snippet": "Feb 18, 2026 · The SQLITE_BUSY result code indicates that the database file could not be written (or in some cases read) because of concurrent activity by some ...",
+      "original_rank": 1
+    },
+    {
+      "id": "source_b42d51698b68e8460a778bd171209a4ef8b70315207e80657e5339596cd29879",
+      "url": "https://sqlite.org/forum/forumpost/4d93f49a04?t=h",
+      "title": "Avoiding SQLITE_BUSY during recovery - SQLite User Forum",
+      "snippet": "Feb 22, 2021 · SQLITE_BUSY requires polling for readiness, So if a third database connection tries to jump in and query while the second connection is running ...",
+      "original_rank": 2
+    },
+    {
+      "id": "source_6573cff4ffe64a3241a595d6faa30ac10374dbd94caa2096314fa5c3b12d739d",
+      "url": "https://www.sqlite.org/c3ref/busy_handler.html",
+      "title": "Register A Callback To Handle SQLITE_BUSY Errors",
+      "snippet": "If the busy callback is NULL, then SQLITE_BUSY is returned immediately upon encountering the lock. If the busy callback is not NULL, then the callback might be ...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_07bd2b8292de05bdee25a79a8da98e60a15088e7e6fc6718d37839b4c9db55b4",
+      "url": "https://sqlite.org/forum/forumpost/4350638e78869137?t=c",
+      "title": "”database is locked”: detecting deadlock vs. busy timeout?",
+      "snippet": "Jun 21, 2023 · I'm looking at a logfile showing a delete failed with SQL_BUSY. The db is in WAL mode with a 100 ms busy timeout. This table is accessed by ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_a209629e9c237efdff5d8f4471e6e0a10534d4fb8ce2a32eb67309c6f8e4353c",
+      "url": "https://sqlite.org/forum/info/1bf33f0ef4e12a55",
+      "title": "[SOLVED] Getting SQLITE_LOCKED where SQLITE_BUSY is ...",
+      "snippet": "Oct 26, 2021 · Documentation for SQLITE_LOCKED says that it can happen either because of a conflict inside the current connection, or because of someone who ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_f1c1c3a8940cce1fd023feedf18355b6f06fcfe848a04ce216f4aa601c3ca4db",
+      "url": "https://sqlite.org/forum/forumpost/4d93f49a04?raw",
+      "title": "Avoiding SQLITE_BUSY during recovery - SQLite User Forum",
+      "snippet": "So if a third database connection tries to jump in and query while the second connection is running recovery, the third connection will get an SQLITE_BUSY error ...",
+      "original_rank": 6
+    },
+    {
+      "id": "source_bba824bd47928839b2bf5f387422b18cf90f1fff71d5949dac72b6ab2799384d",
+      "url": "https://sqlite.org/forum/forumpost/04ed1d235b",
+      "title": "Help understanding the effect of BEGIN IMMEDIATE - SQLite",
+      "snippet": "Jun 21, 2024 · SQLite will immediately return a SQLITE_BUSY error without respecting the busy_timeout previously mentioned, if the database is already locked ...",
+      "original_rank": 7
+    },
+    {
+      "id": "source_0f32b54f0bccc384236177837ee570ae1bef15120de3a54da531a9b57d218c70",
+      "url": "https://www.sqlite.org/lang_transaction.html",
+      "title": "Transaction - SQLite",
+      "snippet": "Feb 18, 2026 · The BEGIN IMMEDIATE might fail with SQLITE_BUSY if another write transaction is already active on another database connection. there are any ...",
+      "original_rank": 8
+    },
+    {
+      "id": "source_12e780879f7481ce71ac1f6c38776cffc6aa5eef0b4404d353f5535d45c04da8",
+      "url": "https://sqlite.org/faq.html",
+      "title": "SQLite Frequently Asked Questions",
+      "snippet": "Nov 26, 2024 · When SQLite tries to access a file that is locked by another process, the default behavior is to return SQLITE_BUSY. You can adjust this ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_3c2734b0d46e824214e81dbe2745d91b810913cc4072879b7987ae947cc79a69",
+      "url": "https://www.sqlite.org/c3ref/c_abort.html",
+      "title": "Result Codes - SQLite",
+      "snippet": "Many SQLite functions return an integer result code from the set shown here in order to indicate success or failure. New error codes may be added in future ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

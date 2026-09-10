@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q038",
+    "query": "hybrid search",
+    "language": "en",
+    "category": "short",
+    "sites": []
+  },
+  "captured_at": "2026-09-10T13:19:01.296Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 5946,
+  "response_sha256": "2731b3b059676ef02df8951f69f2b93b68b85d1b9a323a2fa3836e6b1116709a",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_ceedece305bcc5eca496d149919f8fd386a41054c1790cb3eabed7aeaca74e68",
+      "url": "https://www.elastic.co/what-is/hybrid-search",
+      "title": "What is hybrid search? How it works and when to use it - Elastic",
+      "snippet": "Hybrid search is an information retrieval technique that blends two or more search methods (e.g., lexical search and semantic search) into a single ranked list",
+      "original_rank": 1
+    },
+    {
+      "id": "source_6a7fecda3e84014d89ab07adb243c4fd011f76ac928831a5c2ab6169b1442038",
+      "url": "https://weaviate.io/blog/hybrid-search-explained",
+      "title": "Hybrid Search Explained - Weaviate",
+      "snippet": "Jan 27, 2025 · Hybrid search is a technique that combines multiple search algorithms to improve the accuracy and relevance of search results.What is Hybrid Search? · How does Hybrid Search Work?",
+      "original_rank": 2
+    },
+    {
+      "id": "source_ae1458ac1d874dc5cba8f2efc07aa2da4674618bf4797ea2ceda629314dbde5c",
+      "url": "https://supabase.com/docs/guides/ai/hybrid-search",
+      "title": "Hybrid search | Supabase Docs",
+      "snippet": "Hybrid search combines full text search (searching by keyword) with semantic search (searching by meaning) to identify results that are both directly and ...Use cases for hybrid search · Reciprocal Ranked Fusion...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_2c9dc69872aa33d515925fd72961178b25798c6f069fc9b2137a3248b13577d9",
+      "url": "https://docs.opensearch.org/latest/vector-search/ai-search/hybrid-search/index/",
+      "title": "Hybrid search - OpenSearch Documentation",
+      "snippet": "Hybrid search combines keyword and semantic search to improve search relevance. To implement hybrid search, you need to set up a search pipeline that runs ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_87da6fb18dc26cf7da501b700d24f8f2ac6f255ae7e3ee07baa42caf7d14fbdd",
+      "url": "https://docs.oracle.com/en/database/oracle/oracle-database/26/vecse/understand-hybrid-search.html",
+      "title": "Understand Hybrid Search - Oracle Help Center",
+      "snippet": "With hybrid search, you can search through your documents by performing a combination of full-text queries and vector-based similarity queries, ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_24f89f0fb2b4a3d46414a7290f9c115e26046e5c70fdb9664a6c89b71b5e4290",
+      "url": "https://medium.com/@qdrant/what-is-hybrid-search-2a0c30d0f3d2",
+      "title": "What is Hybrid Search? - Medium",
+      "snippet": "Feb 6, 2024 · There is not a single definition of hybrid search. A combination of vector search with attribute filtering. A mix of dense and sparse vectors.",
+      "original_rank": 6
+    },
+    {
+      "id": "source_51bb30bfb826655069fc236948605eba611de405a67f2ff777059bd8ac343f61",
+      "url": "https://aws.amazon.com/blogs/big-data/hybrid-search-with-amazon-opensearch-service/",
+      "title": "Hybrid Search with Amazon OpenSearch Service - AWS",
+      "snippet": "Mar 19, 2024 · For a hybrid search, you combine a lexical and semantic search query against the text captions of images in the dataset.",
+      "original_rank": 7
+    },
+    {
+      "id": "source_a473a6faf3f330a9f6c2c4ebc0b1a6b0a621fd71ebb671484272c974bc1140cc",
+      "url": "https://www.meilisearch.com/blog/hybrid-search",
+      "title": "Hybrid search: definition, how it works, benefits and more",
+      "snippet": "Mar 13, 2025 · Hybrid search combines keyword and semantic search, giving users the best of both worlds and control over the level of contextual depth they ...",
+      "original_rank": 8
+    },
+    {
+      "id": "source_d20bac1abe631d86914baa1de0b5b2db4b05e2209a5729e8ca9a05db7b2ded4f",
+      "url": "https://www.coveo.com/blog/hybrid-search/",
+      "title": "What is Hybrid Search? - Coveo",
+      "snippet": "Mar 4, 2025 · Hybrid search combines lexical, vector-based, and AI-powered techniques to deliver fast, relevant, and secure results — no matter where the data ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_09cbaec05f7baecd4a57112454edf28e1a9e3a6a253ee70ce8d916c0b97ac98e",
+      "url": "https://docs.pinecone.io/guides/search/hybrid-search",
+      "title": "Hybrid search overview - Pinecone Docs",
+      "snippet": "Hybrid search combines a keyword signal with a semantic signal so a single query benefits from both. Keyword retrieval (full-text BM25 or sparse vectors) ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q017",
+    "query": "BM25 与 向量检索 区别",
+    "language": "zh",
+    "category": "comparison",
+    "sites": []
+  },
+  "captured_at": "2026-09-10T13:12:29.808Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 2338,
+  "response_sha256": "8fb3e106e1187448792d3d3bb6bf8bfd0be4914ea37788e455029182dcdd07e2",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_4f5746df76939052169085d13a8a6928915f9ee73946b1ee9b79b058a98654f5",
+      "url": "https://www.cnblogs.com/ExMan/p/18762905",
+      "title": "BM25 和向量检索的区别 - 博客园",
+      "snippet": "2025年3月10日 · 总结 · BM25更适合需要快速处理大规模数据且对语义理解要求不高的场景。 · 向量检索更适合需要深度语义理解且数据规模较小的场景。",
+      "original_rank": 1
+    },
+    {
+      "id": "source_a48018ebaa4b0ba844cddfac5fb930e273714e0752f55f1f852ad07109555ac1",
+      "url": "https://www.reddit.com/r/Rag/comments/1rf7xf6/whats_your_experience_with_hybrid_retrieval/?tl=zh-hans",
+      "title": "你对混合检索（向量+ BM25）和纯向量搜索在RAG 系统中的 ...",
+      "snippet": "2026年2月26日 · 区别很明显——在针对内部文档的50 个问题的测试集中，准确率从大约60% 提高到85%。 我的理论是：向量搜索在语义相似性方面很棒，但会错过确切的术语。当 ...",
+      "original_rank": 2
+    },
+    {
+      "id": "source_31ec6a7216c8a256c1aa1bedbdd3a07962d1bffcb6fa6803ddfa9d01d599a0ec",
+      "url": "https://blog.csdn.net/star1210644725/article/details/142320042",
+      "title": "BM25检索三者对比_稀疏向量和稠密向量 - CSDN博客",
+      "snippet": "2024年9月17日 · 稠密向量检索依托于高维空间中的向量表示，能够捕捉文档的深层语义信息，而稀疏向量检索则侧重于关键词的匹配，依赖于文档中词条的存在与否。此外，BM25 ...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_3f9a62195761f6e8e5ee2ec2340ad56c0442deb03c261f203437e5146dd317bd",
+      "url": "https://help.aliyun.com/zh/milvus/use-cases/full-text-retrieval-by-milvus-bm25-algorithm-and-application-of-hybrid-retrieval-to-rag-system",
+      "title": "通过Milvus的BM25算法进行全文检索并将混合检索应用于RAG ...",
+      "snippet": "2026年4月15日 · 本文介绍如何利用Milvus 2.5 版本实现快速的全文检索、关键词匹配，以及混合检索（Hybrid Search）。通过增强向量相似性检索和数据分析的灵活性，提升 ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_641237f84eb9013207f4a55621a7685ecaadca64a61cb47dba36672d966cc1ca",
+      "url": "https://zhuanlan.zhihu.com/p/670322092",
+      "title": "RAG提效利器——BM25检索算法原理和Python实现 - 知乎专栏",
+      "snippet": "BM25的核心思想是基于词频(TF)和逆文档频率(IDF)来,同时还引入了文档的长度信息来计算文档D和查询Q之间的相关性。目前被广泛运用的搜索引擎ES就内置了BM25算法进行全文检索 ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_d4f50c613aae82b398d7f71303ba8b91f63de8f65d5289745d02e081aadb3058",
+      "url": "https://milvus.io/docs/zh/embed-with-bm25.md",
+      "title": "BM25 | Milvus 文档",
+      "snippet": "BM25 是信息检索中使用的一种排序函数，用于估计文档与给定搜索 ... BM25 可以通过将文档表示为术语重要性得分向量来生成稀疏嵌入，从而在稀疏向量空间中实现高效检索和排序 ...",
+      "original_rank": 6
+    },
+    {
+      "id": "source_78280dff2e162692b433c37c59d88162c31701a18b82c60397200f5b14f24926",
+      "url": "https://github.com/datawhalechina/all-in-rag/blob/main/docs/chapter4/11_hybrid_search.md",
+      "title": "第一节混合检索 - GitHub",
+      "snippet": "为了更好地理解混合检索，首先需要厘清两种向量的本质区别。 1.1 稀疏向量. 稀疏 ... 传统的稀疏向量方法（如BM25）对OOV词汇会完全忽略，而现代的密集向量方法 ...",
+      "original_rank": 7
+    },
+    {
+      "id": "source_8a1554e4db056710ffd51f7d5542df9cd6007d20a3293f2fd7c9ad42ee0fff18",
+      "url": "https://www.53ai.com/news/RAG/2024080632561.html",
+      "title": "BM25检索+向量检索的LlamaIndex实现- 大模型RAG实战 - 53AI",
+      "snippet": "2024年8月6日 · BM25是一种文本相关度检索方法，主要是判断⼀个⽂档和查询语句匹配的程度的算法，比如在搜索引擎中用于排序搜索结果。 这种文本相关度的判断，主要基于 ...",
+      "original_rank": 8
+    },
+    {
+      "id": "source_c77f841621c8bb5cca45baab69894b4a7be7beed17542dcc71eb4d809d16c817",
+      "url": "https://zilliz.com.cn/blog/How-can-we-implement-hybrid-search-using-the-Milvus-2.5-BM25-algorithm",
+      "title": "RAG开发中，如何用Milvus 2.5 BM25算法实现混合搜索",
+      "snippet": "2024年12月20日 · 通过引入Sparse-BM25算法，Milvus能够在稀疏向量上执行高效的全文检索，并与密集向量搜索相结合，提升检索的召回率和精确度。 参考文档：. https ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_3d7f19e240a5b9744dd90f24430a9e4c6b34886d0ca65bd9f9f1d202946e2e52",
+      "url": "https://mloasisblog.com/blog/ML/RAG-Retrieval-Strategy",
+      "title": "RAG 检索策略：BM25、Embedding 和Reranker 万字深度解析",
+      "snippet": "2025年5月30日 · 传统的BM25 算法检索能精准匹配关键词但忽略了语义信息，现代的向量Embedding 检索能基于语义信息匹配但是不够精准；. 没有哪一种检索策略是最好的 ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

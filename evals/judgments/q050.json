@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q050",
+  "pool_sha256": "dce5309f168a471b275248dcf2e51f8373915b78a4766c91b37fee54e3bf6efc",
+  "assessor": {
+    "kind": "agent",
+    "id": "quality_ranking"
+  },
+  "judged_at": "2026-09-10T13:24:44.589Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_d1aed5d46f787fd036cd68b4bdbde4adc04fe0b9f0f2c2aa6d80d6b1f5d17835",
+      "grade": 2,
+      "reason": "明确2026-07-28协议规范"
+    },
+    {
+      "id": "source_a739f7343f18dab9ad5ed8ca2d59317f2fd6863a360cc328379f53dbf91b487e",
+      "grade": 2,
+      "reason": "明确2026规范相对前版变化"
+    },
+    {
+      "id": "source_3bef6a91327c3092c6e78e6ed832823df3c7e8619728d00439a68e14cb5923c4",
+      "grade": 2,
+      "reason": "明确2026-07-28正式规范发布"
+    },
+    {
+      "id": "source_bf8a1ac48bd812374bb7fc708211862bfe1ba1ba02d019750f4b67b558e1e15c",
+      "grade": 2,
+      "reason": "博客宣布2026-07-28新规范"
+    },
+    {
+      "id": "source_7b138caa8e63ae0102ef6e0432c6cd1cc9ee539a0a57825b1c1d57aedd94af23",
+      "grade": 1,
+      "reason": "2025旧版规范非最新2026"
+    },
+    {
+      "id": "source_bdada42404eb832bf99d95c8b368d51b07d7c4c2268c3f23779ae1d8de2a77e1",
+      "grade": 1,
+      "reason": "2026路线图非实际规范"
+    },
+    {
+      "id": "source_8bc6dbb1e0970326381af3491bdd793406640b767252d3b247fbc415d183a41e",
+      "grade": 1,
+      "reason": "版本编号规则，未直接确认最新规范"
+    },
+    {
+      "id": "source_0d95fa0076f1d0ef1dd401b6f3742f9fb7e75176618d035312c79de5853800a3",
+      "grade": 1,
+      "reason": "发布候选而非明确正式规范"
+    },
+    {
+      "id": "source_920caecd56af832381841f46e207f78176ba2baf7932b1195a3d86c01410650e",
+      "grade": 1,
+      "reason": "工具章节未展示2026版本"
+    },
+    {
+      "id": "source_34fabf499cb7ad23d5fee16fc0dbaf40651a384750aa0ffd0f6bba8eff81c464",
+      "grade": 1,
+      "reason": "授权章节未展示2026版本"
+    }
+  ]
+}

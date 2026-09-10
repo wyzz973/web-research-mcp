@@ -9,6 +9,14 @@ import type {
   SearchSource,
 } from '../shared/types.ts'
 
+import {
+  EngineHealth,
+  classifyEngineFailure,
+  type EngineDiagnostic,
+  type EngineFailure,
+  type EngineSelection,
+} from './engine-health.ts'
+
 import { KEYLESS_ENGINES } from '../shared/search-policy.ts'
 export { KEYLESS_ENGINES } from '../shared/search-policy.ts'
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024
@@ -33,19 +41,43 @@ export function validateSearchQuery(query: string): void {
 }
 
 function upstreamFailure(reason: string): AppError {
-  if (/captcha|blocked|forbidden|access.denied|too.many.requests|429/iu.test(reason)) {
-    return new AppError('UPSTREAM_BLOCKED', 'The configured search engines blocked the request.')
-  }
-  if (/timeout|timed.out/iu.test(reason))
-    return new AppError('TIMEOUT', 'Search engines timed out.', true)
+  const code = classifyEngineFailure(reason)
   return new AppError(
-    'UPSTREAM_UNAVAILABLE',
-    'The configured search engines are unavailable.',
-    true,
+    code,
+    code === 'UPSTREAM_BLOCKED'
+      ? 'The configured search engines blocked the request.'
+      : code === 'TIMEOUT'
+        ? 'Search engines timed out.'
+        : 'The configured search engines are unavailable.',
+    code !== 'UPSTREAM_BLOCKED',
   )
 }
 
-function parsePage(payload: unknown, allowed: ReadonlySet<string>): SearchPage {
+export interface SearchDiagnostics {
+  status: 'idle' | 'ready' | 'degraded' | 'unavailable' | 'closed'
+  endpoint: {
+    total_requests: number
+    failed_requests: number
+    last_elapsed_ms: number | null
+    last_error: string | null
+    last_observed_at: string | null
+  }
+  engines: readonly EngineDiagnostic[]
+}
+export interface SearxngProvider extends SearchProvider {
+  /** Read provider-local observations without issuing a probe or exposing queries. */
+  inspect(): SearchDiagnostics
+}
+
+function parsePage(
+  payload: unknown,
+  allowed: ReadonlySet<string>,
+  observe: (
+    failures: readonly EngineFailure[],
+    successful: ReadonlySet<string>,
+    diagnosticsComplete: boolean,
+  ) => void,
+): SearchPage {
   if (!record(payload) || !Array.isArray(payload.results)) {
     throw new AppError(
       'UPSTREAM_UNAVAILABLE',
@@ -54,6 +86,7 @@ function parsePage(payload: unknown, allowed: ReadonlySet<string>): SearchPage {
     )
   }
   const errors: string[] = []
+  const failures: EngineFailure[] = []
   if (payload.unresponsive_engines !== undefined) {
     if (!Array.isArray(payload.unresponsive_engines)) {
       throw new AppError(
@@ -63,13 +96,26 @@ function parsePage(payload: unknown, allowed: ReadonlySet<string>): SearchPage {
       )
     }
     for (const entry of payload.unresponsive_engines) {
-      if (!Array.isArray(entry) || typeof entry[0] !== 'string' || typeof entry[1] !== 'string') {
+      if (
+        !Array.isArray(entry) ||
+        entry.length < 2 ||
+        entry.length > 3 ||
+        typeof entry[0] !== 'string' ||
+        typeof entry[1] !== 'string' ||
+        (entry[2] !== undefined && typeof entry[2] !== 'boolean')
+      ) {
         throw new AppError(
           'UPSTREAM_UNAVAILABLE',
           'Search endpoint returned invalid engine diagnostics.',
           true,
         )
       }
+      if (allowed.has(entry[0]))
+        failures.push({
+          engine: entry[0],
+          code: classifyEngineFailure(entry[1]),
+          suspended: typeof entry[2] === 'boolean' ? entry[2] : null,
+        })
       const failure = upstreamFailure(entry[1])
       errors.push(`${failure.code}: ${allowed.has(entry[0]) ? entry[0] : 'unconfigured_engine'}`)
     }
@@ -109,6 +155,8 @@ function parsePage(payload: unknown, allowed: ReadonlySet<string>): SearchPage {
     })
   }
   if (payload.results.length > 200) errors.push('UPSTREAM_UNAVAILABLE: response_candidate_limit')
+  const successful = new Set(sources.flatMap((source) => source.engines))
+  observe(failures, successful, Array.isArray(payload.unresponsive_engines))
   if (sources.length === 0 && errors.length > 0) throw upstreamFailure(errors.join(' '))
   return { sources, errors, exhausted: payload.results.length === 0 || payload.paging === false }
 }
@@ -118,7 +166,8 @@ export function createSearxngProvider(options: {
   baseUrl: string
   engines: readonly string[]
   timeoutMs: number
-}): SearchProvider {
+  now?: () => number
+}): SearxngProvider {
   let endpoint: URL
   try {
     const base = new URL(options.baseUrl)
@@ -152,12 +201,22 @@ export function createSearxngProvider(options: {
   if (!Number.isInteger(options.timeoutMs) || options.timeoutMs <= 0)
     throw new AppError('INVALID_ARGUMENT', 'Search timeout must be positive.')
   let closed = false
+  const now = options.now ?? Date.now
+  const health = new EngineHealth([...allowed], now)
+  const endpointDiagnostic: SearchDiagnostics['endpoint'] = {
+    total_requests: 0,
+    failed_requests: 0,
+    last_elapsed_ms: null,
+    last_error: null,
+    last_observed_at: null,
+  }
   const active = new Map<AbortController, Promise<SearchPage>>()
 
   function requestPage(
     input: SearchPageRequest,
     callerSignal: AbortSignal,
     controller: AbortController,
+    selection: EngineSelection,
   ): Promise<SearchPage> {
     const signal = AbortSignal.any([callerSignal, controller.signal])
     throwIfAborted(signal)
@@ -167,7 +226,7 @@ export function createSearxngProvider(options: {
       input.site === undefined ? undefined : resolveScope({ sites: [input.site] }).sites[0]
     url.searchParams.set('q', site ? `${input.query} site:${site}` : input.query)
     url.searchParams.set('format', 'json')
-    url.searchParams.set('engines', [...allowed].join(','))
+    url.searchParams.set('engines', selection.engines.join(','))
     // SearXNG unions explicit categories with engines; omitting categories preserves the exact allowlist.
     url.searchParams.set('language', input.language)
     url.searchParams.set('pageno', String(input.page))
@@ -261,7 +320,18 @@ export function createSearxngProvider(options: {
             try {
               throwIfAborted(signal)
               const payload: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
-              finish(undefined, parsePage(payload, allowed))
+              const page = parsePage(
+                payload,
+                new Set(selection.engines),
+                (failures, successful, diagnosticsComplete) =>
+                  health.observe(selection, failures, successful, diagnosticsComplete),
+              )
+              const skippedErrors = selection.skipped.map(
+                (engine) => `UPSTREAM_UNAVAILABLE: ${engine} (cooling_down_or_probe_in_flight)`,
+              )
+              if (page.sources.length === 0 && skippedErrors.length > 0)
+                throw upstreamFailure(skippedErrors.join(' '))
+              finish(undefined, { ...page, errors: [...page.errors, ...skippedErrors] })
             } catch (error) {
               finish(
                 error instanceof AppError
@@ -299,14 +369,48 @@ export function createSearxngProvider(options: {
   return {
     async searchPage(input, signal) {
       if (closed) throw new AppError('UPSTREAM_UNAVAILABLE', 'Search provider is closed.')
+      throwIfAborted(signal)
+      validateSearchQuery(input.query)
+      if (input.site !== undefined) resolveScope({ sites: [input.site] })
+      const selection = health.select()
       const controller = new AbortController()
-      const promise = requestPage(input, signal, controller)
+      const startedAt = performance.now()
+      endpointDiagnostic.total_requests += 1
+      const promise = requestPage(input, signal, controller, selection)
       active.set(controller, promise)
       try {
-        return await promise
+        const page = await promise
+        endpointDiagnostic.last_error = null
+        return page
+      } catch (error) {
+        endpointDiagnostic.failed_requests += 1
+        endpointDiagnostic.last_error =
+          error instanceof AppError ? error.code : 'UPSTREAM_UNAVAILABLE'
+        throw error
       } finally {
+        endpointDiagnostic.last_elapsed_ms = Math.round(performance.now() - startedAt)
+        endpointDiagnostic.last_observed_at = new Date(now()).toISOString()
+        health.release(selection)
         active.delete(controller)
       }
+    },
+    inspect() {
+      const engines = health.inspect()
+      const failed = engines.filter(
+        (engine) => engine.status === 'cooling_down' || engine.status === 'half_open',
+      ).length
+      const status = closed
+        ? 'closed'
+        : failed === engines.length
+          ? 'unavailable'
+          : failed > 0
+            ? 'degraded'
+            : endpointDiagnostic.last_error
+              ? 'unavailable'
+              : endpointDiagnostic.total_requests > 0
+                ? 'ready'
+                : 'idle'
+      return { status, endpoint: { ...endpointDiagnostic }, engines }
     },
     async close() {
       closed = true

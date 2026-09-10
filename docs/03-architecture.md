@@ -116,3 +116,9 @@ process 关停停止接收新请求，取消在途 I/O，终止并等待提取 w
 有限重试只用于可恢复错误，并计入同一总 deadline；对挑战页、明确拒绝和永久错误不循环重试。Provider 熔断后定时半开探测。所有请求受全局并发限制；调用取消要中止实际网络读取。
 
 日志写 stderr，只记录 request_id、阶段耗时、错误码、缓存状态；查询正文和含凭据/敏感 query 参数的 URL 默认脱敏。抓取内容是外部数据，不获得额外权限；不因页面提示而读取本机文件、Key 或向外发送数据。
+
+## 0.3.0 本地展示适配器与实验排序
+
+`src/tools/runtime.ts` 装配并拥有 Provider、DocumentLoader、SnapshotStore，stdio 与 `src/workbench` 共用。workbench HTTP 适配器仅处理固定静态路由、会话/同源保护和请求取消；业务输入和输出沿用原工具 Schema。前端静态文件在 ui/，不包含服务端路径或搜索凭据。
+
+搜索 Provider 的 inspect 只读取当前实例的引擎观察。冷却控制不出后台请求，不持久化成第二套业务快照；重启后的引擎状态明确为 unknown，SearXNG 自己的暂停仍有效。候选重排发生在 scope 过滤和去重后、快照冻结前，原文补抓选择最终排序后的目标项；已保存页继续按既有游标读取。详见 [ADR 0007](decisions/0007-search-quality-workbench.md)。

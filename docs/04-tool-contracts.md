@@ -70,3 +70,9 @@ document 视图的 truncated=true 表示本页结束后仍有快照内容待续�
 SDK 在已取消连接上可能不再允许发送工具结果；此时只记录请求取消终态并清理资源，不强行写响应。CANCELLED 用于仍可返回业务结果的取消路径，不把用户取消记成 TIMEOUT。
 
 例子见 `examples/`，全部为构造数据，未证明任何上游实际响应。
+
+## 可选候选排序
+
+websearch 新增 ranking_mode=upstream|bm25|bm25_mmr；省略使用部署 ranking.mode，默认 upstream。实验只重排当前已采集并过滤的标题/摘要候选，不扩大全网召回，不自动引入模型或额外查询。排序在冻结候选池与分页前完成，续读必须保持相同模式。非 upstream 模式支持最多 200 候选。
+
+实验结果附 ranking.method、score、original_rank、corpus_size、version；score 是原始 BM25 词法分数，不是概率或词法覆盖率；在 bm25_mmr 下该数值不包含多样性惩罚，因此分数不一定按最终排名单调下降。rank 表示当前排序后的名次。confidence 仍仅表示证据可追溯性。RRF 尚未接入在线搜索，因为聚合结果不提供真实独立引擎排名。

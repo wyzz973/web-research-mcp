@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q026",
+  "pool_sha256": "9e94404c2f22a5bdbe158aaf87205f190f40d77f8dcbf65f2c6379619ed8522f",
+  "assessor": {
+    "kind": "agent",
+    "id": "engine_health"
+  },
+  "judged_at": "2026-09-10T13:19:15.285Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_5ad6f2496d81a6e218ba37a6668d332102c0211c6a1b62a969dbd99d2353c1bf",
+      "grade": 2,
+      "reason": "明确解释ERR_MODULE_NOT_FOUND是ESM加载器无法解析模块文件"
+    },
+    {
+      "id": "source_d937acf0bbad0254fb13a790f4c540490ebc39322cde2dc20f66d838bad48187",
+      "grade": 1,
+      "reason": "仅错误名目录与异步API通用描述未解释原因"
+    },
+    {
+      "id": "source_2444eb86657eaf12ee4963b15dd16fd7df86630b2f8c630dc93c5a216ae58e92",
+      "grade": 1,
+      "reason": "介绍模块类型判定相关但未解释所问错误"
+    },
+    {
+      "id": "source_47dd5316289fc9efc7da0cc6b7d84f58a9d9d7799718c2ccf7660879bb8a98aa",
+      "grade": 1,
+      "reason": "旧版发布日志只提补充该错误文档"
+    },
+    {
+      "id": "source_d0f5c1f250d63dd10e856545884fc6798a45aee2d16421c575aace7432337a80",
+      "grade": 1,
+      "reason": "夜间版目录只列错误名且摘要转向断言"
+    },
+    {
+      "id": "source_50c53fed42babe64fb07730027eee65c8c2a2f74b3a2e1a08a6361c3486c2560",
+      "grade": 1,
+      "reason": "ESM基础定义相关但未涉及模块找不到处理"
+    },
+    {
+      "id": "source_f08ffb72512a409adc51daf1ca610ffaf6a1c64467b9db8c3b73193b70fa07ae",
+      "grade": 1,
+      "reason": "片段提错误码和封装路径但没有完整原因或修复说明"
+    },
+    {
+      "id": "source_c5b592c170a2cbd23167cda412da4347e143a51bff2e37bae1dbaed0197e27c2",
+      "grade": 1,
+      "reason": "片段提错误码和路径封装但未解释所问故障"
+    },
+    {
+      "id": "source_04aa1dc38c8150024e1c7c30b7433ddf6fe18da9128138ca7c545a9e5de1db53",
+      "grade": 1,
+      "reason": "旧版发布日志只提补充该错误文档"
+    },
+    {
+      "id": "source_62ead6ae36dd7e50b63d88e16af6708686377999dcb6cff7959421e7ea238b9c",
+      "grade": 1,
+      "reason": "ESM基础定义相关但未涉及模块找不到处理"
+    }
+  ]
+}

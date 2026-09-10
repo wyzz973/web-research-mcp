@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q016",
+  "pool_sha256": "fd0fef986a43f6f75f6688056c5a999126634732da573011a93cd432fe374eb1",
+  "assessor": {
+    "kind": "agent",
+    "id": "quality_ranking"
+  },
+  "judged_at": "2026-09-10T13:14:37.972Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_776b7fed02e57eb33676da7aecf1397c30509a06c82ec1b92b33d510b8289ded",
+      "grade": 2,
+      "reason": "明确搜索排名相关性控制"
+    },
+    {
+      "id": "source_f110ffbdbe7cedff232b806c20776659b1a3fc305c01137ff207bac29a3fef30",
+      "grade": 1,
+      "reason": "全文搜索章节目录"
+    },
+    {
+      "id": "source_99f7e0621a10ee51745581da13a9ffbf8ddbf1d889a1ddf32df7f4b39cf32841",
+      "grade": 1,
+      "reason": "全文搜索概述仅提到排序"
+    },
+    {
+      "id": "source_c09bc62a35b9afd4ebc15dd0efffd73ddda751b76d8dd96af102017553370202",
+      "grade": 1,
+      "reason": "搜索类型和权重邻近"
+    },
+    {
+      "id": "source_3534fd744d8330d6446c6ded04d7e62366e3878fdfce242f91a64d25da855dcd",
+      "grade": 2,
+      "reason": "讨论ts_rank排名与索引"
+    },
+    {
+      "id": "source_50a6a961c79d537cd6b12d913276dec0270226f29490890bfcd504e1f5952ad4",
+      "grade": 2,
+      "reason": "讨论多字段权重排名"
+    },
+    {
+      "id": "source_524f4ebd0581208c7f0a8d3ada482a8b5366620c5609463392d5d057debec82f",
+      "grade": 1,
+      "reason": "GIN/GiST索引非排名方法"
+    },
+    {
+      "id": "source_6b54c4b1ec252b593431e6a3a50efc202b8997605d4796fb0949605bbfc0a15e",
+      "grade": 1,
+      "reason": "搜索函数目录邻近"
+    },
+    {
+      "id": "source_587e00d0318636f8ccefc7fefa20d8534adc61536b5e4bb65b80df34f60c42c5",
+      "grade": 1,
+      "reason": "旧邮件短段提到phrase ranking但非明确完整答案"
+    },
+    {
+      "id": "source_33e037293ed971c42083e8f6645e6f102622e8ec27887472ffd3212704e1f5b4",
+      "grade": 1,
+      "reason": "扩展目录提到排名能力"
+    }
+  ]
+}

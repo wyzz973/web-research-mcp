@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q001",
+    "query": "MCP tools structuredContent",
+    "language": "en",
+    "category": "exact",
+    "sites": ["modelcontextprotocol.io"]
+  },
+  "captured_at": "2026-09-10T13:07:37.090Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 5870,
+  "response_sha256": "2d46f04d185bb63e18af441a4b72dbbc7c95bc19e72a816bd6f09557976cafaa",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_b9cb8b57df1cd6771f4bba1cbf247bebce7db79cb6ac01465126a9ed56994824",
+      "url": "https://modelcontextprotocol.io/specification/draft/server/tools",
+      "title": "Tools - Model Context Protocol",
+      "snippet": "The Model Context Protocol (MCP) allows servers to expose tools that can be invoked by language models. Tools enable models to interact with external ...User Interaction Model · Protocol Messages · Data Types",
+      "original_rank": 1
+    },
+    {
+      "id": "source_aca6492c13f6430b152368ec3487c4c0dc02757e3955d67a534d4b6a502bdd81",
+      "url": "https://modelcontextprotocol.io/specification/2025-06-18/server/tools",
+      "title": "Tools - What is the Model Context Protocol (MCP)?",
+      "snippet": "Jun 18, 2025 · Tools. Documentation · Specification ... Structured Content; Output Schema. Error Handling; Security Considerations. Server Features. Tools.",
+      "original_rank": 2
+    },
+    {
+      "id": "source_bfba858067cc3eb54024f5328320f85436a0383161243cfd513eaad8e609e836",
+      "url": "https://modelcontextprotocol.io/specification/2025-11-25/server/tools",
+      "title": "Tools - What is the Model Context Protocol (MCP)?",
+      "snippet": "Nov 25, 2025 · structuredContent is server-produced result data and is unrelated to LLM “structured outputs” (schema-constrained model generation). ​. Output ...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_e92d7b209da1412d3da3048d61142264f263db6728ca4fe5ad81bef3d576ac54",
+      "url": "https://modelcontextprotocol.io/specification/2026-07-28/schema",
+      "title": "Schema Reference - What is the Model Context Protocol (MCP)?",
+      "snippet": "Jul 28, 2026 · An optional JSON Schema object defining the structure of the tool's output returned in the structuredContent field of a CallToolResult. This ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_ce5cb1d1334010e63a4c54bccabf30bf2ed6e6e1881f8291c18cf902881a2586",
+      "url": "https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture",
+      "title": "Architecture overview - Model Context Protocol",
+      "snippet": "Jul 28, 2026 · MCP clients will use the */list methods to discover available primitives. For example, a client can first list all available tools ( tools/list ) ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_0d95fa0076f1d0ef1dd401b6f3742f9fb7e75176618d035312c79de5853800a3",
+      "url": "https://blog.modelcontextprotocol.io/posts/2026-07-28-release-candidate/",
+      "title": "The 2026-07-28 MCP Specification Release Candidate",
+      "snippet": "Jul 28, 2026 · MCP Apps (SEP-1865) lets servers ship interactive HTML interfaces that hosts render in a sandboxed iframe. Tools declare their UI templates ...",
+      "original_rank": 6
+    },
+    {
+      "id": "source_9908b1e5c59be54285dc42becb252f781b4420b828ef9b6a941dd03f9736a566",
+      "url": "https://modelcontextprotocol.io/specification/2025-06-18/schema",
+      "title": "Schema Reference - What is the Model Context Protocol (MCP)?",
+      "snippet": "Jun 18, 2025 · An optional JSON Schema object defining the structure of the tool's output returned in the structuredContent field of a CallToolResult.",
+      "original_rank": 7
+    },
+    {
+      "id": "source_7b138caa8e63ae0102ef6e0432c6cd1cc9ee539a0a57825b1c1d57aedd94af23",
+      "url": "https://modelcontextprotocol.io/specification/2025-11-25",
+      "title": "Specification - What is the Model Context Protocol (MCP)?",
+      "snippet": "Nov 25, 2025 · Model Context Protocol (MCP) is an open protocol that enables seamless integration between LLM applications and external data sources and tools.",
+      "original_rank": 8
+    },
+    {
+      "id": "source_e654443dd1fac49176eaeb7350dc2258318af6cd3d13bd641bea11e3d5792aa1",
+      "url": "https://modelcontextprotocol.io/extensions/apps/overview",
+      "title": "MCP Apps - Model Context Protocol",
+      "snippet": "​. How MCP Apps work ... Traditional MCP tools return text, images, resources or structured data that the host displays as part of the conversation. MCP Apps ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_5775c700f0d391770c15beb90ecd87bd5f7f19cdb639a0154fc70c3edf17bb04",
+      "url": "https://modelcontextprotocol.io/specification/2025-11-25/schema",
+      "title": "Schema Reference - What is the Model Context Protocol (MCP)?",
+      "snippet": "Nov 25, 2025 · An optional JSON Schema object defining the structure of the tool's output returned in the structuredContent field of a CallToolResult.",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q025",
+    "query": "SQLite FTS5 BM25",
+    "language": "zh",
+    "category": "sites",
+    "sites": ["sqlite.org"]
+  },
+  "captured_at": "2026-09-10T13:14:56.167Z",
+  "node": "v24.20.0",
+  "status": "error",
+  "elapsed_ms": 464,
+  "response_sha256": "97c9fffdafd4b57b496feb070edbbc0856fdcb5e3930e402d5e10031b6345c3a",
+  "error_code": "UPSTREAM_BLOCKED",
+  "candidates": [],
+  "evidence": {
+    "target_results": 0,
+    "verified_results": 0
+  }
+}

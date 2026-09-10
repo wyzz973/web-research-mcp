@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q014",
+  "pool_sha256": "57b6f34a12ede4b82530a69a22d2d6b7088b8fd1921995a14765c693588683c2",
+  "assessor": {
+    "kind": "agent",
+    "id": "quality_ranking"
+  },
+  "judged_at": "2026-09-10T13:14:37.972Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_c743571e9e0f1216d679e8dd4d64943169cb0085e6c2de56a1b9ea03492188a2",
+      "grade": 2,
+      "reason": "直接定义Retry-After等待时长"
+    },
+    {
+      "id": "source_887bc95757ca326489b0cbf0b323ed4fc0312227fe2c341009ecbfcb635f26bc",
+      "grade": 2,
+      "reason": "直接解释429与Retry-After"
+    },
+    {
+      "id": "source_e76a6ca57a6bd6e7c45605cb2d7762d85ba619038f62207896e8a681099a372e",
+      "grade": 1,
+      "reason": "德语对应错误说明，与英文语言请求不匹配"
+    },
+    {
+      "id": "source_2c6ab3ee752de32349673443a5cb2772312b4bcd2285f14a6e70d3dc35b7d2e0",
+      "grade": 1,
+      "reason": "俄语对应错误说明，与英文语言请求不匹配"
+    },
+    {
+      "id": "source_abc149227e7a6c15ae1dd581405a0f66655a12dc482fc7467947dc01e95c7b99",
+      "grade": 1,
+      "reason": "韩语对应错误说明，与英文语言请求不匹配"
+    },
+    {
+      "id": "source_fa4eaaea98a47bdeb8d34049d54f4c13c331e0a79d900bae9ea6f9edfeb84e6d",
+      "grade": 1,
+      "reason": "状态码总览仅邻近说明"
+    },
+    {
+      "id": "source_733d9c3e8112f2340ef67dc9dd97b0e10b97a67297e6229954e4a34ad3d3d2a7",
+      "grade": 1,
+      "reason": "503状态与Retry-After邻近，非429"
+    },
+    {
+      "id": "source_826c7770a586c40c1fb5cd11b325c51f74ff9b54a09f2029fd71d1952c879f4f",
+      "grade": 1,
+      "reason": "413状态及等待机制邻近，非429"
+    },
+    {
+      "id": "source_0c6b3c72f303c6423414a84ab238d56ae7e14826f81404845e6ea6e8e83c081e",
+      "grade": 0,
+      "reason": "409冲突不说明429或重试头"
+    },
+    {
+      "id": "source_0f3adbf71c502399cfebe03e677abf9d5736d28880f7f09f796784da30234b20",
+      "grade": 0,
+      "reason": "400请求错误不说明429或重试头"
+    }
+  ]
+}

@@ -52,3 +52,11 @@ pnpm check 汇总确定性检查；test 排除需要构建的 MCP 用例，test:
 CI 使用 Node 24.20.0 / pnpm 10.12.3，在 Linux 冻结安装后执行 pnpm check 和 pnpm test:built。实时网络单列，不把验证码或缺少网络环境标成成功。
 
 文件检查不检查外部 URL、Markdown heading anchor 或 Schema 语义；后者由 check:schemas 单独执行。所有检查范围与最新结果见 [实施验收](verification/2026-09-08-implementation.md)。
+
+## 0.3.0 增量验收
+
+`tests/workbench.spec.ts` 使用真实 loopback HTTP，校验 Host/Origin/token、请求大小与并发、浏览器断开和关停取消、实际 webfetch SSRF。Host 反例使用 node:http，不能用会改写 Host 的 fetch 假装已测 DNS 重绑定。
+
+`tests/workbench-ui.spec.ts` 使用实际 HTML/JS + jsdom，仅替换网络，覆盖文本注入、链接协议、实际 token请求头、证据续读、取消与旧请求竞态。真实布局另用浏览器测试；DOM 测试不能声明移动端已验证。
+
+`test:built` 同时验证打包后的 workbench 入口帮助、静态资源、会话注入与实际工具网络策略。CI 额外从冻结候选运行 evaluate.mjs；只复算、不出网重采样。原文精确引用另以保存的正文、SHA-256 和 Unicode 字符范围独立核对。

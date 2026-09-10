@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q010",
+  "pool_sha256": "5bc9fe81e64ee2722e2548271475552b65a5c5bbf8789d1694fe0a76ca994036",
+  "assessor": {
+    "kind": "agent",
+    "id": "root"
+  },
+  "judged_at": "2026-09-10T13:14:37.971Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_d0ec84f2d349fefbf3f3c958afe3df42c2f4eb232be4a45218e8909ce58802a1",
+      "grade": 2,
+      "reason": "9月当前构建"
+    },
+    {
+      "id": "source_4173f8e58a00abf37341eedf26a9b3ea8599a6460a2b71b4a0896d1dcd64d98f",
+      "grade": 2,
+      "reason": "9月镜像构建"
+    },
+    {
+      "id": "source_0d4dc519cdcc80c2223c1fde2589e079558542c166ddd7ddfaba7d9513a29ab3",
+      "grade": 1,
+      "reason": "issue邻近未直接提供release"
+    },
+    {
+      "id": "source_ab4945d883db162238e416704ecbbf3df528cb086f7cfd558b8a6ed7bf691a9d",
+      "grade": 0,
+      "reason": "第三方Chart版本不等于上游release"
+    },
+    {
+      "id": "source_6d0d79d4d8ad2f09c0ac32c584436c08896040283d62e57c0d49e0b1289a0216",
+      "grade": 2,
+      "reason": "9月应用打包"
+    },
+    {
+      "id": "source_83c53f607c3f3650c12e07220f659592c7029bf5f110bff487b101ec5566b364",
+      "grade": 2,
+      "reason": "rolling release更新说明"
+    },
+    {
+      "id": "source_1b57dd6edbe4c5c298fa59e4c122900a7f7325bfe335be9e3c7eb72294189e99",
+      "grade": 1,
+      "reason": "历史项目比较"
+    },
+    {
+      "id": "source_b6cf6f49b09df47f8d84b0be564a7e98d6f6fe4d1848473b7765eb0430d5ecba",
+      "grade": 1,
+      "reason": "当前实例不直接说明release"
+    },
+    {
+      "id": "source_ffddfc4b0b77a83e52ab431dc36503012778537c4a5ac9c6a929c45de4a78c3d",
+      "grade": 0,
+      "reason": "插件介绍不对应上游release"
+    },
+    {
+      "id": "source_2a4070b9f1ae38099af71926ecef7425edaba6f21e1808f808fc9fa59edaf7dc",
+      "grade": 1,
+      "reason": "个人实例9月版本旁证"
+    }
+  ]
+}

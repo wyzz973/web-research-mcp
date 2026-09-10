@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q004",
+    "query": "Python asyncio TaskGroup",
+    "language": "en",
+    "category": "exact",
+    "sites": ["docs.python.org"]
+  },
+  "captured_at": "2026-09-10T13:08:34.643Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 5389,
+  "response_sha256": "2207e1dac68978917f412e9d57c40cc7fb2cf26becd83634abfee8adeda8ee09",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_8648139190e534786d6204dff7161d395d89e1688db509a72c2f161c4389e645",
+      "url": "https://docs.python.org/3/library/asyncio-task.html",
+      "title": "Coroutines and tasks — Python 3.14.7 documentation",
+      "snippet": "asyncio.TaskGroup.create_task() is a new alternative leveraging structural concurrency; it allows for waiting for a group of related tasks with strong safety ...",
+      "original_rank": 1
+    },
+    {
+      "id": "source_9bac478c288052d84c17b10aad0e82d21ce31849826b2a93365edbe55a8f3919",
+      "url": "https://docs.python.org/3/library/asyncio-api-index.html",
+      "title": "High-level API Index — Python 3.14.7 documentation",
+      "snippet": "This page lists all high-level async/await enabled asyncio APIs. Tasks: Utilities to run asyncio programs, create Tasks, and await on multiple things with ...",
+      "original_rank": 2
+    },
+    {
+      "id": "source_eb33d36da592855b5796694f3ce252b91bcbc19ea06f926195e4f54065760e27",
+      "url": "https://docs.python.org/3/library/asyncio.html",
+      "title": "asyncio — Asynchronous I/O — Python 3.14.7 documentation",
+      "snippet": "asyncio is a library to write concurrent code using the async/await syntax. asyncio is used as a foundation for multiple Python asynchronous frameworks that ...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_69aa08a8369f6f09055fdf730c74845c7859a95a0f010bec685ca58906c9bc43",
+      "url": "https://docs.python.org/3/library/asyncio-tools.html",
+      "title": "Command-line introspection tools — Python 3.14.7 ...",
+      "snippet": "6 days ago · The asyncio module can be invoked as a script via python -m asyncio to inspect the task graph of another running Python process without ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_4893ef748ce61e9d8141d038e27e5ecf9d214644ff8b4d7f4224b1f06cb66485",
+      "url": "https://docs.python.org/3/library/asyncio-queue.html",
+      "title": "Queues — Python 3.14.7 documentation",
+      "snippet": "asyncio queues are designed to be similar to classes of the queue module. Although asyncio queues are not thread-safe, they are designed to be used specifically ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_dc7a45a9f79bd4eee598086aad87066bae2659c279032881173bee0fe566e764",
+      "url": "https://docs.python.org/3/library/asyncio-sync.html",
+      "title": "Synchronization Primitives — Python 3.14.7 documentation",
+      "snippet": "An asyncio event can be used to notify multiple asyncio tasks that some event has happened. An Event object manages an internal flag that can be set to true ...",
+      "original_rank": 6
+    },
+    {
+      "id": "source_98d46c60542f8151926c28c00ab518bd45ccbc7f355f3629a97521db8291a70a",
+      "url": "https://docs.python.org/3/library/asyncio-dev.html",
+      "title": "Developing with asyncio — Python 3.14.7 documentation",
+      "snippet": "Asynchronous programming is different from classic “sequential” programming. This page lists common mistakes and traps and explains how to avoid them.",
+      "original_rank": 7
+    },
+    {
+      "id": "source_8d5d185198b9cddde4547a348d13459a1a0af2fea0e081a7162f8a5daf7c8576",
+      "url": "https://docs.python.org/3/library/asyncio-graph.html",
+      "title": "Call graph introspection — Python 3.14.7 documentation",
+      "snippet": "To introspect an async call graph asyncio requires cooperation from control flow structures, such as shield() or TaskGroup . Any time an intermediate Future ...",
+      "original_rank": 8
+    },
+    {
+      "id": "source_d3d8ceb3dd24e4ef834915799db00197303c502b2acef0acc87ee89643d71590",
+      "url": "https://docs.python.org/3/library/asyncio-future.html",
+      "title": "Futures — Python 3.14.7 documentation",
+      "snippet": "See also the create_task() function which is the preferred way for creating new tasks or use asyncio.TaskGroup which keeps reference to the task internally.",
+      "original_rank": 9
+    },
+    {
+      "id": "source_3ecf22034d1108b04a61b6d186f850fc2ace5bb88fa0064992b5bf620eaa1da1",
+      "url": "https://docs.python.org/3/library/asyncio-threading.html",
+      "title": "asyncio and free-threaded Python — Python 3.14.7 ...",
+      "snippet": "21 hours ago · asyncio uses an event loop as a scheduler to enable highly efficient concurrency by switching between tasks to allow non-blocking I/O operations ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

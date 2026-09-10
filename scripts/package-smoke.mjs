@@ -55,6 +55,51 @@ try {
     throw new Error('Package contains development or runtime state.')
   const args = [path.join(installed, 'dist', 'mcp', 'stdio.js')]
   await command(process.execPath, [...args, '--help'], consumer)
+  await command(
+    process.execPath,
+    [path.join(installed, 'dist/workbench/main.js'), '--help'],
+    consumer,
+  )
+  const { startWorkbench } = await import(
+    pathToFileURL(path.join(installed, 'dist/workbench/server.js')).href
+  )
+  const { loadConfiguration } = await import(
+    pathToFileURL(path.join(installed, 'dist/shared/config.js')).href
+  )
+  const { createResearchRuntime } = await import(
+    pathToFileURL(path.join(installed, 'dist/tools/runtime.js')).href
+  )
+  const runtime = createResearchRuntime(
+    loadConfiguration(undefined, { WEB_RESEARCH_DATA_DIR: path.join(temp, 'ui-data') }),
+  )
+  let workbench
+  try {
+    workbench = await startWorkbench({
+      port: 0,
+      uiDirectory: pathToFileURL(path.join(installed, 'ui') + path.sep),
+      websearch: runtime.websearch,
+      webfetch: runtime.webfetch,
+      status: () => ({ search_configured: false, engines: [] }),
+      evaluation: async () => ({ available: false }),
+    })
+    const html = await (await fetch(workbench.url)).text()
+    const token = html.match(/name="workbench-token" content="([a-f0-9]+)"/u)?.[1]
+    if (!token || !html.includes('Research Desk')) throw new Error('Installed UI bootstrap failed')
+    const headers = { 'x-workbench-token': token, 'content-type': 'application/json' }
+    const checked = await fetch(workbench.url + '/api/fetch', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ url: 'http://127.0.0.1/' }),
+    })
+    if ((await checked.json()).error?.code !== 'FETCH_BLOCKED')
+      throw new Error('Installed UI policy failed')
+    if ((await fetch(workbench.url + '/app.js')).status !== 200)
+      throw new Error('Installed UI assets missing')
+  } finally {
+    await workbench?.close()
+    await runtime.close()
+  }
+
   client = new Client({ name: 'packed-consumer', version: '0.1.0' })
   const transport = new StdioClientTransport({
     command: process.execPath,
@@ -93,7 +138,7 @@ try {
   if (!extracted.text.includes('original readable evidence'))
     throw new Error('Installed worker failed to extract the document.')
   process.stderr.write(
-    'PASS: clean packed install, native SQLite, installed MCP bin, schemas and worker artifact.\n',
+    'PASS: clean packed install, native SQLite, installed MCP bin, protected workbench/assets, schemas and worker artifact.\n',
   )
 } finally {
   await client?.close()

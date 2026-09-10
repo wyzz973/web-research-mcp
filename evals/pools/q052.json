@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q052",
+    "query": "Unicode normalization NFKC",
+    "language": "en",
+    "category": "exact",
+    "sites": ["unicode.org"]
+  },
+  "captured_at": "2026-09-10T13:23:28.346Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 5626,
+  "response_sha256": "a97d3bc05e5554e4144bd7262f608db8e8bf10dc663dfb7f868ace0c09b0b744",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_58094cb2c63a37fd9edd552d51651d501a28b410b81c8adf952e49d592a1332e",
+      "url": "https://unicode.org/reports/tr15/",
+      "title": "UAX #15: Unicode Normalization Forms",
+      "snippet": "Jul 30, 2025 · For normalization forms NFC and NFKC, which normalize Unicode strings to Composed forms, where possible, the basic process is first to fully ...Introduction · Notation · Stability Prior to Unicode 4.1",
+      "original_rank": 1
+    },
+    {
+      "id": "source_7dc9b78205dbbed88bae0532cd55020c1fdfdfcbfb1484921e1bd378643409f3",
+      "url": "https://www.unicode.org/standard/reports/tr15/tr15-21.html",
+      "title": "UAX #15: Unicode Normalization",
+      "snippet": "The Normalization Charts [Charts] provide also charts of all the characters in Unicode that normalization forms (NFC, NFD, NFKC, NFKD).",
+      "original_rank": 2
+    },
+    {
+      "id": "source_b21af5eafee24f510b945bda5d46ad51dcedc13890fe3fd1781f4480f8529576",
+      "url": "https://www.unicode.org/versions/corrigendum5.html",
+      "title": "Corrigendum #5: Normalization Idempotency - Unicode",
+      "snippet": "Unicode Normalization Forms (citing Version 4.0) for forms NFC and NFKC is not logically self-consistent in The Unicode Standard, Versions 3.0 through 4.0.1.",
+      "original_rank": 3
+    },
+    {
+      "id": "source_bcb663585b3e6d79ed8b2a2b3292acd96ba06f0c51c377743935bda2f3a99fdd",
+      "url": "https://icu.unicode.org/design/normalization/custom",
+      "title": "Custom Normalization (moved)",
+      "snippet": "Sometimes, normalization is part of a specification that also includes a mapping step and a validation step. For example, NFKC may be combined with case folding ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_8e6a9d22e5232b40955421ce500a091410eeb5691dc3cbcecf56b652b912b36a",
+      "url": "http://www.unicode.org/review/pr-29.html",
+      "title": "Normalization Issue - Unicode",
+      "snippet": "Feb 11, 2004 · The process of forming a composition in Normalization Form NFC (or NFKC) involves: decomposing the string according to the canonical (or ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_ed4066be09417dd3495094338225a429346061f53e7206d401568104562665bb",
+      "url": "https://unicode.org/mail-arch/unicode-ml/y2009-m09/0084.html",
+      "title": "Re: NFC/NFKC Normalization Edge Case - Unicode Mail List Archive",
+      "snippet": "Re: NFC/NFKC Normalization Edge Case. From: Jeff Senn (senn@maya.com) Date: Tue Sep 29 2009 - 11:45:19 CDT. Next message: announcements@unicode.org: ...",
+      "original_rank": 6
+    },
+    {
+      "id": "source_86a8000edd053e909c95c1188cdea6b0e8db09a9888ce3330ae1c69d1d8b66a2",
+      "url": "https://www.unicode.org/L2/L2009/09137-pri145-uax15-30.pdf",
+      "title": "[PDF] UNICODE NORMALIZATION FORMS L2/09-137",
+      "snippet": "Mar 19, 2009 · The specification of NKC and NFKC depends on the definitions of canonical decomposition and compatibility decompositions, as specified in ...",
+      "original_rank": 7
+    },
+    {
+      "id": "source_54b493e51c1c0fc7166fe4e4f36a5c11bcfc35e78c396401cc406d9c822e0933",
+      "url": "https://www.unicode.org/versions/corrigendum2.html",
+      "title": "Corrigendum #2: Yod with Hiriq Normalization - Unicode",
+      "snippet": "Text containing this character that is in normalization form NFKC or NFC as defined in Unicode 3.0 is no longer in that normalization form after the application ...",
+      "original_rank": 8
+    },
+    {
+      "id": "source_aa5d57b18d3bdb81c3b666ef71efb27a3d35cf347ab3359bd15dea91ffd47cc2",
+      "url": "https://www.unicode.org/reports/tr31/tr31-11.html",
+      "title": "UAX #31: Unicode Identifier and Pattern Syntax",
+      "snippet": "If the Normalization Form is NFKC, the implementation shall apply the modifications in Section 5.1, NFKC Modifications, given by the properties XID_Start and ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_7e2ca3a267fe2cbd1d09e462b61dceec65faba5d70e63c7107e1d9fdc0d53c6f",
+      "url": "https://www.unicode.org/versions/corrigendum4.html",
+      "title": "Corrigendum #4: Five CJK Canonical Mapping Errors - Unicode",
+      "snippet": "Text that is in any of the normalization forms (NFD, NFC, NFKD, NFKC) as defined in Unicode 3.2.0 is still in that same normalization form after the application ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

@@ -9,3 +9,5 @@ schemas 的成功/失败约束与 examples 应保持一致。运行实现前不�
 webfetch.first-page.output.json 与 webfetch.last-page.output.json 表示同一构造快照的两页；末页虽然只含后半段，仍为 truncated=false。两页共用完整快照的内容哈希，拼接可复核完整文本，偏移单位为 Unicode code points。
 
 webfetch.more-evidence.input.json 与 webfetch.evidence-page.output.json 演示更多相关段落；source_metadata 含构造的网页声明与分字段来源，图片未下载。
+
+`websearch.ranked.input.json` 展示可选 BM25+MMR 候选重排与限定域证据提取；默认仍为上游顺序。

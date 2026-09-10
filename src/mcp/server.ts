@@ -50,7 +50,7 @@ function response(name: string, value: WebSearchOutput | WebFetchOutput) {
 }
 
 export function createMcpServer(handlers: ToolHandlers, lifetime: AbortSignal): McpServer {
-  const server = new McpServer({ name: 'web-research-mcp', version: '0.2.1' })
+  const server = new McpServer({ name: 'web-research-mcp', version: '0.3.0' })
   const annotations = {
     readOnlyHint: true,
     destructiveHint: false,
@@ -62,7 +62,7 @@ export function createMcpServer(handlers: ToolHandlers, lifetime: AbortSignal): 
     {
       title: 'Search public web sources',
       description:
-        'Search free keyless sources. Use sites/exclude_domains for strict domain filtering. evidence_mode=extract reads a bounded number of results and returns paragraph-level excerpts, source_metadata for display, and snapshot cursors. Use next_evidence_cursor with webfetch to read more related evidence. Relevance is lexical matching; confidence describes traceability, not truth. Search cursors read frozen candidates; repeat the same query/options.',
+        'Search free keyless sources. Use sites/exclude_domains for strict domain filtering. evidence_mode=extract reads a bounded number of results and returns paragraph-level excerpts, source_metadata for display, and snapshot cursors. Use next_evidence_cursor with webfetch to read more related evidence. Relevance is lexical matching; confidence describes traceability, not truth. ranking_mode optionally reranks the frozen title/snippet pool with bm25 or bm25_mmr; default upstream order is preserved. Ranking scores are not probabilities. Search cursors read frozen candidates; repeat the same query/options.',
       inputSchema: schema<WebSearchInput>('websearch.input'),
       outputSchema: schema<WebSearchOutput>('websearch.output'),
       annotations,

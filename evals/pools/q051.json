@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q051",
+    "query": "RAG 引用证据 可追溯性",
+    "language": "zh",
+    "category": "concept",
+    "sites": []
+  },
+  "captured_at": "2026-09-10T13:23:11.981Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 1362,
+  "response_sha256": "81b469058ee1dfe6f1a0a3c8358c27790ef87dbc0a0f51525b6cdf518c8baacf",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_e99e14d1c977cd3b7247ef074fa36ecc8e1cd04b05f170ef441c8339e1dcf315",
+      "url": "https://zhuanlan.zhihu.com/p/2051650757963912545",
+      "title": "RAG 的引用与归因怎么做：让答案里的每一句关键结论都有可 ...",
+      "snippet": "2026年8月23日 · RAG 的引用与归因怎么做：让答案里的每一句关键结论都有可追溯证据. 2 个 ... 摘要句引用原文证据，而不是引用摘要中间产物；; 如果必须引用中间 ...",
+      "original_rank": 1
+    },
+    {
+      "id": "source_240eeb038f0611b93f87c7dd61510d1276e9bf88be2bd53230971a82f195c3bd",
+      "url": "https://www.ibm.com/cn-zh/new/product-blog/production-rag-for-legal-search-how-shorthills-ai-scaled-data-retrieval-with-ibm-watsonx-data",
+      "title": "面向法律检索的生产级RAG 系统：Shorthills AI 如何借助IBM ...",
+      "snippet": "2026年1月28日 · 该框架为法律行业提供AI 驱动的洞察，既追求原始速度，也注重相关性、完整性与可追溯来源。 通过在构建RAG 系统时使用Astra DB on IBM watsonx.data 作为 ...",
+      "original_rank": 2
+    },
+    {
+      "id": "source_78292f7e0c9387fbcdef69f523ac2e1c2160bb18acd66935dcafa5b49850a6d4",
+      "url": "https://www.bohrium.com/sciencepedia/agent-tools/madarco_ragrabbit",
+      "title": "RagRabbit : Infrastructure for AI for Science | SciencePedia",
+      "snippet": "更新. RAG与证据链（文献/引用 ... 通过将AI 生成的响应根植于具体、可检索的数据，该工具显著减少了AI 幻觉问题，并为知情决策提供了关键的“证据链”或“引用可追溯性”。",
+      "original_rank": 3
+    },
+    {
+      "id": "source_84255032dbcc4244af70d559d4d9d5abdf48f5b808fdea8310246a9040af1048",
+      "url": "https://patents.google.com/patent/CN121958631A/zh",
+      "title": "基于知识图谱与RAG的多Word文档问答方法及系统",
+      "snippet": "... 证据覆盖度；最后，问答处理组件以最终证据集合为上下文驱动大模型生成回答并输出问答结果，从而在受控证据约束下提高回答准确性与可追溯性，完成多Word文档问答流程。",
+      "original_rank": 4
+    },
+    {
+      "id": "source_9f3b4afcad27c2879db3a3d7d505396e065255dd28c90aae9a1b25dfa96a5ef0",
+      "url": "https://github.com/Snailclimb/JavaGuide/blob/main/docs/ai/rag/rag-basis.md",
+      "title": "JavaGuide/docs/ai/rag/rag-basis.md at main - GitHub",
+      "snippet": "... RAG 提供实时知识和可追溯证据。这类组合在客服、法律、医疗、金融投研等场景里很常见。 面试时可以这样收尾：知识变动频繁、需要引用来源，优先RAG；输出风格和任务 ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_56dd6d697fc2b7c56c5e34a288fb11a2cb387bd591ddca764ae4ce5541e2bdb7",
+      "url": "https://blog.csdn.net/u013524655/article/details/152443978",
+      "title": "从证据到决策：FinDebate 如何用协同辩论+ 领域RAG 重塑财务 ...",
+      "snippet": "2025年10月3日 · ... RAG技术与安全辩论协议， ... 这些缺口催生了一种新的解决方案—— 需同时实现观点稳定、扩大证据覆盖范围、明确风险表述，并保留引用可追溯性。",
+      "original_rank": 6
+    },
+    {
+      "id": "source_c0a9eea7b2be0e4799416a79ead192b237f5ab63a473388e403fcc592ff50356",
+      "url": "https://wavect.io/zh/blog/rag-production-readiness-checklist-eu/",
+      "title": "面向欧盟企业的RAG 生产就绪清单 - Wavect",
+      "snippet": "2026年9月2日 · 在适当场景提供可追溯证据。事实性回答应返回所用段落和文档版本。引用有助于核查，但不能证明来源确实支持生成的断言。 它会胡编吗？ 检索并不能消除 ...",
+      "original_rank": 7
+    },
+    {
+      "id": "source_4e305187c3efb6636ec49891c58fc6237a3ae48639983576516f7408e94d973c",
+      "url": "https://developer.cloud.tencent.com/article/2719466?from=15425&policyId=undefined&frompage=seopage",
+      "title": "长上下文模型来了，RAG 还要不要做？从成本、延迟和可验证性重新 ...",
+      "snippet": "第三层是证据片段：最终答案必须引用的原文段落、配置项、错误日志、代码行。这部分不一定多，但必须可追溯。 一个典型请求可以 ...",
+      "original_rank": 8
+    },
+    {
+      "id": "source_058da4e57739bfa69820800947976c2b5c74c7fbfc5ec56a658d196cef9c3deb",
+      "url": "https://www.cnblogs.com/javaguide/p/19829574",
+      "title": "万字详解RAG 基础概念：什么是RAG？ 为什么需要？工作原理 ...",
+      "snippet": "2026年4月7日 · 显著降低幻觉并提供引文追溯： RAG 将模型从“基于参数化记忆生成”转变为“基于检索证据生成”。每个回答都有明确的信息来源，提供了关键的可解释性和可验证 ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_ea7e1d2e3ba3803c6096a94e0a378bcb408cc4009f977bf100e5ebda86f8a317",
+      "url": "https://www.phppan.com/2026/02/five-commonly-used-strategies-for-rag-optimization/",
+      "title": "RAG 优化常用的5 种策略 - 潘锦的空间",
+      "snippet": "2026年2月1日 · 切分粒度为「可引用证据」服务能够被引用、被追溯、被定位的最小单元 ... 尤其建议把「无答案率」和「引用可追溯性」拉出来单独看，它们最能反映 ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 0
+  }
+}

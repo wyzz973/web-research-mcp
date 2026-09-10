@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q051",
+  "pool_sha256": "e0731f529187765dcacfc1bea88bb972a7406c30d6e7ee44525e3f6b132fd769",
+  "assessor": {
+    "kind": "agent",
+    "id": "quality_ranking"
+  },
+  "judged_at": "2026-09-10T13:24:44.589Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_e99e14d1c977cd3b7247ef074fa36ecc8e1cd04b05f170ef441c8339e1dcf315",
+      "grade": 2,
+      "reason": "明确关键结论关联原文可追溯证据"
+    },
+    {
+      "id": "source_240eeb038f0611b93f87c7dd61510d1276e9bf88be2bd53230971a82f195c3bd",
+      "grade": 1,
+      "reason": "行业RAG案例仅提可追溯来源"
+    },
+    {
+      "id": "source_78292f7e0c9387fbcdef69f523ac2e1c2160bb18acd66935dcafa5b49850a6d4",
+      "grade": 2,
+      "reason": "明确证据链与引用可追溯性"
+    },
+    {
+      "id": "source_84255032dbcc4244af70d559d4d9d5abdf48f5b808fdea8310246a9040af1048",
+      "grade": 1,
+      "reason": "知识图谱问答证据约束，引用机制未展示"
+    },
+    {
+      "id": "source_9f3b4afcad27c2879db3a3d7d505396e065255dd28c90aae9a1b25dfa96a5ef0",
+      "grade": 1,
+      "reason": "RAG概述仅提可追溯证据"
+    },
+    {
+      "id": "source_56dd6d697fc2b7c56c5e34a288fb11a2cb387bd591ddca764ae4ce5541e2bdb7",
+      "grade": 1,
+      "reason": "财务RAG目标提引用但未说明机制"
+    },
+    {
+      "id": "source_c0a9eea7b2be0e4799416a79ead192b237f5ab63a473388e403fcc592ff50356",
+      "grade": 2,
+      "reason": "明确原段落文档版本与引用核验边界"
+    },
+    {
+      "id": "source_4e305187c3efb6636ec49891c58fc6237a3ae48639983576516f7408e94d973c",
+      "grade": 2,
+      "reason": "明确原文证据片段必须可追溯"
+    },
+    {
+      "id": "source_058da4e57739bfa69820800947976c2b5c74c7fbfc5ec56a658d196cef9c3deb",
+      "grade": 2,
+      "reason": "明确基于检索证据并提供引文追溯"
+    },
+    {
+      "id": "source_ea7e1d2e3ba3803c6096a94e0a378bcb408cc4009f977bf100e5ebda86f8a317",
+      "grade": 2,
+      "reason": "明确最小可引用可定位单元和评估指标"
+    }
+  ]
+}

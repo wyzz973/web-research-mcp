@@ -33,4 +33,8 @@ export type WebSearchInput = {
    * Only valid with evidence_mode=extract; bounded by deployment limits and returned results.
    */
   max_evidence_results?: number
+  /**
+   * Optional candidate reranking over the frozen title/snippet pool. Default uses deployment ranking.mode (upstream by default); repeat the same mode for cursor reads. Scores are not truth probabilities.
+   */
+  ranking_mode?: 'upstream' | 'bm25' | 'bm25_mmr'
 }

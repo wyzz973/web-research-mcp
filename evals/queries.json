@@ -1,0 +1,399 @@
+{
+  "version": 1,
+  "created_at": "2026-09-10",
+  "purpose": "Seed queries; presence does not imply live execution or relevance judgments.",
+  "queries": [
+    {
+      "id": "q001",
+      "query": "MCP tools structuredContent",
+      "language": "en",
+      "category": "exact",
+      "sites": ["modelcontextprotocol.io"]
+    },
+    {
+      "id": "q002",
+      "query": "SQLite SQLITE_BUSY error",
+      "language": "en",
+      "category": "error",
+      "sites": ["sqlite.org"]
+    },
+    {
+      "id": "q003",
+      "query": "向量数据库",
+      "language": "zh",
+      "category": "short",
+      "sites": []
+    },
+    {
+      "id": "q004",
+      "query": "Python asyncio TaskGroup",
+      "language": "en",
+      "category": "exact",
+      "sites": ["docs.python.org"]
+    },
+    {
+      "id": "q005",
+      "query": "倒排索引 原理",
+      "language": "zh",
+      "category": "concept",
+      "sites": []
+    },
+    {
+      "id": "q006",
+      "query": "Node.js 24 permission model",
+      "language": "en",
+      "category": "version",
+      "sites": ["nodejs.org"]
+    },
+    {
+      "id": "q007",
+      "query": "Python ModuleNotFoundError 解决",
+      "language": "zh",
+      "category": "error",
+      "sites": []
+    },
+    {
+      "id": "q008",
+      "query": "SQLite WAL versus rollback journal",
+      "language": "en",
+      "category": "comparison",
+      "sites": ["sqlite.org"]
+    },
+    {
+      "id": "q009",
+      "query": "SearXNG 搜索引擎 配置",
+      "language": "zh",
+      "category": "sites",
+      "sites": ["docs.searxng.org"]
+    },
+    {
+      "id": "q010",
+      "query": "SearXNG latest release September 2026",
+      "language": "en",
+      "category": "freshness",
+      "sites": []
+    },
+    {
+      "id": "q011",
+      "query": "MCP structuredContent 返回格式",
+      "language": "zh",
+      "category": "exact",
+      "sites": ["modelcontextprotocol.io"]
+    },
+    {
+      "id": "q012",
+      "query": "BM25 ranking formula inverse document frequency",
+      "language": "en",
+      "category": "concept",
+      "sites": []
+    },
+    {
+      "id": "q013",
+      "query": "重排序",
+      "language": "zh",
+      "category": "short",
+      "sites": []
+    },
+    {
+      "id": "q014",
+      "query": "HTTP 429 Retry-After",
+      "language": "en",
+      "category": "error",
+      "sites": ["developer.mozilla.org"]
+    },
+    {
+      "id": "q015",
+      "query": "Python 3.13 自由线程",
+      "language": "zh",
+      "category": "version",
+      "sites": ["docs.python.org"]
+    },
+    {
+      "id": "q016",
+      "query": "PostgreSQL full text search ranking",
+      "language": "en",
+      "category": "sites",
+      "sites": ["postgresql.org"]
+    },
+    {
+      "id": "q017",
+      "query": "BM25 与 向量检索 区别",
+      "language": "zh",
+      "category": "comparison",
+      "sites": []
+    },
+    {
+      "id": "q018",
+      "query": "AbortSignal timeout any",
+      "language": "en",
+      "category": "exact",
+      "sites": ["developer.mozilla.org"]
+    },
+    {
+      "id": "q019",
+      "query": "TypeScript TS2322 类型错误",
+      "language": "zh",
+      "category": "error",
+      "sites": []
+    },
+    {
+      "id": "q020",
+      "query": "reciprocal rank fusion",
+      "language": "en",
+      "category": "short",
+      "sites": []
+    },
+    {
+      "id": "q021",
+      "query": "Node.js 最新 LTS 版本 2026",
+      "language": "zh",
+      "category": "freshness",
+      "sites": ["nodejs.org"]
+    },
+    {
+      "id": "q022",
+      "query": "Python 3.12 asyncio eager task factory",
+      "language": "en",
+      "category": "version",
+      "sites": ["docs.python.org"]
+    },
+    {
+      "id": "q023",
+      "query": "最大边际相关性 MMR 算法",
+      "language": "zh",
+      "category": "concept",
+      "sites": []
+    },
+    {
+      "id": "q024",
+      "query": "HTTP cache ETag versus Last-Modified",
+      "language": "en",
+      "category": "comparison",
+      "sites": ["developer.mozilla.org"]
+    },
+    {
+      "id": "q025",
+      "query": "SQLite FTS5 BM25",
+      "language": "zh",
+      "category": "sites",
+      "sites": ["sqlite.org"]
+    },
+    {
+      "id": "q026",
+      "query": "ERR_MODULE_NOT_FOUND Node.js",
+      "language": "en",
+      "category": "error",
+      "sites": ["nodejs.org"]
+    },
+    {
+      "id": "q027",
+      "query": "倒排索引",
+      "language": "zh",
+      "category": "short",
+      "sites": []
+    },
+    {
+      "id": "q028",
+      "query": "nDCG information retrieval evaluation",
+      "language": "en",
+      "category": "concept",
+      "sites": []
+    },
+    {
+      "id": "q029",
+      "query": "Intl.Segmenter 中文 分词",
+      "language": "zh",
+      "category": "exact",
+      "sites": ["developer.mozilla.org"]
+    },
+    {
+      "id": "q030",
+      "query": "Python current stable release September 2026",
+      "language": "en",
+      "category": "freshness",
+      "sites": ["python.org"]
+    },
+    {
+      "id": "q031",
+      "query": "SearXNG 与 自建爬虫 区别",
+      "language": "zh",
+      "category": "comparison",
+      "sites": []
+    },
+    {
+      "id": "q032",
+      "query": "robots.txt RFC 9309",
+      "language": "en",
+      "category": "sites",
+      "sites": ["rfc-editor.org"]
+    },
+    {
+      "id": "q033",
+      "query": "ECONNRESET 连接重置 Node.js",
+      "language": "zh",
+      "category": "error",
+      "sites": []
+    },
+    {
+      "id": "q034",
+      "query": "TypeScript 6.0 release notes",
+      "language": "en",
+      "category": "version",
+      "sites": ["typescriptlang.org"]
+    },
+    {
+      "id": "q035",
+      "query": "搜索召回率 精确率 区别",
+      "language": "zh",
+      "category": "concept",
+      "sites": []
+    },
+    {
+      "id": "q036",
+      "query": "MCP tool annotations readOnlyHint",
+      "language": "en",
+      "category": "exact",
+      "sites": ["modelcontextprotocol.io"]
+    },
+    {
+      "id": "q037",
+      "query": "Python asyncio 超时",
+      "language": "zh",
+      "category": "sites",
+      "sites": ["docs.python.org"]
+    },
+    {
+      "id": "q038",
+      "query": "hybrid search",
+      "language": "en",
+      "category": "short",
+      "sites": []
+    },
+    {
+      "id": "q039",
+      "query": "SQLite 3.45 JSONB",
+      "language": "zh",
+      "category": "version",
+      "sites": ["sqlite.org"]
+    },
+    {
+      "id": "q040",
+      "query": "precision recall MRR nDCG retrieval",
+      "language": "en",
+      "category": "comparison",
+      "sites": []
+    },
+    {
+      "id": "q041",
+      "query": "SearXNG 最近 更新 2026",
+      "language": "zh",
+      "category": "freshness",
+      "sites": []
+    },
+    {
+      "id": "q042",
+      "query": "SQLITE_CORRUPT database disk image malformed",
+      "language": "en",
+      "category": "error",
+      "sites": ["sqlite.org"]
+    },
+    {
+      "id": "q043",
+      "query": "Web Streams ReadableStream cancel",
+      "language": "zh",
+      "category": "exact",
+      "sites": ["developer.mozilla.org"]
+    },
+    {
+      "id": "q044",
+      "query": "DNS rebinding SSRF prevention",
+      "language": "en",
+      "category": "concept",
+      "sites": []
+    },
+    {
+      "id": "q045",
+      "query": "知识蒸馏",
+      "language": "zh",
+      "category": "short",
+      "sites": []
+    },
+    {
+      "id": "q046",
+      "query": "SearXNG search API JSON format",
+      "language": "en",
+      "category": "sites",
+      "sites": ["docs.searxng.org"]
+    },
+    {
+      "id": "q047",
+      "query": "关键词检索 与 语义检索 适用场景",
+      "language": "zh",
+      "category": "comparison",
+      "sites": []
+    },
+    {
+      "id": "q048",
+      "query": "Node.js 24 worker threads resourceLimits",
+      "language": "en",
+      "category": "version",
+      "sites": ["nodejs.org"]
+    },
+    {
+      "id": "q049",
+      "query": "HTTP 503 Retry-After 处理",
+      "language": "zh",
+      "category": "error",
+      "sites": ["developer.mozilla.org"]
+    },
+    {
+      "id": "q050",
+      "query": "Model Context Protocol latest specification 2026",
+      "language": "en",
+      "category": "freshness",
+      "sites": ["modelcontextprotocol.io"]
+    },
+    {
+      "id": "q051",
+      "query": "RAG 引用证据 可追溯性",
+      "language": "zh",
+      "category": "concept",
+      "sites": []
+    },
+    {
+      "id": "q052",
+      "query": "Unicode normalization NFKC",
+      "language": "en",
+      "category": "exact",
+      "sites": ["unicode.org"]
+    },
+    {
+      "id": "q053",
+      "query": "PostgreSQL pg_trgm 相似度",
+      "language": "zh",
+      "category": "sites",
+      "sites": ["postgresql.org"]
+    },
+    {
+      "id": "q054",
+      "query": "document deduplication",
+      "language": "en",
+      "category": "short",
+      "sites": []
+    },
+    {
+      "id": "q055",
+      "query": "Python 3.12 typing override",
+      "language": "zh",
+      "category": "version",
+      "sites": ["docs.python.org"]
+    },
+    {
+      "id": "q056",
+      "query": "BM25 versus TF IDF retrieval",
+      "language": "en",
+      "category": "comparison",
+      "sites": []
+    }
+  ]
+}

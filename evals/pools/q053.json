@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q053",
+    "query": "PostgreSQL pg_trgm 相似度",
+    "language": "zh",
+    "category": "sites",
+    "sites": ["postgresql.org"]
+  },
+  "captured_at": "2026-09-10T13:23:48.973Z",
+  "node": "v24.20.0",
+  "status": "error",
+  "elapsed_ms": 442,
+  "response_sha256": "68dc6653de48ad71d0c7889581fce96dd9f8babae628db64073f5918ae490306",
+  "error_code": "UPSTREAM_BLOCKED",
+  "candidates": [],
+  "evidence": {
+    "target_results": 0,
+    "verified_results": 0
+  }
+}

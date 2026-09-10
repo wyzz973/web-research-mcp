@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q017",
+  "pool_sha256": "18884439703044c7eae5b0ab2215674c63050e3ebcc55347b1ca8dfa8a7dd828",
+  "assessor": {
+    "kind": "agent",
+    "id": "quality_ranking"
+  },
+  "judged_at": "2026-09-10T13:14:37.973Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_4f5746df76939052169085d13a8a6928915f9ee73946b1ee9b79b058a98654f5",
+      "grade": 2,
+      "reason": "直接对比BM25和向量检索"
+    },
+    {
+      "id": "source_a48018ebaa4b0ba844cddfac5fb930e273714e0752f55f1f852ad07109555ac1",
+      "grade": 2,
+      "reason": "讨论混合与纯向量差异"
+    },
+    {
+      "id": "source_31ec6a7216c8a256c1aa1bedbdd3a07962d1bffcb6fa6803ddfa9d01d599a0ec",
+      "grade": 2,
+      "reason": "稀疏稠密BM25对比"
+    },
+    {
+      "id": "source_3f9a62195761f6e8e5ee2ec2340ad56c0442deb03c261f203437e5146dd317bd",
+      "grade": 1,
+      "reason": "混合检索实现未直接比较区别"
+    },
+    {
+      "id": "source_641237f84eb9013207f4a55621a7685ecaadca64a61cb47dba36672d966cc1ca",
+      "grade": 1,
+      "reason": "仅BM25原理单项"
+    },
+    {
+      "id": "source_d4f50c613aae82b398d7f71303ba8b91f63de8f65d5289745d02e081aadb3058",
+      "grade": 1,
+      "reason": "仅BM25定义单项"
+    },
+    {
+      "id": "source_78280dff2e162692b433c37c59d88162c31701a18b82c60397200f5b14f24926",
+      "grade": 2,
+      "reason": "明确稀疏稠密的本质区别"
+    },
+    {
+      "id": "source_8a1554e4db056710ffd51f7d5542df9cd6007d20a3293f2fd7c9ad42ee0fff18",
+      "grade": 1,
+      "reason": "实现示例仅解释BM25"
+    },
+    {
+      "id": "source_c77f841621c8bb5cca45baab69894b4a7be7beed17542dcc71eb4d809d16c817",
+      "grade": 1,
+      "reason": "混合搜索实现邻近"
+    },
+    {
+      "id": "source_3d7f19e240a5b9744dd90f24430a9e4c6b34886d0ca65bd9f9f1d202946e2e52",
+      "grade": 2,
+      "reason": "直接对比关键词与语义检索差异"
+    }
+  ]
+}

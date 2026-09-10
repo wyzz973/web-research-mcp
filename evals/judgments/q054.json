@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q054",
+  "pool_sha256": "29283ba34cb9a7626635c2dde5a4c5e42d7893f747ac9b6eab91b5e84b8fb4db",
+  "assessor": {
+    "kind": "agent",
+    "id": "quality_ranking"
+  },
+  "judged_at": "2026-09-10T13:25:56.319Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_c64d723fcd870f9d85faa2f316cb23d5283dbb573f185655e4977bdbaf87b612",
+      "grade": 2,
+      "reason": "直接定义文档精确及近重复去重"
+    },
+    {
+      "id": "source_260c02529d56dc6b624b388e6952ca83a78cbff04c5ab9e8ffb481edd257021a",
+      "grade": 1,
+      "reason": "存储数据去重单项，未讨论文档级方法"
+    },
+    {
+      "id": "source_8724fd463b74793fc9426b11b682f275924a943ea940ca696207f9e34fca71d7",
+      "grade": 1,
+      "reason": "一般文件数据去重背景"
+    },
+    {
+      "id": "source_e05c2d8eb359a5eddc9680dced0191bf3436a5183b0725351444bdf3565541ff",
+      "grade": 2,
+      "reason": "直接讨论文档哈希精确与近重复"
+    },
+    {
+      "id": "source_008a1bd1ace5a50d7c610a567e56137c4f97d47c4444bc5916cacdc69e33da8a",
+      "grade": 2,
+      "reason": "按文件内容元数据去重及邮件文档"
+    },
+    {
+      "id": "source_523dcc92bcba79a093fe2490fa5b0e6eeb818890820a1e9f090dab332b2b44e4",
+      "grade": 2,
+      "reason": "直接定义同一文档副本去除"
+    },
+    {
+      "id": "source_1b44fdb58b7dd76d76f7e5e2ca3a40a14c097898252b96b2eff0780ef9d4ff46",
+      "grade": 2,
+      "reason": "直接定义文档集去重及eDiscovery"
+    },
+    {
+      "id": "source_827f6b577ad4847b190df27729fe2956ba466fdae5a58d6343161827cc6cadd1",
+      "grade": 1,
+      "reason": "上传操作去重主题但未明确文档判定"
+    },
+    {
+      "id": "source_aa647208eadb5e6e07d40278a4c9126dbda7b5a157252eb0d93d91dafb29d7b2",
+      "grade": 1,
+      "reason": "文件系统链接去重，非文档语义"
+    },
+    {
+      "id": "source_4a131e7b6831e09787ef4bb86ea7b65f951b32c97ab35511a32b35aa900e093f",
+      "grade": 1,
+      "reason": "数据点去重背景，未讨论文档方法"
+    }
+  ]
+}

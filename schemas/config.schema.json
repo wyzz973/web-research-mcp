@@ -253,7 +253,7 @@
       ],
       "properties": {
         "mode": {
-          "const": "upstream"
+          "enum": ["upstream", "bm25", "bm25_mmr"]
         },
         "rrf_enabled": {
           "const": false

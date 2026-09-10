@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q044",
+  "pool_sha256": "e44bd0b03d3714eefe0366c14270edadbf86521f1f631d5e08a1a351c393199c",
+  "assessor": {
+    "kind": "agent",
+    "id": "quality_ranking"
+  },
+  "judged_at": "2026-09-10T13:22:54.014Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_5296c69ce1c12e0aeada6e82e7e11d13a29c15cff59e579c1f477b267a271383",
+      "grade": 1,
+      "reason": "DNS重绑定原理与防护背景，未明确SSRF"
+    },
+    {
+      "id": "source_fc64e630f58e07fe1671c542cd785f2b108cf2755ef380fb3bec5e40efb3ad6d",
+      "grade": 1,
+      "reason": "SSRF绕过案例，摘要仅解释攻击"
+    },
+    {
+      "id": "source_0b1a59e69c63cebc578afff9f05be4634842818096feb19f7623fd66c6a44735",
+      "grade": 1,
+      "reason": "SSRF防护总览但摘要未展示重绑定处理"
+    },
+    {
+      "id": "source_d6975b85f2c3cb9699ca77088f283afa8351be52132f443a84635d9778bdfcb8",
+      "grade": 1,
+      "reason": "解释DNS两次解析攻击，未给防护"
+    },
+    {
+      "id": "source_51b8656a476c9fa7d382ae578622a9aca2dfe2eed798baec172b235939bdbee1",
+      "grade": 2,
+      "reason": "明确传统校验不足并指向SSRF修复"
+    },
+    {
+      "id": "source_14ca3fe0637cedb115d7801e85246bdddbeb737d0a9f190e5a5d928fa4e5022a",
+      "grade": 1,
+      "reason": "绕过denylist案例，未说明防护策略"
+    },
+    {
+      "id": "source_73f7b45d3f3d2a072e886f38fa63cadc880fd8cc4e9f0af31ae59369dd1dae20",
+      "grade": 1,
+      "reason": "SSRF防护绕过漏洞报告"
+    },
+    {
+      "id": "source_ce169439311f7122a0465fa271d599035a95c9e8fbb1de9b16dda6c407ff9d63",
+      "grade": 1,
+      "reason": "重绑定SSRF案例，未提供防护"
+    },
+    {
+      "id": "source_d3af7d8645d308ec815b984d473e4a03fd2aae8532fb33d95dde110208e4a96e",
+      "grade": 2,
+      "reason": "明确DNS pinning等防护策略；未核验有效性"
+    },
+    {
+      "id": "source_27fbd83c2cb895c6d2ddb92e249e8744b46a8b3863a8127fdb4349a11209dc7f",
+      "grade": 1,
+      "reason": "重绑定原理与内网风险，未展示SSRF防护"
+    }
+  ]
+}

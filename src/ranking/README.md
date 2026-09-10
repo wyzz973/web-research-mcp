@@ -10,3 +10,9 @@
 - maxPassages 只限制最终数量，不改变前缀顺序；调用方可取得有界候选池（如 32 段）后冻结并分页。每结果的页长、总字符预算与续读归工具编排管理。没有匹配时不拿开头补齐；只有标题、没有实际正文上下文的窗口不生成证据候选或额外分页。模块不抓取网络、不管理存储，也不生成事实置信分数。
 
 URL 去重与域范围归 [domain-scope.ts](../shared/domain-scope.ts)；回归测试见 [ranking.spec.ts](../../tests/ranking.spec.ts)。
+
+## 候选重排与评估
+
+[retrieval.ts](retrieval.ts) 提供可选 BM25 和 BM25+MMR 候选重排；输入是有界标题/摘要池，平分保持上游顺序，不影响原有 relevance/confidence 定义。算法版本、固定参数和资源预算作为导出常量；默认仍为 upstream。RRF 函数只接受调用方真实取得的独立排名，本轮聚合结果不用于伪造独立名次。
+
+[evaluation.ts](evaluation.ts) 计算完整标注池的 nDCG、MRR 和 pooled Recall；池和排名 ID 必须完全一致，未标注与无相关项不能静默记成 0。数据格式、命令与指标限制见 [评估说明](../../evals/README.md)。

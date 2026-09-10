@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q038",
+  "pool_sha256": "5e659e674841e00aa7302a9f809a6d64eff6a89ca881c97eb2ba6ba9b4cc313a",
+  "assessor": {
+    "kind": "agent",
+    "id": "quality_ranking"
+  },
+  "judged_at": "2026-09-10T13:20:01.487Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_ceedece305bcc5eca496d149919f8fd386a41054c1790cb3eabed7aeaca74e68",
+      "grade": 2,
+      "reason": "直接定义词法语义混合搜索"
+    },
+    {
+      "id": "source_6a7fecda3e84014d89ab07adb243c4fd011f76ac928831a5c2ab6169b1442038",
+      "grade": 2,
+      "reason": "直接定义多种检索算法组合"
+    },
+    {
+      "id": "source_ae1458ac1d874dc5cba8f2efc07aa2da4674618bf4797ea2ceda629314dbde5c",
+      "grade": 2,
+      "reason": "直接定义全文与语义组合"
+    },
+    {
+      "id": "source_2c9dc69872aa33d515925fd72961178b25798c6f069fc9b2137a3248b13577d9",
+      "grade": 2,
+      "reason": "直接定义关键词与语义组合"
+    },
+    {
+      "id": "source_87da6fb18dc26cf7da501b700d24f8f2ac6f255ae7e3ee07baa42caf7d14fbdd",
+      "grade": 2,
+      "reason": "直接定义全文与向量组合"
+    },
+    {
+      "id": "source_24f89f0fb2b4a3d46414a7290f9c115e26046e5c70fdb9664a6c89b71b5e4290",
+      "grade": 2,
+      "reason": "讨论混合搜索定义及稀疏稠密组合"
+    },
+    {
+      "id": "source_51bb30bfb826655069fc236948605eba611de405a67f2ff777059bd8ac343f61",
+      "grade": 2,
+      "reason": "直接示例词法语义混合查询"
+    },
+    {
+      "id": "source_a473a6faf3f330a9f6c2c4ebc0b1a6b0a621fd71ebb671484272c974bc1140cc",
+      "grade": 2,
+      "reason": "直接定义关键词与语义组合"
+    },
+    {
+      "id": "source_d20bac1abe631d86914baa1de0b5b2db4b05e2209a5729e8ca9a05db7b2ded4f",
+      "grade": 2,
+      "reason": "直接定义词法向量混合"
+    },
+    {
+      "id": "source_09cbaec05f7baecd4a57112454edf28e1a9e3a6a253ee70ce8d916c0b97ac98e",
+      "grade": 2,
+      "reason": "直接说明关键词与语义信号融合"
+    }
+  ]
+}

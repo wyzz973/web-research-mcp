@@ -62,6 +62,16 @@ export type WebSearchOutput = {
     has_more_evidence: boolean
     next_evidence_cursor: string | null
     evidence_chars: number
+    ranking?: {
+      method: 'upstream' | 'bm25' | 'bm25_mmr'
+      /**
+       * Raw BM25 lexical score, not a probability. In bm25_mmr mode the final order also accounts for redundancy; this value does not include the MMR diversity penalty.
+       */
+      score: number | null
+      original_rank: number
+      corpus_size: number
+      version: string
+    }
   }[]
   providers: {
     id: string

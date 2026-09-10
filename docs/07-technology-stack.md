@@ -55,3 +55,7 @@ SDK、网络、正文提取、Schema、测试工具与 SQLite 已加入本版本
 不引入 Cordis、Schemastery、Typert、全插件加载器、Python SDK、Web UI、双编译图或大仓库的全部检查脚本。借鉴其类型、边界、验证与决策实践，保留这个服务的独立启动与部署能力。取舍记录见 [ADR 0002](decisions/0002-engineering-baseline.md)。
 
 原生部署使用独立 Python 3.12.11 与 Granian 2.8.2，不属于 MCP Node 包运行依赖；通过 uv 安装固定 wheels，说明见 [原生部署](../deploy/native/README.md)。
+
+## 本地验收页面
+
+工作台使用 Node 内置 HTTP 与静态 HTML/CSS/ES Modules，复用 TypeScript 业务运行时；无额外 Web 框架或前端构建依赖。浏览器展示与 MCP stdio 为独立适配器，HTTP 只监听 loopback。候选排序采用本地 BM25 与词集相似度 MMR 实验，默认不启用额外推理模型。设计见 [ADR 0007](decisions/0007-search-quality-workbench.md)。

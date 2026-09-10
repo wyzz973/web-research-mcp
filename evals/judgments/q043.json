@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q043",
+  "pool_sha256": "4f6cf34253b31bed283f5a44b618601e2cd39d40649cc5bc69ee07932620eda6",
+  "assessor": {
+    "kind": "agent",
+    "id": "quality_ranking"
+  },
+  "judged_at": "2026-09-10T13:22:54.014Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_8b19104d22e89555c7616b8a49bf127f273d207146cb8ec3ae7f37aa0a37e962",
+      "grade": 2,
+      "reason": "直接解释ReadableStream.cancel的丢弃及终止行为"
+    },
+    {
+      "id": "source_62d8a69713921a003a1308ef42933dc0d1003922bec1e199240df1ba1aef971d",
+      "grade": 1,
+      "reason": "reader.cancel邻近API并非流对象方法"
+    },
+    {
+      "id": "source_a7f4fa01533be8c274f8814a9d5652cc5b38177662c84698de88a170c2c8ac91",
+      "grade": 2,
+      "reason": "明确cancel释放资源的回调行为"
+    },
+    {
+      "id": "source_be673d0eca90c2fda93604d84f713fca81d3e230dfe695357c919801f3856b09",
+      "grade": 2,
+      "reason": "直接描述ReadableStream.cancel触发行为"
+    },
+    {
+      "id": "source_483b92f559b940b4ca2d3ef802e29b7c7654c920c5e11f01e79bfa9dfc802b46",
+      "grade": 2,
+      "reason": "直接给ReadableStream.cancel用途"
+    },
+    {
+      "id": "source_18dcd3b63a8511a4bd85d22a3a28a738164c0783b4c9578c167023a01c227395",
+      "grade": 2,
+      "reason": "直接描述取消流语义"
+    },
+    {
+      "id": "source_fe4a6f21c3bd3e6c59955c85e0099b4841743e9756550fa5af69f1321f9c6c4f",
+      "grade": 1,
+      "reason": "locked属性邻近但非cancel"
+    },
+    {
+      "id": "source_29b9b25251cba776aa95aa8c8375ad86ad8aa6ee1a5afdbd47de58e17625ec8f",
+      "grade": 1,
+      "reason": "reader构造函数邻近但非cancel"
+    },
+    {
+      "id": "source_f1afdc8bf97494b7b95d2b8bacf3fcaa2027ab022a5b8225eca6a0cf84f1b095",
+      "grade": 2,
+      "reason": "示例明确cancel停止数据生成"
+    },
+    {
+      "id": "source_3d4f5dba4fab19ebb24ca07f6a0541802bd52496596306db44e2ebd2f812115c",
+      "grade": 1,
+      "reason": "close方法示例提cancel但主要是不同终止API"
+    }
+  ]
+}

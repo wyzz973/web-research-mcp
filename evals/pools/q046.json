@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q046",
+    "query": "SearXNG search API JSON format",
+    "language": "en",
+    "category": "sites",
+    "sites": ["docs.searxng.org"]
+  },
+  "captured_at": "2026-09-10T13:21:36.090Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 5106,
+  "response_sha256": "7faf5c93122b3547c61277d3edd510a748a05c6d78a33b2dabd50d595faf1e7a",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_998af772608f29885b172cf7087e19969680cb8d88f4c2898b79ad23dd256376",
+      "url": "https://docs.searxng.org/dev/search_api.html",
+      "title": "Search API - SearXNG Documentation (2026.9.10+ba055b3e0)",
+      "snippet": "If you want to consume the results as JSON, CSV, or RSS, you need to set the format parameter accordingly. Supported formats are defined in settings.yml , ...",
+      "original_rank": 1
+    },
+    {
+      "id": "source_7c8d67edcff102a7e7fca07b1b9cd65c04077f7da25a4fe79ac631d3e237cb4a",
+      "url": "https://docs.searxng.org/dev/engines/json_engine.html",
+      "title": "JSON Engine - SearXNG Documentation (2026.9.8+3fdc6d753)",
+      "snippet": "The JSON engine is a generic engine with which it is possible to configure engines in the settings. For formatting see the documentation of search_url .",
+      "original_rank": 2
+    },
+    {
+      "id": "source_7001a417915618c4c982faf5844e43e4e9f9b2ddf58c54d6897f9ae42b85a8e9",
+      "url": "https://docs.searxng.org/dev/result_types/index.html",
+      "title": "Result Types - SearXNG Documentation (2026.9.5+c7f3080aa)",
+      "snippet": "The output is usually HTML, but it is also possible to output the result lists as JSON or RSS feed. Thats quite all we need to know before we dive into ...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_244678b227aac6c18ad7163fa7210afa7428385caf9de77c43a3d1875a21484f",
+      "url": "https://docs.searxng.org/dev/engines/offline/search-indexer-engines.html",
+      "title": "Local Search APIs - SearXNG",
+      "snippet": "If none of the methods fit your use case, you can select custom query type and provide the JSON payload to submit to Elasticsearch in custom_query_json .",
+      "original_rank": 4
+    },
+    {
+      "id": "source_da2619385dc55f98b5d370dfd9b37eb6388ff549883621648b3226aaa74817ed",
+      "url": "https://docs.searxng.org/dev/engines/online/tagesschau.html",
+      "title": "Tagesschau API - SearXNG Documentation (2026.9.5+ ...",
+      "snippet": "Via the Tagesschau API, current news and media reports are available in JSON format. This SearXNG engine uses the /api2u/search API.",
+      "original_rank": 5
+    },
+    {
+      "id": "source_f7dcb3f7c50b3ce78ee02227446914605ab977c1d81cb1b0a41d4c1841a4c926",
+      "url": "https://docs.searxng.org/admin/settings/settings_search.html",
+      "title": "search: - SearXNG Documentation (2026.9.5+22056605a)",
+      "snippet": "Result formats available from web, remove format to deny access (use lower case). html. csv. json. rss.",
+      "original_rank": 6
+    },
+    {
+      "id": "source_1daaa492196b1e37ea8fc32f231ba8f5d16a47dce1d3ff4aeef39d36e213e02a",
+      "url": "https://docs.searxng.org/dev/engines/online/google.html",
+      "title": "Google Engines - SearXNG Documentation (2026.9.3+ ...",
+      "snippet": "SearXNG's implementation of the Google API is mainly done in get_google_info . For detailed description of the REST-full API see: Query Parameter Definitions.",
+      "original_rank": 7
+    },
+    {
+      "id": "source_11cd3efc89d8b9eabd8b894cf2eead64e1411a2903b27823090aeb3e18a5aafd",
+      "url": "https://docs.searxng.org/admin/settings/settings_engines.html",
+      "title": "engines: - SearXNG Documentation (2026.9.5+22056605a)",
+      "snippet": "SearXNG does not support true multilingual search. You have to use the language prefix in your search query when searching in a different language. SearXNG ...",
+      "original_rank": 8
+    },
+    {
+      "id": "source_7effc915df55ca8b3698619c93413fe0a56d1d099e716117d0297574ff5e05ed",
+      "url": "https://docs.searxng.org/_modules/searx/autocomplete.html",
+      "title": "Source code for searx.autocomplete - SearXNG",
+      "snippet": "... api/search.asmx/KeywordSearch?' resp = get(autocomplete_url + urlencode(dict ... {urlencode({'format': 'json', 'word': query})}\" response = get(url) ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_261453a4d87d592e69ddf26419a914f0f94f2a1e395933f0db60325d23c3d32d",
+      "url": "https://docs.searxng.org/admin/api.html",
+      "title": "Administration API - SearXNG",
+      "snippet": "The search bar can be embedded into websites. Just paste the example into the HTML of the site. URL of the SearXNG instance and values are customizable. < ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

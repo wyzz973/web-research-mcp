@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q036",
+  "pool_sha256": "903def76644a7548f1cca4ea532987a40fe3ce9f0e5dbe9bcc69c50a5632ef56",
+  "assessor": {
+    "kind": "agent",
+    "id": "quality_ranking"
+  },
+  "judged_at": "2026-09-10T13:20:01.486Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_554fb75927b4fee2081a75dc1f3bb756b82df3f1dd2676461aa258edd5693326",
+      "grade": 2,
+      "reason": "直接说明readOnlyHint及信任边界"
+    },
+    {
+      "id": "source_920caecd56af832381841f46e207f78176ba2baf7932b1195a3d86c01410650e",
+      "grade": 1,
+      "reason": "工具概述未展示目标注解"
+    },
+    {
+      "id": "source_bfba858067cc3eb54024f5328320f85436a0383161243cfd513eaad8e609e836",
+      "grade": 1,
+      "reason": "说明注解信任规则，未解释字段"
+    },
+    {
+      "id": "source_83b497fe725a09968bb96ba998797f2b79d2e24c806971320831650a32eee077",
+      "grade": 1,
+      "reason": "注解工作组背景未展示字段"
+    },
+    {
+      "id": "source_aca6492c13f6430b152368ec3487c4c0dc02757e3955d67a534d4b6a502bdd81",
+      "grade": 1,
+      "reason": "工具概述片段未展示字段"
+    },
+    {
+      "id": "source_e92d7b209da1412d3da3048d61142264f263db6728ca4fe5ad81bef3d576ac54",
+      "grade": 2,
+      "reason": "直接定义readOnlyHint不修改环境及默认值"
+    },
+    {
+      "id": "source_31f6711e56a375e566ac586b73dcca3ec26e29e8b3950183fdbb93436a5fc423",
+      "grade": 2,
+      "reason": "直接定义readOnlyHint可选字段含义"
+    },
+    {
+      "id": "source_6461d7b49c5e150fa7896ef8d876c6477f8537265471cb597937fd53d4b7431e",
+      "grade": 1,
+      "reason": "配置类型含字段但未解释其行为"
+    },
+    {
+      "id": "source_37861559098f9e810f32b931f362515f1fd8d238f5c9500980fe34dd80bb9f2e",
+      "grade": 1,
+      "reason": "server API总览邻近"
+    },
+    {
+      "id": "source_eea2fdd01bcdd3e5aa4271057d421552ba36ae3c6b8b4626f515b045187e8ec0",
+      "grade": 1,
+      "reason": "字段参考标题精确但摘要只有导航"
+    }
+  ]
+}

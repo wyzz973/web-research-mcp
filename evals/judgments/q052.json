@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q052",
+  "pool_sha256": "a10a830b7463d14407931954de84e264a1b74736e4f8c295183933c12d4851fc",
+  "assessor": {
+    "kind": "agent",
+    "id": "quality_ranking"
+  },
+  "judged_at": "2026-09-10T13:24:44.589Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_58094cb2c63a37fd9edd552d51651d501a28b410b81c8adf952e49d592a1332e",
+      "grade": 2,
+      "reason": "直接官方Unicode归一化形式规范"
+    },
+    {
+      "id": "source_7dc9b78205dbbed88bae0532cd55020c1fdfdfcbfb1484921e1bd378643409f3",
+      "grade": 2,
+      "reason": "直接归一化形式及字符图表"
+    },
+    {
+      "id": "source_b21af5eafee24f510b945bda5d46ad51dcedc13890fe3fd1781f4480f8529576",
+      "grade": 1,
+      "reason": "历史幂等性勘误，非一般NFKC说明"
+    },
+    {
+      "id": "source_bcb663585b3e6d79ed8b2a2b3292acd96ba06f0c51c377743935bda2f3a99fdd",
+      "grade": 1,
+      "reason": "自定义归一化与casefold相邻主题"
+    },
+    {
+      "id": "source_8e6a9d22e5232b40955421ce500a091410eeb5691dc3cbcecf56b652b912b36a",
+      "grade": 2,
+      "reason": "直接解释组合归一化步骤"
+    },
+    {
+      "id": "source_ed4066be09417dd3495094338225a429346061f53e7206d401568104562665bb",
+      "grade": 1,
+      "reason": "边界情况邮件，摘要无一般规则"
+    },
+    {
+      "id": "source_86a8000edd053e909c95c1188cdea6b0e8db09a9888ce3330ae1c69d1d8b66a2",
+      "grade": 2,
+      "reason": "规范直接说明兼容分解与NFKC定义"
+    },
+    {
+      "id": "source_54b493e51c1c0fc7166fe4e4f36a5c11bcfc35e78c396401cc406d9c822e0933",
+      "grade": 1,
+      "reason": "特定字符历史勘误"
+    },
+    {
+      "id": "source_aa5d57b18d3bdb81c3b666ef71efb27a3d35cf347ab3359bd15dea91ffd47cc2",
+      "grade": 1,
+      "reason": "标识符中NFKC修改规则属于特定应用"
+    },
+    {
+      "id": "source_7e2ca3a267fe2cbd1d09e462b61dceec65faba5d70e63c7107e1d9fdc0d53c6f",
+      "grade": 1,
+      "reason": "CJK映射历史勘误属于特定应用"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q005",
+  "pool_sha256": "f248c21257fe69266aa2cd80ffb08f37a5e8b12bd514ba25cb152289fd6463ed",
+  "assessor": {
+    "kind": "agent",
+    "id": "root"
+  },
+  "judged_at": "2026-09-10T13:14:37.970Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_476f5415f3eff8fdf96dc8e3311f8fdd1477b42a21c57d4035ad259a61de8196",
+      "grade": 2,
+      "reason": "直接介绍倒排索引原理、实现或词项文档映射；未核验全文。"
+    },
+    {
+      "id": "source_7b0224b55f31fb9244ae2b40f794a588ef90bc3748442c8fb846ca2f13c061c4",
+      "grade": 2,
+      "reason": "直接介绍倒排索引原理、实现或词项文档映射；未核验全文。"
+    },
+    {
+      "id": "source_7cc14c363cb36c4e42208bbd4c1437f12d56ca60a5e00bf2d2c80c2d7a71b621",
+      "grade": 2,
+      "reason": "直接介绍倒排索引原理、实现或词项文档映射；未核验全文。"
+    },
+    {
+      "id": "source_79ff152e1f7a62d4e97af843d74e3fa24bfd37e8fc5239a66023e8fa441b76fa",
+      "grade": 2,
+      "reason": "直接介绍倒排索引原理、实现或词项文档映射；未核验全文。"
+    },
+    {
+      "id": "source_754c313ac34df58ce8b66cad28a153f51d0240b86be708ae34b2c954f20e7f95",
+      "grade": 2,
+      "reason": "直接介绍倒排索引原理、实现或词项文档映射；未核验全文。"
+    },
+    {
+      "id": "source_2ef743bb1bfbdc0004aa6ba11f740ef7ee49ee99dfa0d359a216d81fe4d342a8",
+      "grade": 2,
+      "reason": "直接介绍倒排索引原理、实现或词项文档映射；未核验全文。"
+    },
+    {
+      "id": "source_e9c4489247227d14ef8d0387b933025c1a38af8ca5e8d8f1ab95b6be520a5c08",
+      "grade": 2,
+      "reason": "直接介绍倒排索引原理、实现或词项文档映射；未核验全文。"
+    },
+    {
+      "id": "source_419e23e85a14929839819eec6bb22f86f5c531e421780377805a0d48909e31f7",
+      "grade": 2,
+      "reason": "直接介绍倒排索引原理、实现或词项文档映射；未核验全文。"
+    },
+    {
+      "id": "source_e5214f29a1cb7ce24c9b687bb27c4e059ed82b4f321f5909f27011dffddf98f6",
+      "grade": 2,
+      "reason": "直接介绍倒排索引原理、实现或词项文档映射；未核验全文。"
+    },
+    {
+      "id": "source_8841b3aa10fe3f0f42a28982bd429e98f4dbfd1679c692cc167358355cad6b96",
+      "grade": 2,
+      "reason": "直接介绍倒排索引原理、实现或词项文档映射；未核验全文。"
+    }
+  ]
+}

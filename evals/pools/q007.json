@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q007",
+    "query": "Python ModuleNotFoundError 解决",
+    "language": "zh",
+    "category": "error",
+    "sites": []
+  },
+  "captured_at": "2026-09-10T13:09:30.166Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 1536,
+  "response_sha256": "126289c2906223428c47479516d9840e95a5ab211ba87a26c6ee3d1bd4513374",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_496d76ab427431bdf17f3faac00e54b7dfa14d95d26dc7610761984ad2cc4b97",
+      "url": "https://zhuanlan.zhihu.com/p/416872266",
+      "title": "No module named 'xxx'可能的解决方案大全 - 知乎专栏",
+      "snippet": "至此就获取到了learn_pyhton的根路径，使用sys.append()命令把路径添加到环境变量中即可。 参考： python程序在命令行执行提示ModuleNotFoundError: No module named 'XXX' ...",
+      "original_rank": 1
+    },
+    {
+      "id": "source_dfa15b39593c1246ecb11f6a51d0f73ca58f6f3ebdfc3e548cdeac27e6a1f7a5",
+      "url": "https://www.freecodecamp.org/chinese/news/module-not-found-error-in-python-solved/",
+      "title": "如何解决no module named Python 错误？ - freeCodeCamp",
+      "snippet": "2023年2月24日 · 为了处理一个导入的模块，Python 检查像内置库、已安装的模块和当前项目中的模块这样的地方。如果它不能处理这个模块，它就会抛出ModuleNotFoundError。",
+      "original_rank": 2
+    },
+    {
+      "id": "source_274ef208bc71ab75d731ab212e62d48f5e2845ff1268f5118bc3c7e7cb4003d0",
+      "url": "https://blog.csdn.net/weixin_43603658/article/details/129604624",
+      "title": "报错解决：ModuleNotFoundError: No module named 'XXX' 原创",
+      "snippet": "2023年3月17日 · 解决方法是使用sys.append()命令把报错包的所在文件夹路径加入到PYTHONPATH。 检查拼写是否有误。 可能是当前所处的conda环境有误，或者应该使用python2 ...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_0da830b4fb6981e9250cc8a537d44c0640ae384560766211aa46f0a1a32ee482",
+      "url": "https://www.reddit.com/r/learnpython/comments/yyfniw/how_to_solve_modulenotfounderror_no_module_named/?tl=zh-hans",
+      "title": "如何解决Python 中的ModuleNotFoundError: No module named ...",
+      "snippet": "2022年11月18日 · 这两个文件都不能互相导入，因为当你运行其中一个时，另一个不会在 sys.path 上。你不能这样埋葬你项目的入口点，我开始怀疑到底有什么指导在告诉人们这样 ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_1f2ba1da30c5e505f79cae30ee7708899c4f7571058feadb8da165a5f606c245",
+      "url": "https://developer.cloud.tencent.com/article/2553489",
+      "title": "解决Python无法导入同目录py文件的完整指南| Python导入问题",
+      "snippet": "2025年8月10日 · Python导入同目录文件失败？常见错误ModuleNotFoundError和ImportError的解决方案。分析4种根本原因，提供修改sys.path、绝对导入、创建__init__.py和 ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_28a79dcc4c618f313d30b546a4ae9ec82c7f55f88d50a9b85ba8fc64d83e099a",
+      "url": "https://comate.baidu.com/zh/page/t7mwaxpc4v0",
+      "title": "Python中ModuleNotFoundError错误解析与解决方案_文心快码",
+      "snippet": "ModuleNotFoundError 错误通常由模块未安装、路径问题或环境不一致导致。解决方案包括：1）确认模块名称并安装；2）验证Python环境一致性；3）检查 sys.path 和 PYTHONPATH ...",
+      "original_rank": 6
+    },
+    {
+      "id": "source_ca3f54d1fdea6f533137db41a5387358b39c42533025f5e5aaca9dca2eb22945",
+      "url": "https://www.youtube.com/watch?v=tQPffOZWhCo",
+      "title": "如何解决Python 找不到导入模块的问题 ... - YouTube",
+      "snippet": "2025年5月12日 · 模块是Python 的重要组成部分，在导入模块的过程中，你可能会遇到错误，ModuleNotFoundError No module named，这意味着Python 无法找到相关模块， ...",
+      "original_rank": 7
+    },
+    {
+      "id": "source_c0708b5576c5cc02ba0d32a28086b5a2d2a0d8a381f231f761fe2b8a6fb9e5d9",
+      "url": "https://ceshiren.com/t/topic/26405",
+      "title": "ModuleNotFoundError: No module named 自建文件夹- 学习笔记",
+      "snippet": "2023年7月27日 · Python path 最直接解决办法：在运行的用例文件上直接写下述代码import sys,os sys.path.append(os.path.dirname(os.path.dirname(__file__))) 问题 ...",
+      "original_rank": 8
+    },
+    {
+      "id": "source_2893b21dbcfc22ff93e569114a8ec8d29c7edd4f7b1b795447a9a2fb3a4ec10e",
+      "url": "https://developer.aliyun.com/article/1473621",
+      "title": "【Python】报错ModuleNotFoundError: No module named 'XXX'",
+      "snippet": "2024年4月2日 · 情况一：如果XXX 为第三方库，那么直接pip install XXX，即可解决。 情况二： 如果XXX 为自己写的模块，那么就需要按照如下方式解决。",
+      "original_rank": 9
+    },
+    {
+      "id": "source_9bfca647f3a07b903cd68a83dd9e97813b0f9ec74015ffb5563c73a5a5d154e7",
+      "url": "https://bbs.itying.com/topic/69684484a45f61004d4cd7cd",
+      "title": "Python中关于模块导入的常见问题与解决方案 - 鸿蒙",
+      "snippet": "Python中关于模块导入的常见问题与解决方案 · 1. ModuleNotFoundError: No module named 'xxx' · 2. 相对导入在脚本中报错 · 3. 循环导入问题 · 4. 导入同名模块冲突 · 5. init.",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 0
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "query_id": "q048",
+  "pool_sha256": "4bdf9a48abaf32af037b0bc76507477551b6ecae8e048573d7ddf29dfbac8ece",
+  "assessor": {
+    "kind": "agent",
+    "id": "quality_ranking"
+  },
+  "judged_at": "2026-09-10T13:24:44.588Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_2e6a97d061db5b313fc9b23b61d376ff514de6a28ccffd16bedc78cc021c348b",
+      "grade": 1,
+      "reason": "直接说明resourceLimits但版本为26非24"
+    },
+    {
+      "id": "source_fb156d54f43fe3b3176bd33ce2956675a807026e863a3a9aba38b3b2beb5f7d7",
+      "grade": 1,
+      "reason": "直接资源约束说明但版本为26非24"
+    },
+    {
+      "id": "source_c7f21f55e022131bd943a87697059f1f145cb94c4b8b50206f71e53f13e9afed",
+      "grade": 1,
+      "reason": "24文档仅有resourceLimits导航，摘要主要讲析构"
+    },
+    {
+      "id": "source_4532588d319d0398b5877b28f4267544d29b98a2dde027b33194b54aef17ce82",
+      "grade": 0,
+      "reason": "threadName不同属性，仅导航出现resourceLimits"
+    },
+    {
+      "id": "source_6c0b2775b9125a6f50f9456f88cac1a21143672cbe04c7f66dc5695f3498314e",
+      "grade": 0,
+      "reason": "锁管理API未说明resourceLimits"
+    },
+    {
+      "id": "source_d937acf0bbad0254fb13a790f4c540490ebc39322cde2dc20f66d838bad48187",
+      "grade": 1,
+      "reason": "26文档仅导航resourceLimits与其他主题"
+    }
+  ]
+}

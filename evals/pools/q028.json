@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q028",
+    "query": "nDCG information retrieval evaluation",
+    "language": "en",
+    "category": "concept",
+    "sites": []
+  },
+  "captured_at": "2026-09-10T13:15:48.308Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 4130,
+  "response_sha256": "b1a1abadd92ac51c0486ce80698a2f2ad0c855bb96f0b4644447433112b0a31b",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_8727dc83a930a91462347762971447e93a5385a94f5c1b2a8912c4bc84d2d1ca",
+      "url": "https://en.wikipedia.org/wiki/Discounted_cumulative_gain",
+      "title": "Discounted cumulative gain - Wikipedia",
+      "snippet": "Discounted cumulative gain (DCG) [1] is a measure of ranking quality in information retrieval. NDCG is often used to measure effectiveness of search engine ...",
+      "original_rank": 1
+    },
+    {
+      "id": "source_ea99fd431e21bc6ccb631eefde466edbcd30e1b3e7f5f3e6c2e721f5668580ff",
+      "url": "https://www.evidentlyai.com/ranking-metrics/ndcg-metric",
+      "title": "Normalized Discounted Cumulative Gain (NDCG) explained",
+      "snippet": "Feb 14, 2025 · Normalized Discounted Cumulative Gain (NDCG) is a metric that evaluates the quality of recommendation and information retrieval systems.",
+      "original_rank": 2
+    },
+    {
+      "id": "source_9a32b51d132cdd1151b5251b177c6cd971cab79d8fbcd448b13d2833906f6347",
+      "url": "https://www.geeksforgeeks.org/machine-learning/normalized-discounted-cumulative-gain-multilabel-ranking-metrics-ml/",
+      "title": "Normalized Discounted Cumulative Gain - Multilabel Ranking ...",
+      "snippet": "Jul 15, 2021 · Discounted Cumulative Gain (DCG) is the metric of measuring ranking quality. It is mostly used in information retrieval problems such as ...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_9ac2233be05a12f161acb949fcaed7de8c42361a5e50f95cfd6ced1c29e0e1b5",
+      "url": "https://arxiv.org/html/2307.15053v3",
+      "title": "On (Normalised) Discounted Cumulative Gain as an Off-Policy ...",
+      "snippet": "nDCG as an offline evaluation metric in the recommender systems and Learning-to-Rank research fields, as normalised metric values",
+      "original_rank": 4
+    },
+    {
+      "id": "source_cec5f7589cd584da25868bd655a78eab8692d7a8b97f97f9dcb58388c728081b",
+      "url": "https://www.pinecone.io/learn/offline-evaluation/",
+      "title": "Evaluation Measures in Information Retrieval - Pinecone",
+      "snippet": "Jun 30, 2023 · NDCG@K is one of the most popular offline metrics for evaluating IR systems, in particular web search engines.Metrics in Information Retrieval · Cats in Boxes · Recall@K",
+      "original_rank": 5
+    },
+    {
+      "id": "source_243ab86e90c0d20b41fa4caa09e2ebaf813e6197b86a372a0575e9fd4a3f7313",
+      "url": "https://web.stanford.edu/class/cs276/handouts/EvaluationNew-handout-1-per.pdf",
+      "title": "[PDF] Information Retrieval - Stanford University",
+      "snippet": "▫ NDCG is now quite popular in evaluating Web search. Page 18. Introduction to Information Retrieval. NDCG - Example i. Ground Truth. Ranking Function1.",
+      "original_rank": 6
+    },
+    {
+      "id": "source_ef13459704dc738ca34d93a4ec9ad713a546b785aa8e7c58b9363f0c41f64c50",
+      "url": "https://weaviate.io/blog/retrieval-evaluation-metrics",
+      "title": "Evaluation Metrics for Search and Recommendation Systems",
+      "snippet": "May 28, 2024 · The Normalized Discounted Cumulative Gain@K (NDCG@K) metric measures the system's ability to sort items based on relevance. NDCG@K is highly ...",
+      "original_rank": 7
+    },
+    {
+      "id": "source_f6c38d3e3b6dad5552d00ebe4c941b9865a5387aa3b18e5cad28a63a69113e49",
+      "url": "https://medium.com/data-science/demystifying-ndcg-bee3be58cfe0",
+      "title": "Demystifying NDCG. How to best use this important metric…",
+      "snippet": "Jan 25, 2023 · ML teams often use NDCG to evaluate the performance of a search engine, recommendation, or other information retrieval system.What Is NDCG@K? · How Does NDCG Compare To...",
+      "original_rank": 8
+    },
+    {
+      "id": "source_bb52847fc770da0676b14355355c10a1f3a1840386e250d6d0f3f117827ce08e",
+      "url": "https://dl.acm.org/doi/10.1145/1835449.1835560",
+      "title": "Comparing the sensitivity of information retrieval metrics",
+      "snippet": "Information retrieval effectiveness is usually evaluated using measures such as Normalized Discounted Cumulative Gain (NDCG), Mean Average Precision (MAP) ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_218696690d3e5ea977fa8d4a1848c5962f8c77b66454eb9ab007e37f31318e56",
+      "url": "https://amitness.com/posts/information-retrieval-evaluation",
+      "title": "Evaluation Metrics For Information Retrieval - Amit Chaudhary",
+      "snippet": "Aug 4, 2020 · Average Precision is a metric that evaluates whether all of the ground-truth relevant items selected by the model are ranked higher or not.",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

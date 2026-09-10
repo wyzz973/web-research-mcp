@@ -57,7 +57,7 @@ export interface RuntimeConfiguration {
     user_agent: string
   }
   ranking: {
-    mode: 'upstream'
+    mode: 'upstream' | 'bm25' | 'bm25_mmr'
     rrf_enabled: false
     rrf_k: number
     embeddings_enabled: false

@@ -163,6 +163,32 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 8000
+          },
+          "ranking": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["method", "score", "original_rank", "corpus_size", "version"],
+            "properties": {
+              "method": {
+                "enum": ["upstream", "bm25", "bm25_mmr"]
+              },
+              "score": {
+                "type": ["number", "null"],
+                "description": "Raw BM25 lexical score, not a probability. In bm25_mmr mode the final order also accounts for redundancy; this value does not include the MMR diversity penalty."
+              },
+              "original_rank": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "corpus_size": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           }
         },
         "required": [

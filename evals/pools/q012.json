@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q012",
+    "query": "BM25 ranking formula inverse document frequency",
+    "language": "en",
+    "category": "concept",
+    "sites": []
+  },
+  "captured_at": "2026-09-10T13:10:59.068Z",
+  "node": "v24.20.0",
+  "status": "error",
+  "elapsed_ms": 687,
+  "response_sha256": "009b13e83f1b2c95bfd99ccc02b4426076cd687a6a9c2a3c19dd737305522a35",
+  "error_code": "UPSTREAM_BLOCKED",
+  "candidates": [],
+  "evidence": {
+    "target_results": 0,
+    "verified_results": 0
+  }
+}

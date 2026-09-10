@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q043",
+    "query": "Web Streams ReadableStream cancel",
+    "language": "zh",
+    "category": "exact",
+    "sites": ["developer.mozilla.org"]
+  },
+  "captured_at": "2026-09-10T13:20:38.784Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 3469,
+  "response_sha256": "afde09f49b9247a6802849c1bf02a5fda3d10698871f76ce902615487f64c11a",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_8b19104d22e89555c7616b8a49bf127f273d207146cb8ec3ae7f37aa0a37e962",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/API/ReadableStream/cancel",
+      "title": "ReadableStream.cancel() - Web API | MDN",
+      "snippet": "2023年7月29日 · cancel 用于在不再需要来自它的任何数据的情况下（即使仍有排队等待的数据块）完全结束一个流。调用cancel 后该数据丢失，并且流不再可读。为了仍然可以读 ...",
+      "original_rank": 1
+    },
+    {
+      "id": "source_62d8a69713921a003a1308ef42933dc0d1003922bec1e199240df1ba1aef971d",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/API/ReadableStreamDefaultReader/cancel",
+      "title": "ReadableStreamDefaultReader.cancel() - Web API | MDN",
+      "snippet": "2024年7月28日 · ReadableStreamDefaultReader 接口的 cancel() 方法返回一个 Promise ，这个promise 在流被取消时兑现。消费者在流中调用该方法发出取消流的信号。",
+      "original_rank": 2
+    },
+    {
+      "id": "source_a7f4fa01533be8c274f8814a9d5652cc5b38177662c84698de88a170c2c8ac91",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/API/Streams_API/Using_readable_streams",
+      "title": "使用可读流- Web API | MDN",
+      "snippet": "2025年6月25日 · cancel() ——一个方法，当被包含时，如果应用发出流将被取消的信号，它将被调用（例如，调用 ReadableStream.cancel() ）。内容应该采取任何必要的措施释放 ...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_be673d0eca90c2fda93604d84f713fca81d3e230dfe695357c919801f3856b09",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/API/ReadableStream/ReadableStream",
+      "title": "Web API - ReadableStream - MDN Web Docs - Mozilla",
+      "snippet": "如果应用程序表示该流将被取消（例如，调用了 ReadableStream.cancel() ，则将调用此方法，该方法也由开发人员定义。该方法应该做任何必要的事情来释放对流的访问。 如果 ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_483b92f559b940b4ca2d3ef802e29b7c7654c920c5e11f01e79bfa9dfc802b46",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/API/Streams_API",
+      "title": "Stream API - MDN Web Docs - Mozilla",
+      "snippet": "2024年12月13日 · ... ReadableStream ，之后你可以使用 ReadableStream.getReader() 创建一个reader 读取它，使用 ReadableStream.cancel() 取消它等等。 更复杂的应用包括 ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_18dcd3b63a8511a4bd85d22a3a28a738164c0783b4c9578c167023a01c227395",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/API/ReadableStream",
+      "title": "ReadableStream - Web API | MDN",
+      "snippet": "实例方法. ReadableStream.cancel(). 取消读取流，读取方发出一个信号，表示对这束流失去兴趣 ...",
+      "original_rank": 6
+    },
+    {
+      "id": "source_fe4a6f21c3bd3e6c59955c85e0099b4841743e9756550fa5af69f1321f9c6c4f",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/API/ReadableStream/locked",
+      "title": "ReadableStream.locked - Web API | MDN",
+      "snippet": "2023年5月19日 · ReadableStream 接口的只读属性 locked 返回可读流是否锁定到reader。 一个可读流最多可以有一个激活的reader，并且直到被释放之前都是锁定到该reader ...",
+      "original_rank": 7
+    },
+    {
+      "id": "source_29b9b25251cba776aa95aa8c8375ad86ad8aa6ee1a5afdbd47de58e17625ec8f",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/API/ReadableStreamDefaultReader/ReadableStreamDefaultReader",
+      "title": "ReadableStreamDefaultReader() - Web API | MDN",
+      "snippet": "2024年7月28日 · ReadableStreamDefaultReader() 构造函数创建并返回一个 ReadableStreamDefaultReader 实例对象。 备注：你通常不需要手动创建，可以使用 ReadableStream.",
+      "original_rank": 8
+    },
+    {
+      "id": "source_f1afdc8bf97494b7b95d2b8bacf3fcaa2027ab022a5b8225eca6a0cf84f1b095",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/API/ReadableStreamDefaultController",
+      "title": "ReadableStreamDefaultController - Web API | MDN",
+      "snippet": "2023年7月29日 · cancel() 函数用于在 ReadableStream.cancel() 被调用时停止随机字符串的生成。 请注意， ReadableStreamDefaultController 对象应作为参数传递给 ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_3d4f5dba4fab19ebb24ca07f6a0541802bd52496596306db44e2ebd2f812115c",
+      "url": "https://developer.mozilla.org/zh-CN/docs/Web/API/ReadableStreamDefaultController/close",
+      "title": "ReadableStreamDefaultController.close() - Web API | MDN",
+      "snippet": "2023年7月29日 · cancel() 函数用于在 ReadableStream.cancel() 被调用时停止随机字符串的生成。 当按下按钮时，将停止生成，使用 ReadableStreamDefaultController ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

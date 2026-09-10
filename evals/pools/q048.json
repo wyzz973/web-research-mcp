@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q048",
+    "query": "Node.js 24 worker threads resourceLimits",
+    "language": "en",
+    "category": "version",
+    "sites": ["nodejs.org"]
+  },
+  "captured_at": "2026-09-10T13:22:15.169Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 3995,
+  "response_sha256": "8094e42cbf63a5b67a6b5bea7d0cdfcc9b58917bc6aa3074d505bc68b1da3947",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_2e6a97d061db5b313fc9b23b61d376ff514de6a28ccffd16bedc78cc021c348b",
+      "url": "https://nodejs.org/api/worker_threads.html",
+      "title": "Worker threads | Node.js v26.8.1 Documentation",
+      "snippet": "If the resourceLimits option was passed to the Worker constructor, this matches its values. If this is used in the main thread, its value is an empty object.",
+      "original_rank": 1
+    },
+    {
+      "id": "source_fb156d54f43fe3b3176bd33ce2956675a807026e863a3a9aba38b3b2beb5f7d7",
+      "url": "https://beta.docs.nodejs.org/worker_threads/Worker",
+      "title": "Worker | Node.js 26.8.1 Documentation",
+      "snippet": "Provides the set of JS engine resource constraints for this Worker thread. If the resourceLimits option was passed to the Worker constructor, this matches ...",
+      "original_rank": 2
+    },
+    {
+      "id": "source_c7f21f55e022131bd943a87697059f1f145cb94c4b8b50206f71e53f13e9afed",
+      "url": "https://nodejs.org/download/release/latest-v24.x/docs/api/all.html",
+      "title": "Node.js v24.21.0 Documentation",
+      "snippet": "worker.resourceLimits. During shutdown of the process or worker threads, destructors are not called by the JS engine. ensure proper destruction to avoid ...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_4532588d319d0398b5877b28f4267544d29b98a2dde027b33194b54aef17ce82",
+      "url": "https://beta.docs.nodejs.org/worker_threads/threadName",
+      "title": "worker_threads.threadName | Node.js 26.8.1 Documentation",
+      "snippet": "threads.resourceLimits worker_threads.SHARE_ENV. A string identifier for the current thread or null if the thread is not running. On the corresponding worker ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_6c0b2775b9125a6f50f9456f88cac1a21143672cbe04c7f66dc5695f3498314e",
+      "url": "https://beta.docs.nodejs.org/worker_threads/locks",
+      "title": "worker_threads.locks | Node.js 26.8.1 Documentation",
+      "snippet": "An instance of a LockManager that can be used to coordinate access to resources that may be shared across multiple threads within the same process.",
+      "original_rank": 5
+    },
+    {
+      "id": "source_d937acf0bbad0254fb13a790f4c540490ebc39322cde2dc20f66d838bad48187",
+      "url": "https://nodejs.org/api/all.html",
+      "title": "All | Node.js v26.8.2 Documentation",
+      "snippet": "worker.resourceLimits worker.startCpuProfile([options]) worker threads from preload scripts. By default, a maximum of 10 listeners can be registered for any ...",
+      "original_rank": 6
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

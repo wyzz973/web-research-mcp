@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q022",
+  "pool_sha256": "afb39791ff6a1e80b1968b79785002976ff7f66085ef1166126d885f45628220",
+  "assessor": {
+    "kind": "agent",
+    "id": "engine_health"
+  },
+  "judged_at": "2026-09-10T13:17:18.564Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_8648139190e534786d6204dff7161d395d89e1688db509a72c2f161c4389e645",
+      "grade": 1,
+      "reason": "直接讲eager task但标注Python3.14并非指定3.12"
+    },
+    {
+      "id": "source_2feb2c86c1f24305acd977aff8cf33205de9000d36e352293c278aa1faa5eb88",
+      "grade": 1,
+      "reason": "3.14事件循环涉及eager工厂但版本不匹配"
+    },
+    {
+      "id": "source_d05666e0f97687831663556290e95d4eeee7dfcc5515d2536193b7db6359a2e8",
+      "grade": 2,
+      "reason": "What's New3.12明确列出两个eager工厂函数"
+    },
+    {
+      "id": "source_987f26bca4e358c78f34d78ad5ee41a0ab441db53bd37e3e8738ebe835237b78",
+      "grade": 1,
+      "reason": "新版本任务修复日志不直接说明3.12工厂"
+    },
+    {
+      "id": "source_028831a9095023a7d4eae5f1853ff2a9f3b10138df2e649c136823f41df5ae70",
+      "grade": 2,
+      "reason": "3.12日志明确描述eager工厂实现与同步执行"
+    },
+    {
+      "id": "source_1a4a6d9342e777ec7d308dc9b92dcab5a1caf90c63ab22216c0136ea5300b28d",
+      "grade": 1,
+      "reason": "新版本目录仅含导航条目无3.12说明"
+    },
+    {
+      "id": "source_7d757735927109b5aae7830259eb25cf7f431ef2509b57895f83815572daebd0",
+      "grade": 1,
+      "reason": "开发版目录不满足3.12且仅导航"
+    },
+    {
+      "id": "source_07da0018ceee9440a6658bce0bc87a4957af8c7f980e1d76bec96d3bced966fe",
+      "grade": 1,
+      "reason": "3.16日志相关但版本不匹配"
+    },
+    {
+      "id": "source_ba7cfe8726d56f365f8689d0df06ab2ca661fce56bcd6fc173f10c7824a297fa",
+      "grade": 1,
+      "reason": "3.12目录有目标条目但无工厂行为说明"
+    },
+    {
+      "id": "source_52a6e35f0a0bc222323a269e3a8e0a09299ca7610f676cd211e3008c977ddd95",
+      "grade": 2,
+      "reason": "What's New3.12摘要明确列出eager工厂API"
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q024",
+    "query": "HTTP cache ETag versus Last-Modified",
+    "language": "en",
+    "category": "comparison",
+    "sites": ["developer.mozilla.org"]
+  },
+  "captured_at": "2026-09-10T13:14:38.456Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 2708,
+  "response_sha256": "ddfd70de696629ba8016c4ad66e0186b1bca40b542919f1bfc0acb0b8ac19976",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_b308cbb9c2cdf161c398a6b81067acfa175454586dd55d466658b29a11717a2e",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Last-Modified",
+      "title": "Last-Modified header - HTTP - MDN Web Docs",
+      "snippet": "Jul 4, 2025 · It is less accurate than an ETag for determining file contents, but can be used as a fallback mechanism if ETags are unavailable.",
+      "original_rank": 1
+    },
+    {
+      "id": "source_58cccfbe41ef19846f5ef127d2c2ad9e1902563d610ee0fbee05c1c1b0b097ab",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/ETag",
+      "title": "ETag header - HTTP - MDN Web Docs",
+      "snippet": "Jul 28, 2025 · Typically, the ETag value is a hash of the content, a hash of the last modification timestamp, or just a revision number.",
+      "original_rank": 2
+    },
+    {
+      "id": "source_4a1b57bfe9b2ba791e67b23bcdd06fbeeea52dc6bca3aaf611a230c437201d6a",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching",
+      "title": "HTTP caching - MDN Web Docs - Mozilla",
+      "snippet": "Last-Modified is not just useful for caching; it is a standard HTTP header … it is better to provide both ETag and Last-Modified . receive a 200 OK response",
+      "original_rank": 3
+    },
+    {
+      "id": "source_82d66a824f6ac19b57778cc3bff0d6f065192c4b6f9bb4917ddc003a6662bb99",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/If-None-Match",
+      "title": "If-None-Match header - HTTP - MDN Web Docs",
+      "snippet": "Jul 4, 2025 · The comparison with the stored ETag uses the weak comparison algorithm, meaning two files are considered identical if the content is equivalent ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_9166d803cf3a38b0cd30ee4df51d5b0dd34fb9853854c8f3c1e98377552a49bc",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control",
+      "title": "Cache-Control header - HTTP - MDN Web Docs",
+      "snippet": "Aug 12, 2026 · The HTTP Cache-Control header holds directives (instructions) in both requests and responses that control caching in browsers and shared ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_d19f7a4a108bdab1245112db793e423622cfa78f27f0ddca1330d2ed16ebf6e9",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/If-Modified-Since",
+      "title": "If-Modified-Since header - HTTP - MDN Web Docs",
+      "snippet": "Jul 4, 2025 · The most common use case is to update a cached entity that has no associated ETag . Header type, Request header · Forbidden request header, No ...",
+      "original_rank": 6
+    },
+    {
+      "id": "source_4d290319b944be41856ad306e6e0574f468082097ce043f2245397f9c5c246d6",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Conditional_requests",
+      "title": "HTTP conditional requests - MDN Web Docs",
+      "snippet": "Aug 27, 2026 · Both Last-Modified and ETag allow both types of validation, though the complexity to implement it on the server side may vary. HTTP uses strong ...",
+      "original_rank": 7
+    },
+    {
+      "id": "source_ecce1858eec4678b340a2c74e34323bfd270513743a71610bc0b479b7ab64230",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/304",
+      "title": "304 Not Modified - HTTP - MDN Web Docs",
+      "snippet": "Jun 22, 2026 · The HTTP 304 Not Modified redirection response status code indicates that there is no need to retransmit the requested resources.",
+      "original_rank": 8
+    },
+    {
+      "id": "source_eb87d81c9f4660bbffd0c8a0e937580749ce3d297c6abb482f6a2114a8dabe8d",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/If-Match",
+      "title": "If-Match header - HTTP - MDN Web Docs",
+      "snippet": "Jul 4, 2025 · The comparison with the stored ETag uses the strong comparison algorithm, meaning two files are considered identical byte-by-byte. If a listed ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_b01477e5d74d88237919d89124232a68d2835ff72e098c664389e294a424b192",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/If-Range",
+      "title": "If-Range header - HTTP - MDN Web Docs",
+      "snippet": "Jul 4, 2025 · This header can be used either with the Last-Modified validator or with ETag , but not with both. The most common use case is to resume a ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

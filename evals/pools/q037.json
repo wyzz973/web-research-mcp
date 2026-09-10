@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q037",
+    "query": "Python asyncio 超时",
+    "language": "zh",
+    "category": "sites",
+    "sites": ["docs.python.org"]
+  },
+  "captured_at": "2026-09-10T13:18:43.269Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 3025,
+  "response_sha256": "9270846761b9ee431ce98edc19b0d24898f3b0a2a088da3efe2c46cefa0c12c9",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_f1b89fa72ac3473232994a9d5439e21f4b38e6d0d691296c7a71d46f6766fece",
+      "url": "https://docs.python.org/zh-cn/3.13/library/asyncio-task.html",
+      "title": "协程与任务— Python 3.13.15 文档",
+      "snippet": "2023年9月6日 · 超时¶. asyncio.timeout(delay)¶. 返回一个可被用于限制等待某个操作所耗费时间的异步上下文管理器。 delay 可以为 None ，或是一个表示等待秒数的浮 ...",
+      "original_rank": 1
+    },
+    {
+      "id": "source_7bd24ea08dfc9a3dd9e68c2089e8fa71073206273f719c4b231098ddf9dc7322",
+      "url": "https://docs.python.org/zh-cn/3.12/library/asyncio-task.html",
+      "title": "协程与任务— Python 3.12.14 文档",
+      "snippet": "超时¶. asyncio.timeout(delay)¶. 返回一个可被用于限制等待某个操作所耗费时间的异步上下文管理器。 delay 可以为 None ，或是一个表示等待秒数的浮点数/整数。 如果 ...",
+      "original_rank": 2
+    },
+    {
+      "id": "source_5d5addbc923edfefa15ee8fc51c93f879e22d5e78c0f149501466d0d659542ac",
+      "url": "https://docs.python.org/zh-cn/3.10/library/asyncio-task.html",
+      "title": "协程与任务— Python 3.10.21 文档",
+      "snippet": "如果发生超时，任务将取消并引发 asyncio.TimeoutError . 要避免任务 取消 ，可以加上 shield() 。 此函数将等待直到Future 确实被取消，所以总等待时间可能超过timeout。",
+      "original_rank": 3
+    },
+    {
+      "id": "source_3e5a6db70bfe279ca0c48a3713dc6cdd31b1dc4513c057996b2cff9a420b487f",
+      "url": "https://docs.python.org/zh-cn/3.7/library/asyncio-task.html",
+      "title": "协程与任务— Python 3.7.13 文档",
+      "snippet": "timeout 可以为 None ，也可以为float 或int 型数值表示的等待秒数。如果timeout 为 None ，则等待直到完成。 如果发生超时，任务将取消并引发 asyncio.TimeoutError ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_a7e713ddf31c289741f4befae3c134d04cb5f068794aa83f6a50ec3a449e7c9d",
+      "url": "https://docs.python.org/zh-cn/3.11/library/asyncio-task.html",
+      "title": "协程与任务— Python 3.11.15 文档",
+      "snippet": "2026年3月7日 · 超时¶. asyncio.timeout(delay)¶. 返回一个可被用于限制等待某个操作所耗费时间的异步上下文管理器。 delay 可以为 None ，或是一个表示等待秒数的浮 ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_7d6ea393db278bef1dd791ffaee15ccc2903899d8da9dd14121b11ef308cea17",
+      "url": "https://docs.python.org/zh-cn/3.13/library/asyncio-api-index.html",
+      "title": "高层级API 索引— Python 3.13.15 文档",
+      "snippet": "这个页面列举了所有能用于async/wait 的高层级asyncio API 集。 任务¶. 运行异步程序，创建Task对象，等待多件事运行超时的公共集。 run(). 创建事件循环，运行一个协程 ...",
+      "original_rank": 6
+    },
+    {
+      "id": "source_dedc3d07cf9b0fdd39a56f00d5cff8ee6df14d1026b8594bec42e1df5d9bd6df",
+      "url": "https://docs.python.org/zh-cn/3.8/library/asyncio-queue.html",
+      "title": "队列集— Python 3.8.20 文档",
+      "snippet": "2025年12月9日 · 注意asyncio 的队列没有timeout 形参；请使用 asyncio.wait_for() 函数为队列添加超时操作。 参见下面的Examples 部分。 Queue¶. class asyncio. Queue ...",
+      "original_rank": 7
+    },
+    {
+      "id": "source_b50a588785ba3dcfeadb3905583d15a74b9914851f1709c5e886fbbfdddc0b2c",
+      "url": "https://docs.python.org/zh-cn/3/library/asyncio-sync.html",
+      "title": "同步原语— Python 3.14.7 文档",
+      "snippet": "这些同步原语的方法不接受timeout 参数；请使用 asyncio.wait_for() 函数来执行带有超时的操作。 asyncio 具有下列基本同步原语：. Lock. Event.",
+      "original_rank": 8
+    },
+    {
+      "id": "source_0e57441e35db2cd160ef7a29fe9ba6cec7247a7343ab5b37d03ad65fd76f2440",
+      "url": "https://docs.python.org/zh-cn/3.13/library/asyncio-queue.html",
+      "title": "队列集— Python 3.13.15 文档",
+      "snippet": "尽管asyncio队列不是线程安全的，但是他们是被设计专用于async/await 代码。 注意asyncio 的队列没有timeout 形参；请使用 asyncio.wait_for() 函数为队列添加超时操作。",
+      "original_rank": 9
+    },
+    {
+      "id": "source_44d9de2e0dc3603744cd1cce0d49227561b1ea0f054b8e4e0d3845e07fd78ff3",
+      "url": "https://docs.python.org/zh-cn/3/library/asyncio-api-index.html",
+      "title": "高层级API 索引— Python 3.14.7 文档",
+      "snippet": "这个页面列举了所有能用于async/await 的高层级asyncio API。 任务: 运行异步程序，创建Task 对象，以及带有超时机制地等待多个事项的工具集。,, run(), 创建事件循环 ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

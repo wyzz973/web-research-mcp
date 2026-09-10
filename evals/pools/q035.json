@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "kind": "live_mcp",
+  "query": {
+    "id": "q035",
+    "query": "搜索召回率 精确率 区别",
+    "language": "zh",
+    "category": "concept",
+    "sites": []
+  },
+  "captured_at": "2026-09-10T13:18:03.029Z",
+  "node": "v24.20.0",
+  "status": "partial",
+  "elapsed_ms": 6139,
+  "response_sha256": "c55653aafff84b87e199fd0b898a47e7fbf813ba0054289f6dd9dc3c299eb679",
+  "error_code": null,
+  "candidates": [
+    {
+      "id": "source_b127181c8fe1df10af105ec6ff06907d79ff3eafd97e69e34c35f4e0437c1780",
+      "url": "https://developers.google.com/machine-learning/crash-course/classification/accuracy-precision-recall?hl=zh-cn",
+      "title": "分类：准确率、召回率、精确率和相关指标 | Machine Learning",
+      "snippet": "在实际正例数量非常少的不平衡数据集中，召回率比准确率更有意义，因为它可以衡量模型正确识别所有正例的能力。对于疾病预测等应用，正确识别阳性病例至关重要。假负例的 ...准确率 · 召回率或真正例率 · 假正例率 · 精确率",
+      "original_rank": 1
+    },
+    {
+      "id": "source_c7e6531b8af01799667acada8eda75527ff01f293151a045dc8784172e6af7fa",
+      "url": "https://blog.csdn.net/duan19920101/article/details/121726392",
+      "title": "精确率（precision）、召回率（recall）、准确率（accuracy）",
+      "snippet": "2021年12月5日 · 精确率是针对我们预测结果而言的，它表示的是预测为正的样本中有多少是真正的正样本。召回率是针对我们原来的样本而言的，它表示的是样本中的正例有多少被 ...",
+      "original_rank": 2
+    },
+    {
+      "id": "source_5f61a9fb87c97362a43ef3afea1131adbed42ffb4eb298dfba1dda4ea7542f34",
+      "url": "https://zhuanlan.zhihu.com/p/534141275",
+      "title": "如何理解准确率、精确率和召回率 - 知乎专栏",
+      "snippet": "具体到分类问题，一个常用指标为准确率（accuracy），也称为”正确预测的百分比“（percent correctly predicted。而错误预测的百分比称为错误率（error rate）或错分率（ ...",
+      "original_rank": 3
+    },
+    {
+      "id": "source_75b610c263a71c916c5b9962ba750e7e0351f6a237cefefb2e33f7fe43cefbdb",
+      "url": "https://zilliz.com.cn/faq/what-are-the-roles-of-recall-and-precision-in-search",
+      "title": "在搜索中，召回率和准确率的角色是什么？ - Zilliz 向量数据库",
+      "snippet": "召回率和精确率是评估搜索算法性能的两个重要指标。召回率衡量系统寻找数据集中所有相关文档的能力，而精确率则评估系统返回结果的准确性。本质上，这两个指标有助于 ...",
+      "original_rank": 4
+    },
+    {
+      "id": "source_b534f6ede66c84c126b6bec595d86e9526db6b65ec7689465a84efc690ec9b2d",
+      "url": "https://www.reddit.com/r/datascience/comments/qdai89/i_just_explained_recallprecision_to_a_nonds_and/?tl=zh-hans",
+      "title": "我刚给一个非数据科学家解释了召回率/精确率- r/datascience",
+      "snippet": "2021年10月22日 · 你用一张大网，在一个湖里抓到了总共100条鱼里的80条。这就是80%的召回率。但你同时也捞到了80块石头。这意味着50%的精确率，网里一半 ...",
+      "original_rank": 5
+    },
+    {
+      "id": "source_847edbaa9e05b77f004a69ed7e9bdc9d101f69c6694ce454052569f738a6b13a",
+      "url": "https://www.ultralytics.com/zh/blog/accuracy-precision-recall",
+      "title": "准确率、精确率与召回率：何时各自重要 - Ultralytics",
+      "snippet": "2025年8月20日 · 常见的评估指标包括准确率（整体正确性）、精确率（正类预测的可靠性）和召回率（模型识别实际正类的能力）。它们乍看之下可能很相似，但每个指标关注模型 ...",
+      "original_rank": 6
+    },
+    {
+      "id": "source_a7d6ab4d16c23d2cae187f090b8e10ccf3f56800e65daf97fa822e94aef6f1b5",
+      "url": "https://github.com/milvus-io/milvus/issues/4664",
+      "title": "The definition of \"Recall\" · Issue #4664 · milvus-io/milvus - GitHub",
+      "snippet": "2021年1月26日 · milvus官网中对于召回率的定义是：返回的结果集中正确的结果所占的比重。 但实际上准确率(Accuracy),精确率(Precision),召回率(Recall) 是机器 ...",
+      "original_rank": 7
+    },
+    {
+      "id": "source_3d9d08581f9fd3e0ff5cf9f22350cc9689e9ba24e0f4575ee2f45229d5c1aef0",
+      "url": "https://apxml.com/zh/courses/basics-model-evaluation-metrics/chapter-2-metrics-for-classification/precision-recall-tradeoff",
+      "title": "精确率与召回率的权衡 - ApX Machine Learning",
+      "snippet": "精确率表示被识别为正例的项目中有多少是实际的正例( T P / ( T P + F P ) TP / (TP + FP) TP/(TP+FP))。召回率表示在所有实际正例项目中，有多少被正确识别( T P ...",
+      "original_rank": 8
+    },
+    {
+      "id": "source_bb25b00bd5af7c576649c2c6af2928e56b10fc12e38cd3bad6eff73bf5d246c9",
+      "url": "https://blog.argcv.com/articles/1036.c",
+      "title": "准确率(Accuracy), 精确率(Precision), 召回率(Recall)和F1 ...",
+      "snippet": "2013年1月15日 · 精确率(precision)的公式是 P = T P T P + F P P = \\frac{TP}{TP+FP} P=TP+FPTP​, 它计算的是所有”正确被检索的结果(TP)”占所有”实际被检索到的(TP+FP)”的 ...",
+      "original_rank": 9
+    },
+    {
+      "id": "source_9e5ded62acdcb810d0ea4624124bcb971eae7c199e05d75103f4c84d1434e81e",
+      "url": "https://www.cnblogs.com/szcj/articles/17119117.html",
+      "title": "准确率(Precision)、召回率(Recall)、F值(F-Measure) - 博客园",
+      "snippet": "2023年2月14日 · 准确率和召回率是广泛用于信息检索和统计学分类领域的两个度量值，用来评价结果的质量。其中精度是检索出相关文档数与检索出的文档总数的比率，衡量的 ...",
+      "original_rank": 10
+    }
+  ],
+  "evidence": {
+    "target_results": 1,
+    "verified_results": 1
+  }
+}

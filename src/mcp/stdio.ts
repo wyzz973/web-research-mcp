@@ -4,11 +4,7 @@ import { serveStdio } from '@modelcontextprotocol/server/stdio'
 import { createMcpServer } from './server.ts'
 import { loadConfiguration } from '../shared/config.ts'
 import { AppError } from '../shared/errors.ts'
-import { createDocumentLoader } from '../fetch/index.ts'
-import { createSearxngProvider } from '../search/searxng.ts'
-import { createSnapshotStore } from '../storage/index.ts'
-import { createWebFetch } from '../tools/webfetch.ts'
-import { createWebSearch } from '../tools/websearch.ts'
+import { createResearchRuntime } from '../tools/runtime.ts'
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2)
@@ -19,7 +15,7 @@ async function main(): Promise<void> {
     return
   }
   if (args.includes('--version')) {
-    process.stdout.write('0.2.1\n')
+    process.stdout.write('0.3.0\n')
     return
   }
   if (args.length && !(args.length === 2 && args[0] === '--config' && args[1]))
@@ -28,31 +24,7 @@ async function main(): Promise<void> {
     throw new AppError('INVALID_ARGUMENT', 'Use Node 24.x for this release.')
   const config = loadConfiguration(args[1], process.env)
   const lifetime = new AbortController()
-  const provider =
-    config.search.base_url && config.search.engine_allowlist.length
-      ? createSearxngProvider({
-          baseUrl: config.search.base_url,
-          engines: config.search.engine_allowlist,
-          timeoutMs: config.search.provider_timeout_ms,
-        })
-      : undefined
-  const loader = createDocumentLoader({
-    deadlineMs: config.fetch.deadline_ms,
-    maxCompressedBytes: config.fetch.max_compressed_bytes,
-    maxDecompressedBytes: config.fetch.max_decompressed_bytes,
-    maxRedirects: config.fetch.max_redirects,
-    globalConcurrency: config.fetch.global_concurrency,
-    perHostConcurrency: config.fetch.per_host_concurrency,
-    parserTimeoutMs: config.fetch.parser_timeout_ms,
-    parserMemoryMb: config.fetch.parser_memory_mb,
-    parserConcurrency: config.fetch.parser_worker_concurrency,
-    userAgent: config.fetch.user_agent,
-  })
-  const store = createSnapshotStore({
-    directory: config.storage.directory,
-    ttlSeconds: config.storage.snapshot_ttl_seconds,
-    maxBytes: config.storage.max_bytes,
-  })
+  const runtime = createResearchRuntime(config)
   const active = new Set<Promise<unknown>>()
   function track<T>(task: Promise<T>): Promise<T> {
     active.add(task)
@@ -60,8 +32,7 @@ async function main(): Promise<void> {
       active.delete(task)
     })
   }
-  const websearch = createWebSearch(config, provider, loader, store)
-  const webfetch = createWebFetch(config, loader, store)
+  const { websearch, webfetch } = runtime
   const handle = serveStdio(
     () =>
       createMcpServer(
@@ -83,10 +54,9 @@ async function main(): Promise<void> {
       }, 10_000)
       timer.unref()
       try {
-        await Promise.allSettled([loader.close(), provider?.close() ?? Promise.resolve()])
         await Promise.allSettled(active)
         await handle.close()
-        store.close()
+        await runtime.close()
       } finally {
         clearTimeout(timer)
       }
@@ -103,8 +73,8 @@ async function main(): Promise<void> {
     JSON.stringify({
       level: 'info',
       event: 'ready',
-      search_configured: Boolean(provider),
-      version: '0.2.1',
+      search_configured: Boolean(runtime.provider),
+      version: '0.3.0',
     }) + '\n',
   )
 }

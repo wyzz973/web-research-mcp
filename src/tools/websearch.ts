@@ -9,6 +9,7 @@ import { makeSourceId } from '../shared/ids.ts'
 import { parseContract } from '../shared/contracts.ts'
 import { canonicalUrl, matchesScope, resolveScope } from '../shared/domain-scope.ts'
 import { scoreRelevance } from '../ranking/lexical.ts'
+import { rankCandidates, RETRIEVAL_VERSION } from '../ranking/retrieval.ts'
 import { selectPassages } from '../ranking/passages.ts'
 import { createSourceMetadata } from '../shared/source-metadata.ts'
 import { prepareEvidence } from './evidence.ts'
@@ -22,6 +23,7 @@ interface SearchSpec {
   limit: number
   evidenceMode: 'none' | 'extract'
   evidenceResults: number
+  rankingMode: 'upstream' | 'bm25' | 'bm25_mmr'
 }
 
 interface SavedPool {
@@ -43,6 +45,7 @@ function fingerprint(spec: SearchSpec, config: RuntimeConfiguration): string {
         node: process.versions.node,
         icu: process.versions.icu,
         evidencePolicy: 'paragraph_context_v2',
+        rankingVersion: RETRIEVAL_VERSION,
       }),
     )
     .digest('hex')
@@ -69,7 +72,14 @@ function resolve(input: WebSearchInput, config: RuntimeConfiguration): SearchSpe
       : 0
   if (evidenceResults > config.search.evidence.max_results)
     throw new AppError('INVALID_ARGUMENT', 'Evidence request exceeds the deployment limit.')
+  const rankingMode = input.ranking_mode ?? config.ranking.mode
+  if (rankingMode !== 'upstream' && config.search.retrieval.max_candidates > 200)
+    throw new AppError(
+      'INVALID_ARGUMENT',
+      'Experimental ranking supports at most 200 candidates; reduce the deployment candidate budget.',
+    )
   return {
+    rankingMode,
     query,
     scope: {
       ...scope,
@@ -279,7 +289,23 @@ async function collect(
     version: 2,
     fingerprint: fingerprint(spec, config),
     spec,
-    sources,
+    sources:
+      spec.rankingMode === 'upstream'
+        ? sources
+        : rankCandidates(spec.query, sources, {
+            mode: spec.rankingMode,
+            language: spec.language,
+          }).map(({ candidate, score, originalIndex }, index) => ({
+            ...candidate,
+            rank: index + 1,
+            ranking: {
+              method: spec.rankingMode,
+              score,
+              original_rank: originalIndex + 1,
+              corpus_size: sources.length,
+              version: RETRIEVAL_VERSION,
+            },
+          })),
     warnings: [...new Set(warnings)],
     removedCount,
     expiresAt: new Date(

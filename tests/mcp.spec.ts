@@ -153,6 +153,32 @@ describe('built MCP stdio executable', () => {
     expect(blocked.isError).toBe(true)
     expect(requests).toBe(1)
     expect(secondSession.stderr()).toContain('"event":"ready"')
+
+    const rankedArgs = { ...args, ranking_mode: 'bm25_mmr' }
+    const rankedCall = await secondSession.client.callTool({
+      name: 'websearch',
+      arguments: rankedArgs,
+    })
+    const ranked = parseContract<WebSearchOutput>('websearch.output', rankedCall.structuredContent)
+    expect(ranked.results[0]?.ranking).toMatchObject({
+      method: 'bm25_mmr',
+      original_rank: 1,
+      corpus_size: 3,
+    })
+    const afterRankingRequests = requests
+    await secondSession.client.close()
+    const thirdSession = await connect(cwd, env)
+    const rankedNext = await thirdSession.client.callTool({
+      name: 'websearch',
+      arguments: { ...rankedArgs, cursor: ranked.next_cursor },
+    })
+    const continued = parseContract<WebSearchOutput>(
+      'websearch.output',
+      rankedNext.structuredContent,
+    )
+    expect(continued.results[0]?.rank).toBe(2)
+    expect(continued.results[0]?.ranking?.method).toBe('bm25_mmr')
+    expect(requests).toBe(afterRankingRequests)
   })
 
   it('rejects invalid tool arguments without accepting the request', async () => {

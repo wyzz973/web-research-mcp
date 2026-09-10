@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "query_id": "q030",
+  "pool_sha256": "3adde1c7aae20c7ea467fdfa772d5f055fb995f50afbd630e80bd1c272955725",
+  "assessor": {
+    "kind": "agent",
+    "id": "engine_health"
+  },
+  "judged_at": "2026-09-10T13:19:15.287Z",
+  "basis": "title_snippet",
+  "judgments": [
+    {
+      "id": "source_97aa83fc575144ad97d3493f2a1bf4fcdafa4fada5110f4c1c8bce81382da62a",
+      "grade": 1,
+      "reason": "摘要列2026年9月候选预发布而非当前稳定版本"
+    },
+    {
+      "id": "source_7259223e65b67a7e36228b16f1b541559401ae92f407481ce3f2df7aba198bfd",
+      "grade": 1,
+      "reason": "只显示旧分支近期维护版本，未确定当前稳定主版本"
+    },
+    {
+      "id": "source_84ed1861359f79ce6123ebc1a1f2eb3b6c3ef2bf51e7dc12610a07ce795852f4",
+      "grade": 2,
+      "reason": "活动版本列表明确区分3.15预发布与3.14 bugfix稳定分支"
+    },
+    {
+      "id": "source_600acab9a967586fa02559330faab944ab977043559804751b2d4015047eb7bd",
+      "grade": 1,
+      "reason": "版本状态主题相关但摘要只介绍未来开发分支"
+    },
+    {
+      "id": "source_5fd3b5fbe4734783ac2f79fd06c30a28320b8ec6a86c1b123ea0cd0e78048b52",
+      "grade": 1,
+      "reason": "日历版本提案讨论并非实际当前稳定发行信息"
+    },
+    {
+      "id": "source_1a6a79d7b8d3d7d99d3697c2b0b90951a36dec9425f540d72dac2adb78391b57",
+      "grade": 1,
+      "reason": "2026年9月release candidate明确不是稳定版"
+    },
+    {
+      "id": "source_8c57d9e5c5ba0fb1425e4da198fb6b605cc738b550c401dc1f2d5221690e691f",
+      "grade": 1,
+      "reason": "发布索引摘要只涉及alpha构建修复"
+    },
+    {
+      "id": "source_7a9e47a43589c30d35179d6e95e58fe9de5d1e3e1d5328b0300121af2ef863a3",
+      "grade": 1,
+      "reason": "片段是2025年首次稳定发行，未证明2026年9月最新状态"
+    },
+    {
+      "id": "source_ffd8d1959bf303ce6b5a82c66d46bac1dfcda436c06231d9066e11753976320f",
+      "grade": 1,
+      "reason": "平台稳定版本列表相关但仅展示3.13维护版未确定最新稳定版本"
+    },
+    {
+      "id": "source_73907b1d1014c7be1297a070200317db69397b4045582de916345a2ff4d25b4f",
+      "grade": 0,
+      "reason": "论坛最新议题和环境发现提案不回答稳定发行版本"
+    }
+  ]
+}
