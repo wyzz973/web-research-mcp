@@ -14,22 +14,22 @@
 - **受控抓取**：DNS 固定连接、SSRF/跳转检查、robots、压缩/输出上限、取消、独立解析 worker 与资源清理。
 - **真实 MCP 入口**：SDK 2、stdio 和旧版初始化兼容路径；结构化输出与文本输出一致。
 
-版本为 0.2.0，业务契约为 0.3-draft。默认评分是词法基线；PDF、动态浏览器、向量召回、BM25/RRF 实验和神经精排不属于本版本。high 证据等级不表示事实一定正确。
+版本为 0.2.1，业务契约为 0.3-draft。默认评分是词法基线；PDF、动态浏览器、向量召回、BM25/RRF 实验和神经精排不属于本版本。high 证据等级不表示事实一定正确。
 
 ## 快速开始
 
-需要 **Node 24.20.0**、**pnpm 10.12.3** 和 Docker Compose。Node 版本记录在 `.node-version`。
+需要 **Node 24.20.0**、**pnpm 10.12.3** 和 **uv**；本机原生运行 SearXNG 无需 Docker。Node 版本记录在 `.node-version`，原生部署支持 macOS/Linux。
 
 ```sh
 git clone https://github.com/wyzz973/web-research-mcp.git
 cd web-research-mcp
 pnpm install --frozen-lockfile
 pnpm searxng:setup
-docker compose -f deploy/compose.yaml up -d
+pnpm searxng:start
 pnpm build
 ```
 
-SearXNG 只监听 `127.0.0.1:18888`。初始化将随机实例 secret 写入被 Git 忽略的 `.cache/searxng/settings.yml`；这不是搜索 API Key。固定镜像和精确引擎配置见 [部署说明](deploy/README.md)。
+SearXNG 只监听 `127.0.0.1:18888`。首次 setup 下载固定源码、隔离 Python 与哈希锁定依赖；配置、secret、日志与缓存保存在被 Git 忽略的 `.cache/searxng-native/`。不改系统 Python，无需搜索 API Key。用 `pnpm searxng:status` 查看状态、`pnpm searxng:stop` 停止。详见 [原生部署](deploy/native/README.md)；[Docker 部署](deploy/README.md) 仍为可选方式。
 
 运行一次带原文证据的搜索：
 
@@ -84,7 +84,7 @@ SEARXNG_URL=http://127.0.0.1:18888 SEARXNG_ENGINES=brave,google pnpm test:live
 
 check 包括类型、类型感知 lint、格式、生成类型、Schema、模块边界、文档、离线行为与 MCP 测试。test:built 将真实 tarball 安装到干净目录，验证 SQLite、MCP 入口和解析 worker。test:live 明确访问上游，不放入普通 CI；失败会保存到被 Git 忽略的 artifacts/live/result.json，不自动绕过封锁。
 
-执行证据见 [0.2.0 段落与展示验收](docs/verification/2026-09-09-paragraph-evidence.md) 和 [初版实施记录](docs/verification/2026-09-08-implementation.md)。离线测试不能保证所有网站随时可抓取。
+原生部署实测见 [无 Docker 验证](docs/verification/2026-09-10-native-searxng.md)。其他执行证据见 [0.2.0 段落与展示验收](docs/verification/2026-09-09-paragraph-evidence.md) 和 [初版实施记录](docs/verification/2026-09-08-implementation.md)。离线测试不能保证所有网站随时可抓取。
 
 ## 文档
 

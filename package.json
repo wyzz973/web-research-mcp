@@ -1,6 +1,6 @@
 {
   "name": "web-research-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Free, keyless web search and evidence retrieval over MCP",
   "type": "module",
@@ -23,9 +23,16 @@
     "test:mcp": "pnpm build && vitest run tests/mcp.spec.ts",
     "test:built": "pnpm build && node scripts/package-smoke.mjs",
     "test:live": "pnpm build && node scripts/live-smoke.mjs",
-    "searxng:setup": "node scripts/searxng-setup.mjs",
+    "searxng:setup": "node scripts/searxng-native.mjs setup",
     "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm check:types && pnpm check:schemas && pnpm check:boundaries && pnpm check:docs && pnpm test && pnpm test:mcp",
-    "call": "node scripts/call-tool.mjs"
+    "call": "node scripts/call-tool.mjs",
+    "searxng:native:setup": "node scripts/searxng-native.mjs setup",
+    "searxng:start": "node scripts/searxng-native.mjs start",
+    "searxng:run": "node scripts/searxng-native.mjs run",
+    "searxng:status": "node scripts/searxng-native.mjs status",
+    "searxng:stop": "node scripts/searxng-native.mjs stop",
+    "searxng:docker:setup": "node scripts/searxng-setup.mjs",
+    "test:native": "node scripts/searxng-native-smoke.mjs"
   },
   "license": "MIT",
   "packageManager": "pnpm@10.12.3",

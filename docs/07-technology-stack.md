@@ -11,7 +11,7 @@
 | 包管理 | pnpm，精确 packageManager 版本 | 一份 lockfile；不混用 npm/yarn 安装产生锁文件 |
 | 协议 | 官方 MCP TypeScript SDK v2 | server 用运行依赖，client 用集成测试依赖；先验证目标客户端支持 |
 | 传输 | stdio；Streamable HTTP 后续 | 初版无 HTTP 服务框架；不自建 JSON-RPC 实现 |
-| 搜索 | 自建 SearXNG HTTP JSON | 固定镜像及精确引擎白名单，全部满足免 Key 条件 |
+| 搜索 | 自建 SearXNG HTTP JSON | 原生 Python/Granian 或可选 Docker，固定源码/依赖及精确免 Key 引擎 |
 | 网络 | Undici + Node DNS + ipaddr.js | 使用受控 dispatcher/lookup，手动处理跳转；未经策略包装不可直接 fetch |
 | 域范围 | Node URL/IDNA + tldts/固定 PSL 数据 | 区分合法站点、公共后缀和 hostname 边界，纯匹配逻辑独立 |
 | 基线相关性 | Node Intl.Segmenter + 版本化词法覆盖 | 无推理模型或外部 Key；记录 Node/ICU/locale 以复现分词 |
@@ -53,3 +53,5 @@ SDK、网络、正文提取、Schema、测试工具与 SQLite 已加入本版本
 ## 明确不沿用的 DSH 技术
 
 不引入 Cordis、Schemastery、Typert、全插件加载器、Python SDK、Web UI、双编译图或大仓库的全部检查脚本。借鉴其类型、边界、验证与决策实践，保留这个服务的独立启动与部署能力。取舍记录见 [ADR 0002](decisions/0002-engineering-baseline.md)。
+
+原生部署使用独立 Python 3.12.11 与 Granian 2.8.2，不属于 MCP Node 包运行依赖；通过 uv 安装固定 wheels，说明见 [原生部署](../deploy/native/README.md)。
