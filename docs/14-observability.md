@@ -31,7 +31,7 @@
 
 Node.js 的 Undici 发 HTTP 请求；node:dns、ipaddr.js 等检查解析地址，并把验证过的地址固定用于连接。robots-parser 检查网站抓取规则。JSDOM 在独立 worker 中解析静态 HTML，Mozilla Readability 提取可读正文，Turndown 与 GFM 插件转换 Markdown。SQLite 保存正文快照与续读游标。
 
-这不等于完整浏览器：不会运行页面 JavaScript，不登录网站，不自动处理验证码。当前支持 HTML/XHTML、纯文本与 Markdown；PDF、动态浏览器后备不在本版。完整原文是提取后的正文快照，不是整个网页资源包。
+static 是轻量 HTTP 提取；新增 crawl4ai 使用真实浏览器渲染。两者都不登录网站、不绕验证码。当前支持 HTML/XHTML、纯文本与 Markdown，PDF 不在本版。完整原文是提取后的正文快照，不是整个网页资源包。
 
 ## 免费搜索如何更可靠
 

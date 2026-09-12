@@ -64,6 +64,7 @@ export function snapshotPage(
     status: snapshot.warnings.length ? 'partial' : 'ok',
     error: null,
     view: 'document',
+    fetch_backend: snapshot.fetchBackend ?? 'static',
     source_metadata:
       snapshot.sourceMetadata ??
       createSourceMetadata(snapshot.url, snapshot.finalUrl, snapshot.fetchedAt),
@@ -101,7 +102,15 @@ export function createWebFetch(
 ) {
   return async (raw: unknown, parent: AbortSignal): Promise<WebFetchOutput> => {
     const requestId = randomUUID()
-    const deadline = withDeadline(parent, config.fetch.deadline_ms)
+    const requestedEngine =
+      raw && typeof raw === 'object' && 'engine' in raw ? raw.engine : config.fetch.default_engine
+    const initialRead = raw && typeof raw === 'object' && 'url' in raw
+    const deadline = withDeadline(
+      parent,
+      initialRead && (requestedEngine === 'crawl4ai' || requestedEngine === 'auto')
+        ? config.fetch.crawl4ai.deadline_ms
+        : config.fetch.deadline_ms,
+    )
     try {
       const args = await trace.span('fetch.resolve', raw, async () =>
         parseContract<WebFetchInput>('webfetch.input', raw),
@@ -163,6 +172,7 @@ export function createWebFetch(
             truncated: page.has_more_evidence,
             next_cursor: page.next_evidence_cursor,
             view: 'evidence',
+            fetch_backend: evidenceSnapshot.fetchBackend ?? 'static',
             source_metadata:
               evidenceSnapshot.sourceMetadata ??
               createSourceMetadata(
@@ -193,7 +203,11 @@ export function createWebFetch(
         const document = await trace.span(
           'fetch.load',
           { url },
-          () => loader.load(url, { signal: deadline.signal }),
+          () =>
+            loader.load(url, {
+              signal: deadline.signal,
+              engine: args.engine ?? config.fetch.default_engine,
+            }),
           (value) => ({
             title: value.title,
             text_chars: Array.from(value.text).length,

@@ -36,6 +36,51 @@ const labels = {
   no_error_reported: '未报告错误，未确认结果',
 }
 const guides = {
+  'crawl4ai.robots': [
+    '检查浏览器资源的抓取规则',
+    '读取或复用该资源所在站点的 robots.txt，再决定是否允许这次访问。',
+    '主页面、脚本和数据接口都遵守同样的公网与抓取策略。',
+  ],
+  'crawl4ai.cleanup': [
+    '检查浏览器进程清理',
+    '确认本次 Python 与独立 Chromium 进程组已经退出。',
+    '清理失败时会停止继续启动浏览器，避免把残留进程误当已释放。',
+  ],
+  'crawl4ai.start': [
+    '准备启动 Crawl4AI 浏览器',
+    '启动独立 Chromium，让需要 JavaScript 的网页可以生成正文。',
+    '这是真实浏览器读取，不使用 LLM 或 API Key；启动和运行也受时间预算约束。',
+  ],
+  'crawl4ai.render': [
+    '等待网页动态显示',
+    'Chromium 打开网页并执行 JavaScript，让网页把动态内容放到页面中。',
+    '并非所有网页都能读到：登录、验证码、超时与访问限制仍会返回失败。',
+  ],
+  'crawl4ai.resource': [
+    '检查并读取网页资源',
+    '网页可能继续加载脚本等资源，每个请求仍需符合网络策略。',
+    '动态读取不能通过页面脚本访问本机或内网；受限请求会被拦截并记录。',
+  ],
+  'crawl4ai.blocked': [
+    '拦截不允许的浏览器请求',
+    '某个网页或资源请求不符合网络或抓取策略，本次访问被阻止。',
+    '请查看输出中的真实地址和原因；不会为了读取正文而放宽限制。',
+  ],
+  'crawl4ai.extract': [
+    '从动态页面提取正文',
+    'Crawl4AI 根据浏览器实际生成的页面提取可读内容。',
+    '这些内容来自网页，不是模型生成的答案；后续仍要保存快照和原文定位。',
+  ],
+  'crawl4ai.finish': [
+    '取得浏览器提取结果',
+    '记录本次动态读取的完成状态，并结束本次拥有的浏览器资源。',
+    '查看实际状态与输出；步骤结束不等于正文一定取得成功。',
+  ],
+  'crawl4ai.fallback': [
+    '从静态提取切换到动态读取',
+    '自动模式遇到允许的静态提取失败，尝试用 Chromium 生成网页正文。',
+    '这会实际访问网络，继续消耗本次预算；不会用动态模式绕过验证码或 robots。',
+  ],
   'fetch.resolve': [
     '理解网页读取要求',
     '检查这次是读取一个公开网址，还是用游标继续读取已保存内容。',
@@ -239,6 +284,10 @@ const guides = {
 }
 // These named instrumentation points record an event, not an operation duration.
 const eventNames = new Set([
+  'crawl4ai.start',
+  'crawl4ai.finish',
+  'crawl4ai.blocked',
+  'crawl4ai.cleanup',
   'search.queued',
   'search.upstream_start',
   'search.upstream_end',
@@ -507,6 +556,8 @@ function updatePlayback() {
 function recovery(step) {
   if (!['error', 'partial', 'cancelled', 'interrupted'].includes(step.status)) return null
   const value = text(step.output)
+  if (/CRAWL4AI_NOT_INSTALLED|crawl4ai:setup/i.test(value))
+    return '本机尚未准备好 Crawl4AI。请在项目目录运行 pnpm crawl4ai:setup，完成后重新运行；也可选择静态方式读取无需 JavaScript 的网页。'
   if (/CAPTCHA|UPSTREAM_BLOCKED|captcha/i.test(value))
     return '上游要求人机验证或限制自动访问。保留可用引擎结果，等待冷却后再试；不要反复点击搜索。冷却不会保证解除验证码。'
   if (/ROBOTS|robots/i.test(value) && ['error', 'partial'].includes(step.status))
@@ -652,6 +703,10 @@ async function refreshStatus() {
   if (state.disposed) return
   byId('connection').textContent =
     output.search_configured === false ? '本地已连接 · 搜索未配置' : '本地服务已连接'
+  if (output.crawl4ai)
+    byId('crawl4ai-hint').textContent = output.crawl4ai.installed
+      ? `Crawl4AI ${output.crawl4ai.version || ''} 已安装。动态读取执行 JavaScript，不调用 LLM。关闭搜索原文提取后，此选项不参与搜索。`
+      : 'Crawl4AI 尚未安装，请在项目目录运行 pnpm crawl4ai:setup。静态读取仍可使用；动态读取不会绕过验证码或 robots。'
   const container = byId('engines')
   container.replaceChildren()
   for (const engine of array(output.engines)) {
@@ -712,7 +767,15 @@ function formInput() {
     const url = new URL(query)
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
       throw new Error('请填写不含用户名、密码的 HTTP(S) 网页地址。')
-    return { mode, body: { url: url.href, format: 'text', max_chars: 8000 } }
+    return {
+      mode,
+      body: {
+        url: url.href,
+        format: 'text',
+        max_chars: 8000,
+        engine: byId('trace-fetch-engine').value,
+      },
+    }
   }
   const sites = [
     ...new Set(
@@ -730,7 +793,9 @@ function formInput() {
       ranking_mode: byId('trace-ranking').value,
       evidence_mode: extract ? 'extract' : 'none',
       ...(sites.length ? { sites } : {}),
-      ...(extract ? { max_evidence_results: 3 } : {}),
+      ...(extract
+        ? { max_evidence_results: 3, fetch_engine: byId('trace-fetch-engine').value }
+        : {}),
     },
   }
 }

@@ -2,6 +2,8 @@
 import type { RuntimeConfiguration } from '../generated/config.ts'
 import type { WebSearchOutput } from '../generated/websearch.output.ts'
 import type { WebFetchOutput } from '../generated/webfetch.output.ts'
+import { createCrawl4aiLoader, crawl4aiStatus } from '../fetch/crawl4ai.ts'
+import { createFetchRouter } from '../fetch/router.ts'
 import { createDocumentLoader } from '../fetch/index.ts'
 import { createSearxngProvider } from '../search/searxng.ts'
 import { createResilientProvider } from '../search/resilient.ts'
@@ -50,7 +52,7 @@ export function createResearchRuntime(config: RuntimeConfiguration) {
         onEvent: (event) => tracer.event(`search.${event.type}`, event.outcome ?? 'ok', event),
       })
     : undefined
-  const loader = createDocumentLoader({
+  const fetchOptions = {
     deadlineMs: config.fetch.deadline_ms,
     maxCompressedBytes: config.fetch.max_compressed_bytes,
     maxDecompressedBytes: config.fetch.max_decompressed_bytes,
@@ -62,7 +64,20 @@ export function createResearchRuntime(config: RuntimeConfiguration) {
     parserConcurrency: config.fetch.parser_worker_concurrency,
     userAgent: config.fetch.user_agent,
     tracer,
+  }
+  const browser = createCrawl4aiLoader({
+    ...fetchOptions,
+    deadlineMs: config.fetch.crawl4ai.deadline_ms,
+    enabled: config.fetch.crawl4ai.enabled,
+    waitMs: config.fetch.crawl4ai.wait_ms,
+    concurrency: config.fetch.crawl4ai.concurrency,
   })
+  const loader = createFetchRouter(createDocumentLoader(fetchOptions), browser, {
+    defaultEngine: config.fetch.default_engine,
+    allowFallback: config.fetch.browser_fallback,
+    tracer,
+  })
+
   const store = createSnapshotStore({
     directory: config.storage.directory,
     ttlSeconds: config.storage.snapshot_ttl_seconds,
@@ -120,6 +135,11 @@ export function createResearchRuntime(config: RuntimeConfiguration) {
   let closing: Promise<void> | undefined
   return {
     provider,
+    crawl4ai: () => ({
+      ...crawl4aiStatus(),
+      enabled: config.fetch.crawl4ai.enabled,
+      default_engine: config.fetch.default_engine,
+    }),
     resilient,
     traces,
     get traceStatus() {

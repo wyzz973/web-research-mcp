@@ -15,7 +15,7 @@ async function main(): Promise<void> {
     return
   }
   if (args.includes('--version')) {
-    process.stdout.write('0.4.0\n')
+    process.stdout.write('0.5.0\n')
     return
   }
   if (args.length && !(args.length === 2 && args[0] === '--config' && args[1]))
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
       level: 'info',
       event: 'ready',
       search_configured: Boolean(runtime.provider),
-      version: '0.4.0',
+      version: '0.5.0',
     }) + '\n',
   )
 }

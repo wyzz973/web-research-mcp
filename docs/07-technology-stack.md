@@ -59,3 +59,5 @@ SDK、网络、正文提取、Schema、测试工具与 SQLite 已加入本版本
 ## 本地验收页面
 
 工作台使用 Node 内置 HTTP 与静态 HTML/CSS/ES Modules，复用 TypeScript 业务运行时；无额外 Web 框架或前端构建依赖。浏览器展示与 MCP stdio 为独立适配器，HTTP 只监听 loopback。候选排序采用本地 BM25 与词集相似度 MMR 实验，默认不启用额外推理模型。设计见 [ADR 0007](decisions/0007-search-quality-workbench.md)。
+
+0.5.0 可选动态渲染使用 Crawl4AI 0.9.3、Python 3.12.11、Playwright 1.62.0 及其固定浏览器 revision；Python wheel 哈希锁定，Chromium 保留 sandbox。Node 负责全部实际网络策略，Python 本身禁止互联网 socket，子进程通过本地管道交换有界数据。无额外模型调用，仍免 Key。

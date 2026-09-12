@@ -245,7 +245,10 @@ async function search(continuation = false) {
       ),
     ]
     if (sites.length) input.sites = sites
-    if (byId('extract').checked) input.max_evidence_results = 3
+    if (byId('extract').checked) {
+      input.max_evidence_results = 3
+      input.fetch_engine = byId('fetch-engine').value
+    }
     if (!input.query) {
       byId('query').focus()
       return
@@ -534,7 +537,16 @@ function selectResult(result, focus) {
     actions.append(
       button(
         '抓取网页原文 ↗',
-        () => read({ url: result.url, format: 'text', max_chars: 12000 }, 'document'),
+        () =>
+          read(
+            {
+              url: result.url,
+              format: 'text',
+              max_chars: 12000,
+              engine: byId('fetch-engine').value,
+            },
+            'document',
+          ),
         'secondary',
       ),
     )
@@ -620,6 +632,10 @@ async function refreshStatus() {
   try {
     const output = await api('/api/status')
     byId('status-json').textContent = JSON.stringify(output, null, 2)
+    if (output.crawl4ai)
+      byId('crawl4ai-hint').textContent = output.crawl4ai.installed
+        ? `Crawl4AI ${output.crawl4ai.version || ''} 已安装。动态读取执行网页 JavaScript，不调用 LLM；快照续读不重新出网。`
+        : 'Crawl4AI 尚未安装，请在项目目录运行 pnpm crawl4ai:setup。静态读取仍可使用；动态读取不会绕过验证码或 robots。'
     byId('connection').textContent =
       output.search_configured === false ? '本地已连接 · 搜索未配置' : '本地服务已连接'
     byId('connection').classList.add('ready')

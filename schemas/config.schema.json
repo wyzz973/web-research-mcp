@@ -172,7 +172,9 @@
         "max_output_chars",
         "allow_https_downgrade",
         "parser_memory_mb",
-        "user_agent"
+        "user_agent",
+        "default_engine",
+        "crawl4ai"
       ],
       "properties": {
         "deadline_ms": {
@@ -203,7 +205,7 @@
           "const": true
         },
         "browser_fallback": {
-          "const": false
+          "type": "boolean"
         },
         "global_concurrency": {
           "type": "integer",
@@ -236,6 +238,34 @@
         "user_agent": {
           "type": "string",
           "minLength": 1
+        },
+        "default_engine": {
+          "enum": ["static", "crawl4ai", "auto"]
+        },
+        "crawl4ai": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "deadline_ms", "wait_ms", "concurrency"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "deadline_ms": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 90000
+            },
+            "wait_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5000
+            },
+            "concurrency": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2
+            }
+          }
         }
       }
     },

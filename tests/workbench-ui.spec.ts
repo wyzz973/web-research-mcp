@@ -50,6 +50,7 @@ async function setup(handler?: ApiHandler, evaluation: unknown = { available: fa
       return Promise.resolve(
         Response.json({
           service: 'ready',
+          crawl4ai: { installed: false, version: '0.9.3' },
           search_configured: true,
           engines: [{ id: 'google', status: 'blocked', message: 'Challenge observed' }],
         }),
@@ -105,6 +106,7 @@ describe('local workbench browser behavior', () => {
     )
     input('sites', 'sqlite.org， docs.python.org sqlite.org')
     input('ranking', 'bm25_mmr')
+    input('fetch-engine', 'crawl4ai')
     submit()
     await vi.waitFor(() =>
       expect(document.querySelector('blockquote')?.textContent).toBe(
@@ -125,6 +127,7 @@ describe('local workbench browser behavior', () => {
         evidence_mode: 'extract',
         sites: ['sqlite.org', 'docs.python.org'],
         max_evidence_results: 3,
+        fetch_engine: 'crawl4ai',
       }),
     )
     expect(document.getElementById('notice')?.textContent).toContain('Google is cooling down')
@@ -255,7 +258,57 @@ describe('local workbench browser behavior', () => {
     )
     expect(document.querySelector('.document')).toBeNull()
     expect(document.getElementById('read-area')?.textContent).toContain('非连续全文')
-    expect(calls.filter((call) => call.path === '/api/fetch')).toHaveLength(3)
+    const reads = calls.filter((call) => call.path === '/api/fetch')
+    expect(reads).toHaveLength(3)
+    for (const request of reads) {
+      if (typeof request.init?.body !== 'string') throw new Error('Expected JSON request body')
+      expect(JSON.parse(request.init.body)).not.toHaveProperty('engine')
+    }
+  })
+
+  it('uses the selected backend for a fresh URL, omits it for search without evidence, and reports installation failures', async () => {
+    const { dom, document, calls, input, submit, click } = await setup(async (path) =>
+      Response.json(
+        path === '/api/search'
+          ? {
+              status: 'ok',
+              results: [
+                {
+                  ...baseResult,
+                  evidence: [],
+                  evidence_status: 'not_requested',
+                  next_evidence_cursor: null,
+                },
+              ],
+            }
+          : {
+              status: 'error',
+              error: { code: 'CONFIGURATION_REQUIRED', message: 'Run pnpm crawl4ai:setup' },
+            },
+      ),
+    )
+    expect(document.getElementById('crawl4ai-hint')?.textContent).toContain('pnpm crawl4ai:setup')
+    input('fetch-engine', 'auto')
+    const extract = document.getElementById('extract')
+    if (!(extract instanceof dom.window.HTMLInputElement)) throw new Error('Missing extract input')
+    extract.checked = false
+    submit()
+    await vi.waitFor(() => expect(document.querySelector('.source-heading')).not.toBeNull())
+    const search = calls.find((call) => call.path === '/api/search')
+    if (typeof search?.init?.body !== 'string') throw new Error('Expected search JSON')
+    expect(JSON.parse(search.init.body)).not.toHaveProperty('fetch_engine')
+    click('抓取网页原文 ↗')
+    await vi.waitFor(() =>
+      expect(document.getElementById('read-status')?.textContent).toContain('pnpm crawl4ai:setup'),
+    )
+    const request = calls.find((call) => call.path === '/api/fetch')
+    if (typeof request?.init?.body !== 'string') throw new Error('Expected fetch JSON')
+    expect(JSON.parse(request.init.body)).toEqual({
+      url: baseResult.url,
+      format: 'text',
+      max_chars: 12000,
+      engine: 'auto',
+    })
   })
 
   it('cancels actual request signals and shows cancellation without a false successful result', async () => {

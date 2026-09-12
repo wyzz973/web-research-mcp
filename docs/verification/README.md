@@ -9,3 +9,5 @@
 - [0.3.0 引擎诊断、排序评估与工作台](2026-09-10-search-quality-workbench.md)
 
 - [0.4.0 本地可观测与请求复用](2026-09-12-observability.md)
+
+- [0.5.0 Crawl4AI 接入](2026-09-12-crawl4ai.md)

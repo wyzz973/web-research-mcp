@@ -44,7 +44,7 @@
     "per_host_concurrency": 2,
     "public_urls_only": true,
     "respect_robots": true,
-    "browser_fallback": false,
+    "browser_fallback": true,
     "global_concurrency": 8,
     "parser_worker_concurrency": 2,
     "parser_timeout_ms": 5000,
@@ -52,7 +52,14 @@
     "max_output_chars": 50000,
     "allow_https_downgrade": false,
     "parser_memory_mb": 128,
-    "user_agent": "web-research-mcp/0.1 (+https://github.com/wyzz973/web-research-mcp)"
+    "user_agent": "web-research-mcp/0.1 (+https://github.com/wyzz973/web-research-mcp)",
+    "default_engine": "static",
+    "crawl4ai": {
+      "enabled": true,
+      "deadline_ms": 45000,
+      "wait_ms": 1500,
+      "concurrency": 1
+    }
   },
   "ranking": {
     "mode": "upstream",

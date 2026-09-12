@@ -47,5 +47,21 @@ export function validationMessage(
   ) {
     return 'Provide sites or include_domains, not both.'
   }
+  if (
+    name === 'webfetch.input' &&
+    value &&
+    typeof value === 'object' &&
+    'cursor' in value &&
+    'engine' in value
+  )
+    return 'Do not supply engine with cursor; the saved snapshot already fixes the fetch backend.'
+  if (
+    name === 'websearch.input' &&
+    value &&
+    typeof value === 'object' &&
+    'fetch_engine' in value &&
+    (!('evidence_mode' in value) || value.evidence_mode !== 'extract')
+  )
+    return 'fetch_engine requires evidence_mode=extract.'
   return ajv.errorsText(errors)
 }

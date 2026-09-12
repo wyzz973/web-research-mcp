@@ -42,10 +42,11 @@ async function main(): Promise<void> {
       ...(runtime.traces ? { traces: runtime.traces } : {}),
       status: () => ({
         service: 'ready',
-        package_version: '0.4.0',
+        package_version: '0.5.0',
         schema_version: '0.3-draft',
         search_configured: Boolean(runtime.provider),
         tracing: runtime.traceStatus,
+        crawl4ai: runtime.crawl4ai(),
         request_policy: runtime.resilient?.inspect() ?? null,
         ...(runtime.provider?.inspect() ?? { status: 'unconfigured', engines: [], endpoint: null }),
       }),

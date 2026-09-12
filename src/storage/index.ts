@@ -179,6 +179,7 @@ export function createSnapshotStore(options: {
           }
           const content = format === 'text' ? document.text : document.markdown
           const snapshot: DocumentSnapshot = {
+            ...(document.fetchBackend ? { fetchBackend: document.fetchBackend } : {}),
             sourceId: makeSourceId(document.url),
             snapshotId,
             url: document.url,

@@ -66,8 +66,10 @@
             提取正文，<b>Turndown</b> 转为 Markdown；<b>SQLite</b> 保存正文快照和续读位置。
           </p>
           <p>
-            它不会运行网页 JavaScript。验证码、robots
-            禁止、超时或必须动态渲染的页面可能无法读取；失败会保留在记录中，不会把搜索摘要冒充原文。
+            静态模式不执行网页 JavaScript。Crawl4AI 动态模式启动独立 Chromium 执行
+            JavaScript，再提取可读正文；无需 LLM 或 API
+            Key。自动模式先静态读取，仅在允许的提取失败时尝试动态读取。验证码、robots
+            禁止、超时或受限资源仍可能导致失败，不会绕过访问限制或把摘要冒充原文。
           </p>
         </details>
       </section>
@@ -107,10 +109,20 @@
             </select></label
           ><label class="search-control checkbox"
             ><input id="trace-evidence" type="checkbox" checked />提取前 3 条原文</label
+          ><label for="trace-fetch-engine"
+            >原文读取方式<select id="trace-fetch-engine" aria-describedby="crawl4ai-hint">
+              <option value="static">静态</option>
+              <option value="crawl4ai">Crawl4AI 动态</option>
+              <option value="auto">自动（静态失败或正文过短再动态）</option>
+            </select></label
           ><label class="checkbox"
             ><input id="trace-content" type="checkbox" checked />记录查询与正文预览（仅本机）</label
           >
         </div>
+        <p id="crawl4ai-hint" class="small">
+          动态模式用 Chromium 执行网页 JavaScript；不调用 LLM，不绕过验证码或
+          robots。关闭搜索原文提取后，此选项不参与搜索。
+        </p>
         <p id="request-hint" class="small">
           提交会实际访问上游。重复点击将取消上次调用并开始新调用；逐步回看只读记录，不重发搜索。
         </p>

@@ -169,6 +169,9 @@
       "type": "string",
       "format": "uuid",
       "description": "Optional local execution trace identifier. No hosted tracing account is required."
+    },
+    "fetch_backend": {
+      "enum": ["static", "crawl4ai"]
     }
   },
   "required": ["schema_version", "request_id", "status", "warnings", "error"],

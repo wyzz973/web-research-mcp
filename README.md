@@ -14,7 +14,7 @@
 - **受控抓取**：DNS 固定连接、SSRF/跳转检查、robots、压缩/输出上限、取消、独立解析 worker 与资源清理。
 - **真实 MCP 入口**：SDK 2、stdio 和旧版初始化兼容路径；结构化输出与文本输出一致。
 
-版本为 0.4.0，业务契约为 0.3-draft。新增引擎冷却/恢复诊断、56 条中英文查询的评估工具、可选 BM25/MMR 候选排序与本地验收页面。默认保留上游顺序；PDF、动态浏览器、向量召回和神经精排不属于本版本。RRF 仅有离线函数，在线没有独立引擎排名，不伪造融合结果。high 证据等级不表示事实一定正确。
+版本为 0.5.0，业务契约为 0.3-draft。新增引擎冷却/恢复诊断、56 条中英文查询的评估工具、可选 BM25/MMR 候选排序与本地验收页面。默认保留上游顺序；已支持受控 Crawl4AI 动态渲染；PDF、向量召回和神经精排不属于本版本。RRF 仅有离线函数，在线没有独立引擎排名，不伪造融合结果。high 证据等级不表示事实一定正确。
 
 ## 可视化观察每一步
 
@@ -74,6 +74,19 @@ pnpm call webfetch '{"cursor":"ACTUAL_CURSOR","max_chars":3000}'
 
 示例使用匿名 **Brave 网页搜索 + DuckDuckGo 网页搜索**，不使用商业 Search API。可选择其他经准入的引擎；可达性与结果质量会变化。
 
+## Crawl4AI 动态网页
+
+可选安装独立 Python/Crawl4AI/Chromium，无需 Docker 或搜索 Key：
+
+```sh
+pnpm crawl4ai:setup
+pnpm call webfetch '{"url":"https://quotes.toscrape.com/js/","engine":"crawl4ai","format":"text"}' --config config/local.example.json
+```
+
+`engine=static` 为默认轻量 HTTP 提取；`crawl4ai` 执行受控浏览器渲染；`auto` 仅在静态提取失败或 HTML 正文少于 80 个非空白字符时尝试动态。验证码、robots、私网、HTTPS 降级、超时不会触发绕过。搜索提取证据时可以指定 `fetch_engine`，游标续读不带 engine。
+
+两张工作台页面均可选择抓取策略，并在 trace 中看到 Crawl4AI 渲染与资源网关步骤。返回 fetch_backend 与快照中的提取器版本标识实际后端。详见 [Crawl4AI 安装与限制](deploy/crawl4ai/README.md)。
+
 ## 连接 MCP 客户端
 
 配置客户端使用 Node 24 启动 dist/mcp/stdio.js。以下为常见 mcpServers 格式，路径需替换成本机路径：
@@ -106,6 +119,8 @@ SEARXNG_URL=http://127.0.0.1:18888 SEARXNG_ENGINES=brave,duckduckgo pnpm test:li
 ```
 
 check 包括类型、类型感知 lint、格式、生成类型、Schema、模块边界、文档、离线行为与 MCP 测试。test:built 将真实 tarball 安装到干净目录，验证 SQLite、MCP 入口和解析 worker。test:live 明确访问上游，不放入普通 CI；失败会保存到被 Git 忽略的 artifacts/live/result.json，不自动绕过封锁。
+
+0.5.0 的动态页面、网关、快照与取消验证见 [Crawl4AI 验收报告](docs/verification/2026-09-12-crawl4ai.md)。
 
 0.4.0 的真实步骤、缓存与取消验证见 [可观测验收报告](docs/verification/2026-09-12-observability.md)。
 

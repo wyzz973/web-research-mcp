@@ -37,4 +37,8 @@ export type WebSearchInput = {
    * Optional candidate reranking over the frozen title/snippet pool. Default uses deployment ranking.mode (upstream by default); repeat the same mode for cursor reads. Scores are not truth probabilities.
    */
   ranking_mode?: 'upstream' | 'bm25' | 'bm25_mmr'
+  /**
+   * Fetch strategy for new URL reads. static uses HTTP/readability; crawl4ai renders with a protected local Chromium; auto falls back only after static EXTRACTION_FAILED or under 80 visible HTML text characters. Requires pnpm crawl4ai:setup for browser rendering.
+   */
+  fetch_engine?: 'static' | 'crawl4ai' | 'auto'
 }

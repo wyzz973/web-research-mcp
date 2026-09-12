@@ -23,6 +23,10 @@
       "minimum": 100,
       "maximum": 50000,
       "default": 12000
+    },
+    "engine": {
+      "enum": ["static", "crawl4ai", "auto"],
+      "description": "Fetch strategy for new URL reads. static uses HTTP/readability; crawl4ai renders with a protected local Chromium; auto falls back only after static EXTRACTION_FAILED or under 80 visible HTML text characters. Requires pnpm crawl4ai:setup for browser rendering."
     }
   },
   "required": [],
@@ -38,6 +42,18 @@
       "required": ["cursor"],
       "not": {
         "required": ["url"]
+      }
+    }
+  ],
+  "allOf": [
+    {
+      "if": {
+        "required": ["cursor"]
+      },
+      "then": {
+        "not": {
+          "required": ["engine"]
+        }
       }
     }
   ]

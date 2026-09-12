@@ -46,7 +46,7 @@ export interface RuntimeConfiguration {
     per_host_concurrency: number
     public_urls_only: true
     respect_robots: true
-    browser_fallback: false
+    browser_fallback: boolean
     global_concurrency: number
     parser_worker_concurrency: number
     parser_timeout_ms: number
@@ -55,6 +55,13 @@ export interface RuntimeConfiguration {
     allow_https_downgrade: false
     parser_memory_mb: number
     user_agent: string
+    default_engine: 'static' | 'crawl4ai' | 'auto'
+    crawl4ai: {
+      enabled: boolean
+      deadline_ms: number
+      wait_ms: number
+      concurrency: number
+    }
   }
   ranking: {
     mode: 'upstream' | 'bm25' | 'bm25_mmr'

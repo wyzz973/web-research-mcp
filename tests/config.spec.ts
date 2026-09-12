@@ -55,7 +55,7 @@ describe('configuration admission at startup', () => {
     { search: { upstream_policy: { requires_account: true } } },
     { search: { upstream_policy: { allow_paid_proxy_dependency: true } } },
     { fetch: { public_urls_only: false } },
-    { fetch: { browser_fallback: true } },
+    { fetch: { crawl4ai: { concurrency: 3 } } },
   ])('rejects unknown fields and weakened fixed policies %j', (override) => {
     expect(() => loadConfiguration(configFile(override))).toThrow(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' }),

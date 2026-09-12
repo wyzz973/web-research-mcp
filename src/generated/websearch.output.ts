@@ -72,6 +72,7 @@ export type WebSearchOutput = {
       corpus_size: number
       version: string
     }
+    fetch_backend?: 'static' | 'crawl4ai'
   }[]
   providers: {
     id: string

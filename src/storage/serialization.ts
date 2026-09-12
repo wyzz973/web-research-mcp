@@ -92,7 +92,14 @@ export function decodeSnapshot(value: unknown): DocumentSnapshot {
     }
     return { id: item.id, text: item.text, start_char: item.start_char, end_char: item.end_char }
   })
+  if (
+    value.fetchBackend !== undefined &&
+    value.fetchBackend !== 'static' &&
+    value.fetchBackend !== 'crawl4ai'
+  )
+    throw new AppError('STORAGE_UNAVAILABLE', 'Invalid stored fetch backend.')
   const snapshot: DocumentSnapshot = {
+    ...(value.fetchBackend !== undefined ? { fetchBackend: value.fetchBackend } : {}),
     sourceId: parseSourceId(stringField('sourceId')),
     snapshotId: parseSnapshotId(stringField('snapshotId')),
     url: stringField('url'),

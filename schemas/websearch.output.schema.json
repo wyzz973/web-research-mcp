@@ -189,6 +189,9 @@
                 "minLength": 1
               }
             }
+          },
+          "fetch_backend": {
+            "enum": ["static", "crawl4ai"]
           }
         },
         "required": [

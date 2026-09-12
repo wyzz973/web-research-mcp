@@ -34,7 +34,10 @@ export interface SearchProvider {
   close(): Promise<void>
 }
 
+export type FetchEngine = 'static' | 'crawl4ai' | 'auto'
+
 export interface LoadedDocument {
+  readonly fetchBackend?: 'static' | 'crawl4ai'
   readonly sourceMetadata?: SourceMetadata
   readonly url: string
   readonly finalUrl: string
@@ -48,7 +51,10 @@ export interface LoadedDocument {
 }
 
 export interface DocumentLoader {
-  load(url: string, options: { signal: AbortSignal; scope?: DomainScope }): Promise<LoadedDocument>
+  load(
+    url: string,
+    options: { signal: AbortSignal; scope?: DomainScope; engine?: FetchEngine },
+  ): Promise<LoadedDocument>
   close(): Promise<void>
 }
 
@@ -60,6 +66,7 @@ export interface Segment {
 }
 
 export interface DocumentSnapshot {
+  readonly fetchBackend?: 'static' | 'crawl4ai'
   readonly sourceMetadata?: SourceMetadata
   readonly sourceId: SourceId
   readonly snapshotId: SnapshotId

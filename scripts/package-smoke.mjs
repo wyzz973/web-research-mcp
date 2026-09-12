@@ -127,6 +127,12 @@ try {
   await client.connect(transport)
   const tools = await client.listTools()
   if (tools.tools.length !== 2) throw new Error('Installed tools missing')
+  const optionalBrowser = await client.callTool({
+    name: 'webfetch',
+    arguments: { url: 'https://example.org/', engine: 'crawl4ai' },
+  })
+  if (optionalBrowser.structuredContent?.error?.code !== 'CONFIGURATION_REQUIRED')
+    throw new Error('Optional browser must give setup instructions in a clean package install')
   const fetched = await client.callTool({
     name: 'webfetch',
     arguments: { url: 'http://127.0.0.1/' },

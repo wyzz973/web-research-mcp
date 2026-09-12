@@ -58,6 +58,7 @@ async function setup(handler?: ApiHandler) {
       return Promise.resolve(
         Response.json({
           service: 'ready',
+          crawl4ai: { installed: false, version: '0.9.3' },
           search_configured: true,
           engines: [{ engine: 'duckduckgo', status: 'cooling_down', reason: 'CAPTCHA' }],
         }),
@@ -176,6 +177,7 @@ describe('trace explorer actual browser DOM', () => {
     })
     input('trace-sites', 'sqlite.org，docs.python.org sqlite.org')
     input('trace-ranking', 'bm25_mmr')
+    input('trace-fetch-engine', 'auto')
     submit()
     await vi.waitFor(
       () =>
@@ -201,6 +203,7 @@ describe('trace explorer actual browser DOM', () => {
       evidence_mode: 'extract',
       sites: ['sqlite.org', 'docs.python.org'],
       max_evidence_results: 3,
+      fetch_engine: 'auto',
     })
     finish?.(Response.json({ status: 'partial', trace_id: 'run-live' }))
     await vi.waitFor(() =>
@@ -214,6 +217,7 @@ describe('trace explorer actual browser DOM', () => {
       return Response.json({ status: 'ok' })
     })
     input('trace-mode', 'fetch')
+    input('trace-fetch-engine', 'crawl4ai')
     document.getElementById('trace-mode')?.dispatchEvent(new dom.window.Event('change'))
     const capture = document.getElementById('trace-content')
     if (!(capture instanceof dom.window.HTMLInputElement))
@@ -233,12 +237,63 @@ describe('trace explorer actual browser DOM', () => {
       url: 'https://www.sqlite.org/wal.html',
       format: 'text',
       max_chars: 8000,
+      engine: 'crawl4ai',
     })
     expect(
       [...document.querySelectorAll('.search-control')].every((control) =>
         control.hasAttribute('hidden'),
       ),
     ).toBe(true)
+  })
+
+  it('omits the fetch engine when evidence is disabled and explains actual Crawl4AI steps without rerunning them', async () => {
+    const names = ['start', 'render', 'resource', 'blocked', 'extract', 'finish', 'fallback']
+    const browserRun = {
+      ...run,
+      tool: 'webfetch',
+      spans: names.map((name, index) => ({
+        ...run.spans[0],
+        id: `browser-${index}`,
+        name: `crawl4ai.${name}`,
+      })),
+    }
+    const { dom, document, calls, input, submit, click } = await setup(async (path) =>
+      Response.json(
+        path === '/api/traces'
+          ? { runs: [browserRun] }
+          : path.startsWith('/api/traces/')
+            ? { run: browserRun }
+            : { status: 'ok' },
+      ),
+    )
+    expect(document.getElementById('crawl4ai-hint')?.textContent).toContain('pnpm crawl4ai:setup')
+    const requestCount = calls.length
+    const expectedExplanations = [
+      '启动独立 Chromium',
+      'Chromium 打开网页并执行 JavaScript',
+      '每个请求仍需符合网络策略',
+      '本次访问被阻止',
+      '不是模型生成的答案',
+      '步骤结束不等于正文一定取得成功',
+      '继续消耗本次预算',
+    ]
+    for (const explanation of expectedExplanations) {
+      click('next-step')
+      expect(document.getElementById('step-detail')?.textContent).toContain(explanation)
+    }
+    expect(document.getElementById('step-detail')?.textContent).toContain(
+      '不会用动态模式绕过验证码或 robots',
+    )
+    expect(calls).toHaveLength(requestCount)
+    input('trace-fetch-engine', 'crawl4ai')
+    const extract = document.getElementById('trace-evidence')
+    if (!(extract instanceof dom.window.HTMLInputElement)) throw new Error('Missing evidence input')
+    extract.checked = false
+    submit()
+    await vi.waitFor(() => expect(calls.some((call) => call.path === '/api/search')).toBe(true))
+    const request = calls.find((call) => call.path === '/api/search')
+    if (typeof request?.init?.body !== 'string') throw new Error('Expected search JSON')
+    expect(JSON.parse(request.init.body)).not.toHaveProperty('fetch_engine')
   })
 
   it('aborts real fetch signals on cancel and does not let late cancelled responses override a new call', async () => {

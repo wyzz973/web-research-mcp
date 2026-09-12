@@ -80,12 +80,24 @@
               <option value="12">12 条</option>
             </select></label
           >
+          <label for="fetch-engine"
+            ><span>原文读取方式</span
+            ><select id="fetch-engine" aria-describedby="crawl4ai-hint">
+              <option value="static">静态</option>
+              <option value="crawl4ai">Crawl4AI 动态</option>
+              <option value="auto">自动（静态失败或正文过短再动态）</option>
+            </select></label
+          >
           <label class="checkbox-field"
             ><input id="extract" type="checkbox" checked /><span>提取前 3 条原文</span></label
           >
         </div>
         <p id="sites-hint" class="field-hint">
           多个域名用逗号或空格分隔，包含子域。留空搜索所有站点。
+        </p>
+        <p id="crawl4ai-hint" class="field-hint">
+          动态模式用 Chromium 执行网页 JavaScript，再提取正文；不调用 LLM，不绕过验证码或
+          robots。快照续读不会重新启动浏览器。
         </p>
       </form>
       <div class="examples">

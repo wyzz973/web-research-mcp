@@ -25,6 +25,7 @@ interface SearchSpec {
   evidenceMode: 'none' | 'extract'
   evidenceResults: number
   rankingMode: 'upstream' | 'bm25' | 'bm25_mmr'
+  fetchEngine: 'static' | 'crawl4ai' | 'auto'
 }
 
 interface SavedPool {
@@ -47,6 +48,7 @@ function fingerprint(spec: SearchSpec, config: RuntimeConfiguration): string {
         icu: process.versions.icu,
         evidencePolicy: 'paragraph_context_v2',
         rankingVersion: RETRIEVAL_VERSION,
+        fetchPolicy: config.fetch.crawl4ai,
       }),
     )
     .digest('hex')
@@ -92,6 +94,8 @@ function resolve(input: WebSearchInput, config: RuntimeConfiguration): SearchSpe
     limit: input.limit ?? config.search.limit,
     evidenceMode,
     evidenceResults,
+    fetchEngine:
+      evidenceMode === 'extract' ? (input.fetch_engine ?? config.fetch.default_engine) : 'static',
   }
 }
 
@@ -375,7 +379,7 @@ async function enrich(
     const document = await trace.span(
       'evidence.fetch',
       { url: row.url, rank: row.rank },
-      () => loader.load(row.url, { signal, scope: spec.scope }),
+      () => loader.load(row.url, { signal, scope: spec.scope, engine: spec.fetchEngine }),
       (value) => ({
         title: value.title,
         text_chars: Array.from(value.text).length,
@@ -410,6 +414,7 @@ async function enrich(
         }),
       (value) => ({ passage_count: value.length, passages: value.slice(0, 3) }),
     )
+    row.fetch_backend = snapshot.fetchBackend ?? 'static'
     row.warnings.push(...snapshot.warnings)
     row.source_metadata =
       snapshot.sourceMetadata ??

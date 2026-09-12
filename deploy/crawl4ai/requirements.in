@@ -1,0 +1,2 @@
+# Optional native renderer; no LLM extraction extras.
+crawl4ai==0.9.3

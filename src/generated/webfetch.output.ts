@@ -66,6 +66,7 @@ export type WebFetchOutput = {
    * Optional local execution trace identifier. No hosted tracing account is required.
    */
   trace_id?: string
+  fetch_backend?: 'static' | 'crawl4ai'
 }
 export type Relevance = {
   score: number | null

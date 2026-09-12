@@ -82,3 +82,11 @@ websearch 新增 ranking_mode=upstream|bm25|bm25_mmr；省略使用部署 rankin
 0.4.0 在 websearch/webfetch 输出中添加可选 trace_id，指向本地有界执行记录。request_id 仍为本次工具响应 ID。trace 不附在正常工具输出中，避免占用 LLM 上下文。原文/候选游标和错误语义保持不变；诊断存储失败不会改变工具结果，操作者在 /api/status 看到 tracing=storage_unavailable。
 
 成功 Provider 搜索页可在同进程复用 60 秒；这不是新网页抓取，标题/摘要的观察可能来自短缓存。完整页面证据仍有真实 fetched_at 和快照定位。部分失败/错误页不缓存、不自动使用过期候选。元数据采集默认不开正文记录；本地调试开启后仍有脱敏/截断。
+
+## 0.5.0 抓取后端
+
+webfetch 新 URL 请求允许 engine=static|crawl4ai|auto，省略使用部署 fetch.default_engine（默认 static）。cursor 请求禁止 engine，因为快照已固定提取方式。websearch 提取证据时可指定 fetch_engine，同样参与冻结候选池指纹；未启用 evidence_mode=extract 时禁止该字段。
+
+crawl4ai 使用可选安装的独立 Python/Chromium，默认总预算 45 秒、固定渲染等待 1.5 秒、一个浏览器并发。它只处理匿名受控 GET，不接收任意 JS、Cookie、身份信息或浏览器代理设置。auto 仅对 EXTRACTION_FAILED 或 HTML 少于 80 个非空白字符的静态结果尝试浏览器，不对策略/验证码/robots/超时/大小/MIME失败后备。fetch.browser_fallback 可禁用 auto；显式动态还受 fetch.crawl4ai.enabled 约束。
+
+响应 fetch_backend=static|crawl4ai 表示实际后端，随正文快照保存并在续读中保持。Crawl4AI 渲染后的 DOM 经统一 Readability/Turndown 规范化；quote/hash/Unicode offsets 相对保存的提取文本，不宣称等于原始服务器 HTML。缺少安装返回 CONFIGURATION_REQUIRED 并给出 setup 命令。受控浏览器不解决所有动态网站、验证码或需要登录/POST API 的页面。

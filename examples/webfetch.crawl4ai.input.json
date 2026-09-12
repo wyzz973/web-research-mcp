@@ -1,0 +1,6 @@
+{
+  "url": "https://quotes.toscrape.com/js/",
+  "engine": "crawl4ai",
+  "format": "text",
+  "max_chars": 3000
+}
