@@ -1,4 +1,5 @@
 /** Fetch and paginate immutable snapshots without re-fetching on continuation. */
+import { noOpTraceRecorder, type TraceRecorder } from '../shared/trace.ts'
 import { randomUUID } from 'node:crypto'
 import type { WebFetchInput } from '../generated/webfetch.input.ts'
 import type { WebFetchOutput } from '../generated/webfetch.output.ts'
@@ -96,12 +97,15 @@ export function createWebFetch(
   config: RuntimeConfiguration,
   loader: DocumentLoader,
   store: SnapshotStore,
+  trace: TraceRecorder = noOpTraceRecorder,
 ) {
   return async (raw: unknown, parent: AbortSignal): Promise<WebFetchOutput> => {
     const requestId = randomUUID()
     const deadline = withDeadline(parent, config.fetch.deadline_ms)
     try {
-      const args = parseContract<WebFetchInput>('webfetch.input', raw)
+      const args = await trace.span('fetch.resolve', raw, async () =>
+        parseContract<WebFetchInput>('webfetch.input', raw),
+      )
       const maxChars = args.max_chars ?? config.fetch.max_chars
       if (maxChars > config.fetch.max_output_chars)
         throw new AppError(
@@ -124,7 +128,17 @@ export function createWebFetch(
               'CURSOR_MISMATCH',
               'Evidence cursors read original text; use the snapshot cursor for another document view.',
             )
-          const { snapshot: evidenceSnapshot, page } = readEvidencePage(payload, store, maxChars)
+          const { snapshot: evidenceSnapshot, page } = await trace.span(
+            'fetch.read_evidence',
+            { max_chars: maxChars, view: 'evidence' },
+            async () => readEvidencePage(payload, store, maxChars),
+            (value) => ({
+              snapshot_id: value.snapshot.snapshotId,
+              returned_passages: value.page.evidence.length,
+              has_more: value.page.has_more_evidence,
+              network_requested: false,
+            }),
+          )
           return {
             schema_version: '0.3-draft',
             request_id: requestId,
@@ -160,17 +174,56 @@ export function createWebFetch(
           }
         }
         const cursor = readCursor(payload)
-        snapshot = store.getDocument(cursor.snapshotId)
+        snapshot = await trace.span(
+          'fetch.read_snapshot',
+          { snapshot_id: cursor.snapshotId, offset: cursor.offset },
+          async () => store.getDocument(cursor.snapshotId),
+          (value) => ({
+            snapshot_id: value.snapshotId,
+            text_chars: Array.from(value.content).length,
+            network_requested: false,
+          }),
+        )
         offset = cursor.offset
         if (args.format && args.format !== snapshot.format)
           throw new AppError('CURSOR_MISMATCH', 'The format differs from this cursor snapshot.')
       } else {
         if (!args.url) throw new AppError('INVALID_ARGUMENT', 'A URL or cursor is required.')
-        const document = await loader.load(args.url, { signal: deadline.signal })
+        const url = args.url
+        const document = await trace.span(
+          'fetch.load',
+          { url },
+          () => loader.load(url, { signal: deadline.signal }),
+          (value) => ({
+            title: value.title,
+            text_chars: Array.from(value.text).length,
+            warnings: value.warnings,
+          }),
+        )
         throwIfAborted(deadline.signal)
-        snapshot = store.saveDocument(document, args.format ?? 'markdown')
+        snapshot = await trace.span(
+          'fetch.snapshot',
+          { url: document.finalUrl, format: args.format ?? 'markdown' },
+          async () => store.saveDocument(document, args.format ?? 'markdown'),
+          (value) => ({
+            snapshot_id: value.snapshotId,
+            content_sha256: value.contentSha256,
+            expires_at: value.expiresAt,
+          }),
+        )
       }
-      return snapshotPage(snapshot, offset, maxChars, store, requestId)
+      const documentSnapshot = snapshot
+      return await trace.span(
+        'fetch.present',
+        { snapshot_id: snapshot.snapshotId, offset, max_chars: maxChars },
+        async () => snapshotPage(documentSnapshot, offset, maxChars, store, requestId),
+        (value) => ({
+          status: value.status,
+          content_chars: Array.from(value.content ?? '').length,
+          content_preview: value.content?.slice(0, 1800),
+          has_more: Boolean(value.next_cursor),
+        }),
+      )
     } catch (error) {
       return {
         schema_version: '0.3-draft',

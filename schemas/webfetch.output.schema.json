@@ -164,6 +164,11 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 8000
+    },
+    "trace_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Optional local execution trace identifier. No hosted tracing account is required."
     }
   },
   "required": ["schema_version", "request_id", "status", "warnings", "error"],

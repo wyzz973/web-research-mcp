@@ -374,6 +374,11 @@
     },
     "evidence_summary": {
       "$ref": "#/$defs/evidence_summary"
+    },
+    "trace_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Optional local execution trace identifier. No hosted tracing account is required."
     }
   },
   "required": [

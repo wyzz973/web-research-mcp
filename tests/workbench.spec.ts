@@ -28,6 +28,7 @@ async function fixture() {
     uiDirectory: pathToFileURL(`${directory}/`),
     websearch,
     webfetch: runtime.webfetch,
+    ...(runtime.traces ? { traces: runtime.traces } : {}),
     status: () => ({ engines: [], search_configured: false }),
     evaluation: async () => ({ available: false }),
   })
@@ -40,6 +41,45 @@ async function fixture() {
 }
 
 describe('local workbench HTTP boundary', () => {
+  it('correlates authenticated trace requests and protects recorded inputs from unauthenticated access', async () => {
+    const { app, headers } = await fixture()
+    const correlation = 'b2db4116-c63d-4fc8-8f11-99d5a632edbd'
+    const response = await fetch(`${app.url}/api/search`, {
+      method: 'POST',
+      headers: { ...headers, 'x-trace-request': correlation, 'x-trace-content': 'true' },
+      body: JSON.stringify({ query: 'inspect this query' }),
+    })
+    const output = (await response.json()) as WebSearchOutput
+    expect(output.trace_id).toBeTypeOf('string')
+    expect((await fetch(`${app.url}/api/traces`)).status).toBe(403)
+    expect((await fetch(`${app.url}/api/traces/${output.trace_id}`)).status).toBe(403)
+    const history = await fetch(`${app.url}/api/traces`, { headers })
+    const listing = (await history.json()) as {
+      runs: Array<{ id: string; span_count: number; client_request_id: string }>
+    }
+    expect(listing.runs[0]?.client_request_id).toBe(correlation)
+    expect(listing.runs[0]?.id).toBe(output.trace_id)
+    expect(listing.runs[0]?.span_count).toBeGreaterThan(0)
+    const trace = await fetch(`${app.url}/api/traces/${output.trace_id}`, { headers })
+    expect(await trace.json()).toMatchObject({
+      run: {
+        client_request_id: correlation,
+        status: 'error',
+        input: { query: 'inspect this query' },
+        capture_content: true,
+      },
+    })
+    expect(
+      (
+        await fetch(`${app.url}/api/search`, {
+          method: 'POST',
+          headers: { ...headers, 'x-trace-request': '../../other' },
+          body: '{}',
+        })
+      ).status,
+    ).toBe(400)
+  })
+
   it('boots a protected same-origin session and exposes the real tool failure envelope', async () => {
     const { app, headers } = await fixture()
     const response = await fetch(`${app.url}/api/search`, {

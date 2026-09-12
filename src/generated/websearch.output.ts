@@ -81,6 +81,10 @@ export type WebSearchOutput = {
   next_cursor: string | null
   scope: null | Scope
   evidence_summary: EvidenceSummary
+  /**
+   * Optional local execution trace identifier. No hosted tracing account is required.
+   */
+  trace_id?: string
 }
 export type Relevance = {
   score: number | null

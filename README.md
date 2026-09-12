@@ -14,7 +14,13 @@
 - **受控抓取**：DNS 固定连接、SSRF/跳转检查、robots、压缩/输出上限、取消、独立解析 worker 与资源清理。
 - **真实 MCP 入口**：SDK 2、stdio 和旧版初始化兼容路径；结构化输出与文本输出一致。
 
-版本为 0.3.0，业务契约为 0.3-draft。新增引擎冷却/恢复诊断、56 条中英文查询的评估工具、可选 BM25/MMR 候选排序与本地验收页面。默认保留上游顺序；PDF、动态浏览器、向量召回和神经精排不属于本版本。RRF 仅有离线函数，在线没有独立引擎排名，不伪造融合结果。high 证据等级不表示事实一定正确。
+版本为 0.4.0，业务契约为 0.3-draft。新增引擎冷却/恢复诊断、56 条中英文查询的评估工具、可选 BM25/MMR 候选排序与本地验收页面。默认保留上游顺序；PDF、动态浏览器、向量召回和神经精排不属于本版本。RRF 仅有离线函数，在线没有独立引擎排名，不伪造融合结果。high 证据等级不表示事实一定正确。
+
+## 可视化观察每一步
+
+打开 [过程观察](http://127.0.0.1:18900/trace)，可以实际运行搜索或 webfetch，并查看运行历史、步骤树、瀑布时间条、输入输出与中文解释。“上一步/下一步”只回看已记录步骤，不重发搜索。普通 MCP 调用也写入同一数据目录的 traces.sqlite，可通过输出 trace_id 关联。
+
+默认仅记录元数据；观察页明确勾选后可记录有界查询/正文预览，敏感字段始终屏蔽。最近 100 次/24 小时，数据不上传第三方。成功搜索页短缓存 60 秒，相同在途请求合并，控制上游启动间隔和并发；partial/错误不缓存，也不绕验证码。详见 [小白观察与调试指南](docs/14-observability.md)。
 
 ## 在浏览器里验收
 
@@ -66,7 +72,7 @@ pnpm call webfetch '{"url":"https://www.sqlite.org/fts5.html","format":"text","m
 pnpm call webfetch '{"cursor":"ACTUAL_CURSOR","max_chars":3000}'
 ```
 
-示例使用匿名 **Brave 网页搜索 + Google 网页搜索**，不使用商业 Search API。可选择其他经准入的引擎；可达性与结果质量会变化。
+示例使用匿名 **Brave 网页搜索 + DuckDuckGo 网页搜索**，不使用商业 Search API。可选择其他经准入的引擎；可达性与结果质量会变化。
 
 ## 连接 MCP 客户端
 
@@ -80,7 +86,7 @@ pnpm call webfetch '{"cursor":"ACTUAL_CURSOR","max_chars":3000}'
       "args": ["/absolute/path/to/web-research-mcp/dist/mcp/stdio.js"],
       "env": {
         "SEARXNG_URL": "http://127.0.0.1:18888",
-        "SEARXNG_ENGINES": "brave,google"
+        "SEARXNG_ENGINES": "brave,duckduckgo"
       }
     }
   }
@@ -96,10 +102,12 @@ stdio 会等待客户端输入；没有普通命令行输出是正常行为。st
 ```sh
 pnpm check
 pnpm test:built
-SEARXNG_URL=http://127.0.0.1:18888 SEARXNG_ENGINES=brave,google pnpm test:live
+SEARXNG_URL=http://127.0.0.1:18888 SEARXNG_ENGINES=brave,duckduckgo pnpm test:live
 ```
 
 check 包括类型、类型感知 lint、格式、生成类型、Schema、模块边界、文档、离线行为与 MCP 测试。test:built 将真实 tarball 安装到干净目录，验证 SQLite、MCP 入口和解析 worker。test:live 明确访问上游，不放入普通 CI；失败会保存到被 Git 忽略的 artifacts/live/result.json，不自动绕过封锁。
+
+0.4.0 的真实步骤、缓存与取消验证见 [可观测验收报告](docs/verification/2026-09-12-observability.md)。
 
 0.3.0 的完整测试、浏览器链路与 56 条查询结论见 [本版验收报告](docs/verification/2026-09-10-search-quality-workbench.md)。
 

@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { Client } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import { afterEach, describe, expect, it } from 'vitest'
+import { createTraceStore } from '../src/storage/traces.ts'
 import { parseContract } from '../src/shared/contracts.ts'
 import type { WebSearchOutput } from '../src/generated/websearch.output.ts'
 import type { WebFetchOutput } from '../src/generated/webfetch.output.ts'
@@ -113,6 +114,20 @@ describe('built MCP stdio executable', () => {
     const result = await firstSession.client.callTool({ name: 'websearch', arguments: args })
     const first = parseContract<WebSearchOutput>('websearch.output', result.structuredContent)
     expect(first.status).toBe('ok')
+    expect(first.trace_id).toBeTypeOf('string')
+    const traceStore = createTraceStore({ directory: join(cwd, 'data'), readOnly: true })
+    try {
+      const trace = traceStore.get(first.trace_id ?? '')
+      expect(trace?.tool).toBe('websearch')
+      expect(trace?.request_id).toBe(first.request_id)
+      expect(trace?.status).toBe('ok')
+      expect(trace?.spans.map((s) => s.name)).toContain('search.provider_request')
+      expect(trace?.capture_content).toBe(false)
+      expect(JSON.stringify(trace?.input)).not.toContain('MCP tools')
+    } finally {
+      traceStore.close()
+    }
+
     expect(first.results.map((item) => item.url)).toEqual(['https://example.org/a'])
     expect(first.scope?.removed_count).toBe(2)
     expect(first.results[0]?.confidence.fact_probability).toBeNull()

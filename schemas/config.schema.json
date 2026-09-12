@@ -307,6 +307,20 @@
           "const": false
         }
       }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "capture_content"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "capture_content": {
+          "type": "boolean",
+          "description": "Record bounded query and text previews locally. False records only operational metadata."
+        }
+      }
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",

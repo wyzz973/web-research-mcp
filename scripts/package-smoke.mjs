@@ -79,6 +79,7 @@ try {
       uiDirectory: pathToFileURL(path.join(installed, 'ui') + path.sep),
       websearch: runtime.websearch,
       webfetch: runtime.webfetch,
+      traces: runtime.traces,
       status: () => ({ search_configured: false, engines: [] }),
       evaluation: async () => ({ available: false }),
     })
@@ -91,10 +92,25 @@ try {
       headers,
       body: JSON.stringify({ url: 'http://127.0.0.1/' }),
     })
-    if ((await checked.json()).error?.code !== 'FETCH_BLOCKED')
-      throw new Error('Installed UI policy failed')
+    const checkedOutput = await checked.json()
+    if (checkedOutput.error?.code !== 'FETCH_BLOCKED') throw new Error('Installed UI policy failed')
     if ((await fetch(workbench.url + '/app.js')).status !== 200)
       throw new Error('Installed UI assets missing')
+    const traceHtml = await (await fetch(workbench.url + '/trace')).text()
+    if (!traceHtml.includes('name="workbench-token"') || !traceHtml.includes('/trace.js'))
+      throw new Error('Installed trace page missing')
+    const traceResponse = await fetch(workbench.url + '/api/traces/' + checkedOutput.trace_id, {
+      headers,
+    })
+    const traceBody = await traceResponse.json()
+    if (
+      traceResponse.status !== 200 ||
+      traceBody.run?.status !== 'error' ||
+      !traceBody.spans?.some((span) => span.name === 'fetch.dns')
+    )
+      throw new Error('Installed trace API or pipeline instrumentation missing')
+    if ((await fetch(workbench.url + '/api/traces')).status !== 403)
+      throw new Error('Installed traces exposed without session')
   } finally {
     await workbench?.close()
     await runtime.close()

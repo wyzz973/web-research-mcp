@@ -1,4 +1,5 @@
 /** Search bounded candidate pools, then optionally acquire exact page evidence. */
+import { noOpTraceRecorder, type TraceRecorder } from '../shared/trace.ts'
 import { createHash, randomUUID } from 'node:crypto'
 import type { WebSearchInput } from '../generated/websearch.input.ts'
 import type { WebSearchOutput } from '../generated/websearch.output.ts'
@@ -153,6 +154,7 @@ async function collect(
   config: RuntimeConfiguration,
   provider: SearchProvider,
   signal: AbortSignal,
+  trace: TraceRecorder,
 ): Promise<SavedPool> {
   const sites = spec.scope.sites.length ? spec.scope.sites : [undefined]
   const sources: SearchResult[] = []
@@ -186,16 +188,35 @@ async function collect(
       throwIfAborted(signal)
       requests++
       try {
-        const response = await provider.searchPage(
-          {
-            query: spec.query,
-            language: spec.language,
-            timeRange: spec.timeRange,
-            page,
-            ...(site === undefined ? {} : { site }),
+        const response = await trace.span(
+          'search.provider_request',
+          { query: spec.query, site, page, language: spec.language },
+          async () => {
+            const pageResult = await provider.searchPage(
+              {
+                query: spec.query,
+                language: spec.language,
+                timeRange: spec.timeRange,
+                page,
+                ...(site === undefined ? {} : { site }),
+              },
+              signal,
+            )
+            if (pageResult.errors.length) trace.annotate({ errors: pageResult.errors }, 'partial')
+            return pageResult
           },
-          signal,
+          (value) => ({
+            candidate_count: value.sources.length,
+            errors: value.errors,
+            exhausted: value.exhausted,
+            sources: value.sources.slice(0, 5),
+          }),
         )
+        if (response.errors.length)
+          trace.event('search.branch_partial', 'partial', {
+            errors: response.errors,
+            candidate_count: response.sources.length,
+          })
         warnings.push(...response.errors.map((error) => `Search branch ${index + 1}: ${error}`))
         if (response.errors.length)
           lastFailure = new AppError(
@@ -204,55 +225,70 @@ async function collect(
             true,
           )
         if (response.exhausted) finished.add(index)
-        for (const source of response.sources) {
-          if (candidates >= config.search.retrieval.max_candidates) {
-            truncated = true
-            break
-          }
-          candidates++
-          if (!matchesScope(source.url, spec.scope)) {
-            removedCount++
-            continue
-          }
-          const url = canonicalUrl(source.url)
-          const existing = seen.get(url)
-          if (existing) {
-            existing.providers = [...new Set([...existing.providers, ...source.engines])] as [
-              string,
-              ...string[],
-            ]
-            continue
-          }
-          const row: SearchResult = {
-            source_id: makeSourceId(url),
-            url,
-            title: source.title,
-            snippet: source.snippet,
-            published_at: source.publishedAt,
-            rank: sources.length + 1,
-            providers: [source.engines[0] ?? 'searxng', ...source.engines.slice(1)],
-            evidence_level: 'search_snippet',
-            evidence_status: 'not_requested',
-            evidence: [],
-            source_metadata: createSourceMetadata(url),
-            evidence_chars: 0,
-            has_more_evidence: false,
-            next_evidence_cursor: null,
-            relevance: wireRelevance(
-              scoreRelevance(
-                spec.query,
-                `${source.title}\n${source.snippet}`,
-                'title_snippet',
-                spec.language,
-              ),
-              'title_snippet',
-            ),
-            confidence: confidence('unknown', 'Page evidence has not been requested.'),
-            warnings: [],
-          }
-          sources.push(row)
-          seen.set(url, row)
-        }
+        const decisions: { url: string; decision: string }[] = []
+        await trace.span(
+          'search.filter_deduplicate',
+          { incoming_count: response.sources.length, scope: spec.scope },
+          async () => {
+            for (const source of response.sources) {
+              if (candidates >= config.search.retrieval.max_candidates) {
+                truncated = true
+                break
+              }
+              candidates++
+              if (!matchesScope(source.url, spec.scope)) {
+                removedCount++
+                decisions.push({ url: source.url, decision: 'outside_scope' })
+                continue
+              }
+              const url = canonicalUrl(source.url)
+              const existing = seen.get(url)
+              if (existing) {
+                decisions.push({ url, decision: 'duplicate' })
+                existing.providers = [...new Set([...existing.providers, ...source.engines])] as [
+                  string,
+                  ...string[],
+                ]
+                continue
+              }
+              const row: SearchResult = {
+                source_id: makeSourceId(url),
+                url,
+                title: source.title,
+                snippet: source.snippet,
+                published_at: source.publishedAt,
+                rank: sources.length + 1,
+                providers: [source.engines[0] ?? 'searxng', ...source.engines.slice(1)],
+                evidence_level: 'search_snippet',
+                evidence_status: 'not_requested',
+                evidence: [],
+                source_metadata: createSourceMetadata(url),
+                evidence_chars: 0,
+                has_more_evidence: false,
+                next_evidence_cursor: null,
+                relevance: wireRelevance(
+                  scoreRelevance(
+                    spec.query,
+                    `${source.title}\n${source.snippet}`,
+                    'title_snippet',
+                    spec.language,
+                  ),
+                  'title_snippet',
+                ),
+                confidence: confidence('unknown', 'Page evidence has not been requested.'),
+                warnings: [],
+              }
+              decisions.push({ url, decision: 'accepted' })
+              sources.push(row)
+              seen.set(url, row)
+            }
+          },
+          () => ({
+            retained_count: sources.length,
+            removed_scope_count: removedCount,
+            decisions: decisions.slice(0, 20),
+          }),
+        )
       } catch (error) {
         if (
           signal.aborted &&
@@ -289,23 +325,34 @@ async function collect(
     version: 2,
     fingerprint: fingerprint(spec, config),
     spec,
-    sources:
-      spec.rankingMode === 'upstream'
-        ? sources
-        : rankCandidates(spec.query, sources, {
-            mode: spec.rankingMode,
-            language: spec.language,
-          }).map(({ candidate, score, originalIndex }, index) => ({
-            ...candidate,
-            rank: index + 1,
-            ranking: {
-              method: spec.rankingMode,
-              score,
-              original_rank: originalIndex + 1,
-              corpus_size: sources.length,
-              version: RETRIEVAL_VERSION,
-            },
-          })),
+    sources: await trace.span(
+      'search.rank',
+      { mode: spec.rankingMode, candidate_count: sources.length, version: RETRIEVAL_VERSION },
+      async () =>
+        spec.rankingMode === 'upstream'
+          ? sources
+          : rankCandidates(spec.query, sources, {
+              mode: spec.rankingMode,
+              language: spec.language,
+            }).map(({ candidate, score, originalIndex }, index) => ({
+              ...candidate,
+              rank: index + 1,
+              ranking: {
+                method: spec.rankingMode,
+                score,
+                original_rank: originalIndex + 1,
+                corpus_size: sources.length,
+                version: RETRIEVAL_VERSION,
+              },
+            })),
+      (rows) => ({
+        mode: spec.rankingMode,
+        candidate_count: rows.length,
+        results: rows
+          .slice(0, 8)
+          .map((row) => ({ title: row.title, url: row.url, rank: row.rank, ranking: row.ranking })),
+      }),
+    ),
     warnings: [...new Set(warnings)],
     removedCount,
     expiresAt: new Date(
@@ -322,31 +369,76 @@ async function enrich(
   loader: DocumentLoader,
   store: SnapshotStore,
   signal: AbortSignal,
+  trace: TraceRecorder,
 ): Promise<void> {
   try {
-    const document = await loader.load(row.url, { signal, scope: spec.scope })
+    const document = await trace.span(
+      'evidence.fetch',
+      { url: row.url, rank: row.rank },
+      () => loader.load(row.url, { signal, scope: spec.scope }),
+      (value) => ({
+        title: value.title,
+        text_chars: Array.from(value.text).length,
+        warnings: value.warnings,
+      }),
+    )
     throwIfAborted(signal)
-    const snapshot = store.saveDocument(document, 'text')
-    const passages = selectPassages(spec.query, snapshot, {
-      maxPassages: config.search.evidence.max_candidate_passages,
-      maxChars: config.search.evidence.max_chars_per_passage,
-      language: spec.language,
-    })
+    const snapshot = await trace.span(
+      'fetch.snapshot',
+      { url: document.finalUrl, format: 'text' },
+      async () => store.saveDocument(document, 'text'),
+      (value) => ({
+        snapshot_id: value.snapshotId,
+        content_sha256: value.contentSha256,
+        segments: value.segments.length,
+        expires_at: value.expiresAt,
+      }),
+    )
+    const passages = await trace.span(
+      'evidence.select',
+      {
+        query: spec.query,
+        snapshot_id: snapshot.snapshotId,
+        method: 'paragraph_context_v2',
+        max_passages: config.search.evidence.max_candidate_passages,
+      },
+      async () =>
+        selectPassages(spec.query, snapshot, {
+          maxPassages: config.search.evidence.max_candidate_passages,
+          maxChars: config.search.evidence.max_chars_per_passage,
+          language: spec.language,
+        }),
+      (value) => ({ passage_count: value.length, passages: value.slice(0, 3) }),
+    )
     row.warnings.push(...snapshot.warnings)
     row.source_metadata =
       snapshot.sourceMetadata ??
       createSourceMetadata(snapshot.url, snapshot.finalUrl, snapshot.fetchedAt)
     if (!passages.length) {
+      trace.event('evidence.no_match', 'partial', {
+        url: row.url,
+        reason: 'Fetched text had no matching complete paragraph.',
+      })
       row.evidence_status = 'no_match'
       row.confidence = confidence('low', 'The fetched text contains no query-matching passage.')
       return
     }
     Object.assign(
       row,
-      prepareEvidence(snapshot, passages, store, {
-        perPage: config.search.evidence.max_passages_per_result,
-        maxChars: config.search.evidence.max_chars_per_result,
-      }),
+      await trace.span(
+        'evidence.persist',
+        { snapshot_id: snapshot.snapshotId, selected_passages: passages.length },
+        async () =>
+          prepareEvidence(snapshot, passages, store, {
+            perPage: config.search.evidence.max_passages_per_result,
+            maxChars: config.search.evidence.max_chars_per_result,
+          }),
+        (value) => ({
+          returned_passages: value.evidence.length,
+          evidence_chars: value.evidence_chars,
+          has_more: value.has_more_evidence,
+        }),
+      ),
     )
     if (passages.length === config.search.evidence.max_candidate_passages)
       row.warnings.push(
@@ -363,6 +455,7 @@ async function enrich(
   } catch (error) {
     if (signal.aborted && !(signal.reason instanceof AppError && signal.reason.code === 'TIMEOUT'))
       throwIfAborted(signal)
+    trace.event('evidence.unavailable', 'partial', { url: row.url, error: toolError(error) })
     row.evidence_status =
       error instanceof AppError &&
       error.code === 'FETCH_BLOCKED' &&
@@ -379,6 +472,7 @@ export function createWebSearch(
   provider: SearchProvider | undefined,
   loader: DocumentLoader,
   store: SnapshotStore,
+  trace: TraceRecorder = noOpTraceRecorder,
 ) {
   const pending = new Map<string, Promise<WebSearchOutput>>()
   const run = async (raw: unknown, parent: AbortSignal): Promise<WebSearchOutput> => {
@@ -390,8 +484,16 @@ export function createWebSearch(
     )
     let spec: SearchSpec | undefined
     try {
-      const args = parseContract<WebSearchInput>('websearch.input', raw)
-      spec = resolve(args, config)
+      const { args, resolved } = await trace.span(
+        'search.resolve',
+        raw,
+        async () => {
+          const args = parseContract<WebSearchInput>('websearch.input', raw)
+          return { args, resolved: resolve(args, config) }
+        },
+        (value) => value.resolved,
+      )
+      spec = resolved
       throwIfAborted(deadline.signal)
       let pool: SavedPool
       let poolId: string
@@ -408,9 +510,15 @@ export function createWebSearch(
           throw new AppError('CURSOR_MISMATCH', 'Invalid saved search cursor.')
         poolId = cursor.poolId
         offset = cursor.offset
-        pool = savedPool(store.getSearch(poolId), fingerprint(spec, config))
+        pool = await trace.span(
+          'search.read_pool',
+          { pool_id: poolId, offset },
+          async () => savedPool(store.getSearch(poolId), fingerprint(resolved, config)),
+          (value) => ({ candidate_count: value.sources.length, expires_at: value.expiresAt }),
+        )
         try {
           const cachedPage = store.getSearch(`${poolId}/page/${offset}`)
+          trace.event('search.cached_page', 'ok', { offset, network_requested: false })
           return {
             ...parseContract<WebSearchOutput>('websearch.output', cachedPage),
             request_id: requestId,
@@ -424,13 +532,51 @@ export function createWebSearch(
             'CONFIGURATION_REQUIRED',
             'Configure SEARXNG_URL and an explicit SEARXNG_ENGINES allowlist.',
           )
-        pool = await collect(spec, config, provider, deadline.signal)
+        const configuredProvider = provider
+        pool = await trace.span(
+          'search.collect',
+          {
+            query: spec.query,
+            scope: spec.scope,
+            max_candidates: config.search.retrieval.max_candidates,
+            max_requests: config.search.retrieval.max_upstream_requests,
+          },
+          async () => {
+            const value = await collect(
+              resolved,
+              config,
+              configuredProvider,
+              deadline.signal,
+              trace,
+            )
+            if (value.warnings.length) trace.annotate({ warnings: value.warnings }, 'partial')
+            return value
+          },
+          (value) => ({ candidate_count: value.sources.length, warnings: value.warnings }),
+        )
         poolId = randomUUID()
-        store.putSearch(poolId, pool, pool.expiresAt)
+        const frozenPool = pool
+        const frozenId = poolId
+        await trace.span(
+          'search.freeze',
+          { pool_id: poolId, candidate_count: pool.sources.length },
+          async () => store.putSearch(frozenId, frozenPool, frozenPool.expiresAt),
+          () => ({ expires_at: frozenPool.expiresAt, storage: 'SQLite' }),
+        )
       }
       if (offset > pool.sources.length)
         throw new AppError('CURSOR_MISMATCH', 'Cursor offset exceeds the saved candidate pool.')
-      const results = structuredClone(pool.sources.slice(offset, offset + spec.limit))
+      const results = await trace.span(
+        'search.page',
+        { offset, limit: spec.limit, candidate_count: pool.sources.length },
+        async () => structuredClone(pool.sources.slice(offset, offset + resolved.limit)),
+        (value) => ({
+          returned_count: value.length,
+          sources: value
+            .slice(0, 8)
+            .map((row) => ({ url: row.url, title: row.title, rank: row.rank })),
+        }),
+      )
       const target =
         spec.evidenceMode === 'extract' ? Math.min(spec.evidenceResults, results.length) : 0
       if (spec.evidenceMode === 'extract') {
@@ -441,15 +587,28 @@ export function createWebSearch(
         // The target count is capped at five; network and parser layers enforce shared global/domain limits.
         const resolvedSpec = spec
         const outcomes = await Promise.allSettled(
-          results
-            .slice(0, target)
-            .map((row) => enrich(row, resolvedSpec, config, loader, store, deadline.signal)),
+          results.slice(0, target).map((row) =>
+            trace.span('evidence.result', { url: row.url, rank: row.rank }, async () => {
+              await enrich(row, resolvedSpec, config, loader, store, deadline.signal, trace)
+              return {
+                status: row.evidence_status === 'verified' ? 'ok' : 'partial',
+                evidence_status: row.evidence_status,
+                evidence_chars: row.evidence_chars,
+                passage_count: row.evidence.length,
+                warnings: row.warnings,
+              }
+            }),
+          ),
         )
         const failed = outcomes.find(
           (outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected',
         )
         if (failed) throw failed.reason
       }
+      if (spec.evidenceMode !== 'extract')
+        trace.event('evidence.skipped', 'skipped', {
+          reason: 'evidence_mode=none; only search snippets were requested.',
+        })
       throwIfAborted(parent)
       const verified = results.filter((row) => row.evidence_status === 'verified').length
       const warnings = [...pool.warnings]

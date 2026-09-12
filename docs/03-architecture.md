@@ -122,3 +122,7 @@ process 关停停止接收新请求，取消在途 I/O，终止并等待提取 w
 `src/tools/runtime.ts` 装配并拥有 Provider、DocumentLoader、SnapshotStore，stdio 与 `src/workbench` 共用。workbench HTTP 适配器仅处理固定静态路由、会话/同源保护和请求取消；业务输入和输出沿用原工具 Schema。前端静态文件在 ui/，不包含服务端路径或搜索凭据。
 
 搜索 Provider 的 inspect 只读取当前实例的引擎观察。冷却控制不出后台请求，不持久化成第二套业务快照；重启后的引擎状态明确为 unknown，SearXNG 自己的暂停仍有效。候选重排发生在 scope 过滤和去重后、快照冻结前，原文补抓选择最终排序后的目标项；已保存页继续按既有游标读取。详见 [ADR 0007](decisions/0007-search-quality-workbench.md)。
+
+## 0.4.0 观测边界
+
+runtime 注入 shared TraceRecorder 到 Provider、抓取和工具编排；AsyncLocalStorage 只用于这个显式实例的父子关联，不作为服务定位器。shared 定义接口/内存上下文，storage 管理独立 traces.sqlite。MCP/HTTP 共享工具代码与持久记录目录，缓存/调度状态仍属于各自进程，不能混称统一后端配额。详见 [ADR 0008](decisions/0008-local-observability.md)。

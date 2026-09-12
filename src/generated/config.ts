@@ -74,4 +74,11 @@ export interface RuntimeConfiguration {
     stream: 'stderr'
     include_query_text: false
   }
+  observability?: {
+    enabled: boolean
+    /**
+     * Record bounded query and text previews locally. False records only operational metadata.
+     */
+    capture_content: boolean
+  }
 }

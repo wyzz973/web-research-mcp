@@ -76,3 +76,9 @@ SDK 在已取消连接上可能不再允许发送工具结果；此时只记录�
 websearch 新增 ranking_mode=upstream|bm25|bm25_mmr；省略使用部署 ranking.mode，默认 upstream。实验只重排当前已采集并过滤的标题/摘要候选，不扩大全网召回，不自动引入模型或额外查询。排序在冻结候选池与分页前完成，续读必须保持相同模式。非 upstream 模式支持最多 200 候选。
 
 实验结果附 ranking.method、score、original_rank、corpus_size、version；score 是原始 BM25 词法分数，不是概率或词法覆盖率；在 bm25_mmr 下该数值不包含多样性惩罚，因此分数不一定按最终排名单调下降。rank 表示当前排序后的名次。confidence 仍仅表示证据可追溯性。RRF 尚未接入在线搜索，因为聚合结果不提供真实独立引擎排名。
+
+## 本地执行关联
+
+0.4.0 在 websearch/webfetch 输出中添加可选 trace_id，指向本地有界执行记录。request_id 仍为本次工具响应 ID。trace 不附在正常工具输出中，避免占用 LLM 上下文。原文/候选游标和错误语义保持不变；诊断存储失败不会改变工具结果，操作者在 /api/status 看到 tracing=storage_unavailable。
+
+成功 Provider 搜索页可在同进程复用 60 秒；这不是新网页抓取，标题/摘要的观察可能来自短缓存。完整页面证据仍有真实 fetched_at 和快照定位。部分失败/错误页不缓存、不自动使用过期候选。元数据采集默认不开正文记录；本地调试开启后仍有脱敏/截断。

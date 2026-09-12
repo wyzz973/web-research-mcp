@@ -62,6 +62,10 @@ export type WebFetchOutput = {
   has_more_evidence?: boolean
   next_evidence_cursor?: string | null
   evidence_chars?: number
+  /**
+   * Optional local execution trace identifier. No hosted tracing account is required.
+   */
+  trace_id?: string
 }
 export type Relevance = {
   score: number | null

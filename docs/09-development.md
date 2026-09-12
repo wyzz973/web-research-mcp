@@ -43,3 +43,5 @@ ADR 的 accepted 表示设计已经采用，不等于功能已运行；完成与
 发布包前，从干净目录安装打包产物，使用 plain Node 启动声明 bin，通过真实 MCP client 做工具发现与调用，并验证 parser worker 可加载。限制 package files 清单，排除 data、录制正文、临时文件和开发凭据。实际包许可及第三方通知在首次对外发布前确定，当前 package 保持 private。
 
 计划 CI 在 Linux 执行确定性检查；Mac ARM64 完成开发验证，Windows 支持只在对应产物实际测试后声明。实时搜索不作为普通 PR 的不稳定阻塞项，但修改 Provider 后必须补独立 live 证据；缺环境标记未测，不算成功。
+
+诊断 UI 迭代应保持真实埋点与展示一致；瞬时事件不能冒充阶段耗时，缓存/共享调用不能冒充实际出网。Trace 原文预览和运行数据库不上传 Git。

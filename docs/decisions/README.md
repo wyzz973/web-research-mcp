@@ -11,5 +11,6 @@ ADR 保存会影响后续维护的取舍；当前执行状态与验证结果分�
 | [0005](0005-paragraph-evidence-and-source-metadata.md) | 段落证据与来源展示元数据 | 0.2.0 / 0.3-draft |
 | [0006](0006-native-searxng.md) | 无 Docker 原生部署 | 0.2.1 |
 | [0007](0007-search-quality-workbench.md) | 引擎诊断、排序评估与本地工作台 | 0.3.0 |
+| [0008](0008-local-observability.md) | 本地可观测与请求复用 | 0.4.0 |
 
 新增架构、跨模块契约、持久化格式、重大依赖或验证策略使用 [模板](template.md)。局部重命名、排版等机械修改无需新 ADR。既有决策仍适用时更新原文，不制造相同结论的重复记录。

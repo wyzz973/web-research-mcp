@@ -30,3 +30,13 @@ node scripts/search-doctor.mjs --config config/local.example.json --query "MCP t
 ```
 
 输出 scope=single_process_probe，包含查询结果状态/数量以及结构化诊断，不输出完整查询或候选内容。退出码 0 表示请求正常（可能正常零结果），1 表示失败，2 表示部分引擎降级。这个命令在新进程中运行，不读取长期 MCP 实例的内存健康状态，也不会删除上游暂停信息。回归覆盖见 [engine-health.spec.ts](../../tests/engine-health.spec.ts)。
+
+## 降低重复出网：进程内缓存、合并与调度
+
+[resilient.ts](resilient.ts) 的 `createResilientProvider(provider, options)` 装饰同一个 `SearchProvider`，并拥有其关闭职责。运行时显式装配后，同一个长期 MCP/工作台进程可复用成功搜索页：默认有效期 60 秒、最多 128 项，缓存键和序列化页面合计最多 8 MiB。键包含原始 query、language、timeRange、site 和 page，不合并不同语言、站点或分页，也不做语义近似缓存。命中后保留原上游顺序和内容，TTL 不随命中延长；缓存对象与每个调用者返回对象隔离。正常零结果可以缓存；errors 非空的部分页面、异常和取消结果都不缓存，不用过期内容掩盖故障。缓存不会声称当前引擎已经恢复。
+
+相同的并发搜索页共用一次上游请求，各调用者仍有独立取消/总 deadline。一个调用者超时不取消其他人；最后一个订阅者退出才取消实际 I/O。排队也受原调用者信号约束，不为排队重置时限。默认实际请求启动间隔至少 1 秒、最多 2 个在途请求；待完成订阅者总数（包括合并订阅）最多 128，超过时返回可重试的 `UPSTREAM_UNAVAILABLE`。这些约束作用于一个 Provider 实例到 SearXNG 的请求，不表示 SearXNG 内部每个引擎各有 1 秒间隔，不构成上游可用性保证。
+
+`inspect()` 返回独立的 request-policy 统计（命中、未命中、合并次数、适配器调用次数 provider_calls、缓存字节/项数、队列/在途数）；原 SearXNG `inspect()` 继续负责引擎观察。可选 `onEvent` 记录 cache_hit（含缓存年龄）、cache_miss、coalesced、queued、upstream_start（含排队时间）和 upstream_end（ok/partial/error/cancelled）。cache_miss 不等于已出网，upstream_start 表示适配器调用开始，真正的 HTTP 由 search.http_request 步骤证明；coalesced 不新增上游调用。事件不含查询和 URL，绑定各订阅者的异步上下文，方便本地轨迹关联。遥测回调异常只增加 observer_errors，不改变搜索结果。
+
+`close()` 停止接收、清理排队计时器、拒绝所有订阅并取消实际请求，然后等待被装饰 Provider 关闭与在途任务结束。缓存和统计仅在本进程有效，重启或单次 CLI 会重新开始，未实现跨进程请求合并或缓存，也不修改 SearXNG 暂停状态。行为测试见 [search-resilient.spec.ts](../../tests/search-resilient.spec.ts)，覆盖受控异步 I/O、独立取消、排队 deadline、并发/间隔、关闭等待、TTL/容量和轨迹上下文；不把这些测试当作真实免费引擎的可用性证明。

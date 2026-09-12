@@ -1,3 +1,4 @@
+import { noOpTraceRecorder, type TraceRecorder } from '../shared/trace.ts'
 import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import { AppError, throwIfAborted } from '../shared/errors.ts'
@@ -167,6 +168,7 @@ export function createSearxngProvider(options: {
   engines: readonly string[]
   timeoutMs: number
   now?: () => number
+  tracer?: TraceRecorder
 }): SearxngProvider {
   let endpoint: URL
   try {
@@ -200,6 +202,7 @@ export function createSearxngProvider(options: {
   }
   if (!Number.isInteger(options.timeoutMs) || options.timeoutMs <= 0)
     throw new AppError('INVALID_ARGUMENT', 'Search timeout must be positive.')
+  const trace = options.tracer ?? noOpTraceRecorder
   let closed = false
   const now = options.now ?? Date.now
   const health = new EngineHealth([...allowed], now)
@@ -231,79 +234,144 @@ export function createSearxngProvider(options: {
     url.searchParams.set('language', input.language)
     url.searchParams.set('pageno', String(input.page))
     if (input.timeRange !== 'any') url.searchParams.set('time_range', input.timeRange)
-    return new Promise<SearchPage>((resolve, reject) => {
-      let settled = false
-      const finish = (error?: Error, value?: SearchPage) => {
-        if (settled) return
-        settled = true
-        clearTimeout(timer)
-        if (error) reject(error)
-        else if (value) resolve(value)
-      }
-      const timer = setTimeout(
-        () => controller.abort(new AppError('TIMEOUT', 'Search endpoint timed out.', true)),
-        options.timeoutMs,
-      )
-      const transport = url.protocol === 'https:' ? httpsRequest : httpRequest
-      const request = transport(
-        url,
-        {
-          method: 'GET',
-          signal,
-          agent: false,
-          headers: {
-            accept: 'application/json',
-            'accept-encoding': 'identity',
-            'user-agent': 'web-research-mcp/0.1',
-          },
-        },
-        (response) => {
-          const status = response.statusCode ?? 0
-          const fail = (error: AppError) => {
-            response.destroy()
-            finish(error)
+    return trace.span(
+      'search.http_request',
+      {
+        engines: selection.engines,
+        page: input.page,
+        endpoint: endpoint.origin,
+        network_requested: true,
+      },
+      () =>
+        new Promise<SearchPage>((resolve, reject) => {
+          let settled = false
+          const finish = (error?: Error, value?: SearchPage) => {
+            if (settled) return
+            settled = true
+            clearTimeout(timer)
+            if (error) reject(error)
+            else if (value) resolve(value)
           }
-          if (status === 403 || status === 429)
-            return fail(
-              new AppError(
-                'UPSTREAM_BLOCKED',
-                'Search endpoint denied the request or disabled JSON.',
-                false,
-                status,
-              ),
-            )
-          if (status < 200 || status >= 300)
-            return fail(
-              new AppError(
-                'UPSTREAM_UNAVAILABLE',
-                'Search endpoint returned an HTTP error; redirects are disabled.',
-                status >= 500,
-                status,
-              ),
-            )
-          if (
-            !/\bapplication\/(?:[a-z0-9.+-]+\+)?json\b/iu.test(
-              response.headers['content-type'] ?? '',
-            )
-          ) {
-            return fail(
-              new AppError(
-                'UPSTREAM_BLOCKED',
-                'Search endpoint returned a non-JSON page, possibly an access challenge.',
-              ),
-            )
-          }
-          const chunks: Buffer[] = []
-          let size = 0
-          response.on('data', (chunk: Buffer) => {
-            size += chunk.length
-            if (size > MAX_RESPONSE_BYTES)
-              return fail(
-                new AppError('UPSTREAM_UNAVAILABLE', 'Search response exceeded its byte limit.'),
-              )
-            chunks.push(chunk)
-          })
-          response.on('error', () => {
+          const timer = setTimeout(
+            () => controller.abort(new AppError('TIMEOUT', 'Search endpoint timed out.', true)),
+            options.timeoutMs,
+          )
+          const transport = url.protocol === 'https:' ? httpsRequest : httpRequest
+          const request = transport(
+            url,
+            {
+              method: 'GET',
+              signal,
+              agent: false,
+              headers: {
+                accept: 'application/json',
+                'accept-encoding': 'identity',
+                'user-agent': 'web-research-mcp/0.1',
+              },
+            },
+            (response) => {
+              const status = response.statusCode ?? 0
+              const fail = (error: AppError) => {
+                response.destroy()
+                finish(error)
+              }
+              if (status === 403 || status === 429)
+                return fail(
+                  new AppError(
+                    'UPSTREAM_BLOCKED',
+                    'Search endpoint denied the request or disabled JSON.',
+                    false,
+                    status,
+                  ),
+                )
+              if (status < 200 || status >= 300)
+                return fail(
+                  new AppError(
+                    'UPSTREAM_UNAVAILABLE',
+                    'Search endpoint returned an HTTP error; redirects are disabled.',
+                    status >= 500,
+                    status,
+                  ),
+                )
+              if (
+                !/\bapplication\/(?:[a-z0-9.+-]+\+)?json\b/iu.test(
+                  response.headers['content-type'] ?? '',
+                )
+              ) {
+                return fail(
+                  new AppError(
+                    'UPSTREAM_BLOCKED',
+                    'Search endpoint returned a non-JSON page, possibly an access challenge.',
+                  ),
+                )
+              }
+              const chunks: Buffer[] = []
+              let size = 0
+              response.on('data', (chunk: Buffer) => {
+                size += chunk.length
+                if (size > MAX_RESPONSE_BYTES)
+                  return fail(
+                    new AppError(
+                      'UPSTREAM_UNAVAILABLE',
+                      'Search response exceeded its byte limit.',
+                    ),
+                  )
+                chunks.push(chunk)
+              })
+              response.on('error', () => {
+                if (signal.aborted) {
+                  try {
+                    throwIfAborted(signal)
+                  } catch (error) {
+                    finish(
+                      error instanceof Error
+                        ? error
+                        : new AppError('CANCELLED', 'Search cancelled.'),
+                    )
+                  }
+                } else
+                  finish(
+                    new AppError('UPSTREAM_UNAVAILABLE', 'Search response was interrupted.', true),
+                  )
+              })
+              response.on('end', () => {
+                if (settled) return
+                try {
+                  throwIfAborted(signal)
+                  const payload: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+                  const page = parsePage(
+                    payload,
+                    new Set(selection.engines),
+                    (failures, successful, diagnosticsComplete) =>
+                      health.observe(selection, failures, successful, diagnosticsComplete),
+                  )
+                  trace.event('search.engine_response', page.errors.length ? 'partial' : 'ok', {
+                    engines: selection.engines,
+                    result_count: page.sources.length,
+                    errors: page.errors,
+                    diagnostics: health.inspect(),
+                  })
+                  const skippedErrors = selection.skipped.map(
+                    (engine) => `UPSTREAM_UNAVAILABLE: ${engine} (cooling_down_or_probe_in_flight)`,
+                  )
+                  if (page.sources.length === 0 && skippedErrors.length > 0)
+                    throw upstreamFailure(skippedErrors.join(' '))
+                  finish(undefined, { ...page, errors: [...page.errors, ...skippedErrors] })
+                } catch (error) {
+                  finish(
+                    error instanceof AppError
+                      ? error
+                      : new AppError(
+                          'UPSTREAM_UNAVAILABLE',
+                          'Search endpoint returned invalid JSON.',
+                          true,
+                        ),
+                  )
+                }
+              })
+            },
+          )
+          request.on('error', () => {
             if (signal.aborted) {
               try {
                 throwIfAborted(signal)
@@ -313,57 +381,18 @@ export function createSearxngProvider(options: {
                 )
               }
             } else
-              finish(new AppError('UPSTREAM_UNAVAILABLE', 'Search response was interrupted.', true))
-          })
-          response.on('end', () => {
-            if (settled) return
-            try {
-              throwIfAborted(signal)
-              const payload: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
-              const page = parsePage(
-                payload,
-                new Set(selection.engines),
-                (failures, successful, diagnosticsComplete) =>
-                  health.observe(selection, failures, successful, diagnosticsComplete),
-              )
-              const skippedErrors = selection.skipped.map(
-                (engine) => `UPSTREAM_UNAVAILABLE: ${engine} (cooling_down_or_probe_in_flight)`,
-              )
-              if (page.sources.length === 0 && skippedErrors.length > 0)
-                throw upstreamFailure(skippedErrors.join(' '))
-              finish(undefined, { ...page, errors: [...page.errors, ...skippedErrors] })
-            } catch (error) {
               finish(
-                error instanceof AppError
-                  ? error
-                  : new AppError(
-                      'UPSTREAM_UNAVAILABLE',
-                      'Search endpoint returned invalid JSON.',
-                      true,
-                    ),
+                new AppError(
+                  'UPSTREAM_UNAVAILABLE',
+                  'Unable to connect to the configured search endpoint.',
+                  true,
+                ),
               )
-            }
           })
-        },
-      )
-      request.on('error', () => {
-        if (signal.aborted) {
-          try {
-            throwIfAborted(signal)
-          } catch (error) {
-            finish(error instanceof Error ? error : new AppError('CANCELLED', 'Search cancelled.'))
-          }
-        } else
-          finish(
-            new AppError(
-              'UPSTREAM_UNAVAILABLE',
-              'Unable to connect to the configured search endpoint.',
-              true,
-            ),
-          )
-      })
-      request.end()
-    })
+          request.end()
+        }),
+      (value) => ({ candidate_count: value.sources.length, errors: value.errors }),
+    )
   }
 
   return {
@@ -373,6 +402,11 @@ export function createSearxngProvider(options: {
       validateSearchQuery(input.query)
       if (input.site !== undefined) resolveScope({ sites: [input.site] })
       const selection = health.select()
+      trace.event('search.engine_selection', 'ok', {
+        engines: selection.engines,
+        skipped: selection.skipped,
+        diagnostics: health.inspect(),
+      })
       const controller = new AbortController()
       const startedAt = performance.now()
       endpointDiagnostic.total_requests += 1
@@ -383,6 +417,14 @@ export function createSearxngProvider(options: {
         endpointDiagnostic.last_error = null
         return page
       } catch (error) {
+        trace.event(
+          'search.engine_failure',
+          error instanceof AppError && error.code === 'CANCELLED' ? 'cancelled' : 'error',
+          {
+            error_code: error instanceof AppError ? error.code : 'UPSTREAM_UNAVAILABLE',
+            diagnostics: health.inspect(),
+          },
+        )
         endpointDiagnostic.failed_requests += 1
         endpointDiagnostic.last_error =
           error instanceof AppError ? error.code : 'UPSTREAM_UNAVAILABLE'

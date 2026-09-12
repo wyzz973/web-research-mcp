@@ -16,7 +16,7 @@ curl --fail http://127.0.0.1:18888/healthz
 
 端点为 `http://127.0.0.1:18888`，只发布在本机 loopback。镜像固定为 SearXNG `2026.9.8-3fdc6d753` 的 digest，见 [compose.yaml](compose.yaml)。Docker 内监听 8080 不代表宿主机对外开放。
 
-[settings.template.yaml](settings.template.yaml) 通过 `keep_only` 移除其余默认引擎，只保留 `duckduckgo`、`bing`、`google`、`brave` 四个匿名网页适配器。实例不提供 API Key 后备，不取用浏览器账号、Cookie 或登录凭据。根据下方实测及后续波动，建议 MCP 的常用 engines 配置 `brave,google`；DuckDuckGo 与 Bing 保留用于显式对照，遇到暂停或挑战时不重试绕过。
+[settings.template.yaml](settings.template.yaml) 通过 `keep_only` 移除其余默认引擎，只保留 `duckduckgo`、`bing`、`google`、`brave` 四个匿名网页适配器。实例不提供 API Key 后备，不取用浏览器账号、Cookie 或登录凭据。当前 MCP 的 engines 配置为 `brave,duckduckgo`；Google 与 Bing 保留用于显式对照，遇到暂停或挑战时不重试绕过。下方保留历史实测。
 
 初始化脚本把随机的 32 字节实例 secret 写到已被 `.gitignore` 排除的 `.cache/searxng/settings.yml`；目录权限为 0700，文件为 0600，secret 不输出。再次执行会保留现有 secret 并更新模板。这个 secret 是本地 SearXNG 内部签名配置，不是搜索服务的 API Key。不要提交生成文件。
 
@@ -88,4 +88,4 @@ docker compose -f deploy/compose.yaml down
 
 对照完成后将 Brave 加入主模板和 18888 本地配置，保留原随机 secret，重启后确认 Healthy；实际加载引擎为上述四个匿名适配器。主实例单独查询 Brave：`MCP tools structuredContent site:modelcontextprotocol.io`、语言 `en`，HTTP 200，13 条结果，2.113 秒，空引擎错误列表。第一条为官方 Tools，后续包含 `csharp.sdk.modelcontextprotocol.io` 官方 SDK 子域。应用层默认允许子域，指定 `include_subdomains=false` 可收窄为精确 hostname。
 
-本次配置变更后没有再次请求被挑战的 DuckDuckGo。推荐 `brave,google` 作为当前初始配置，并保留所有引擎失败诊断；免费匿名网页搜索仍可能随时变化。
+本次配置变更后没有再次请求被挑战的 DuckDuckGo。当时推荐 `brave,google` 作为初始配置，并保留所有引擎失败诊断；免费匿名网页搜索仍可能随时变化。

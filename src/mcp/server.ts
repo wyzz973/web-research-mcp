@@ -50,7 +50,7 @@ function response(name: string, value: WebSearchOutput | WebFetchOutput) {
 }
 
 export function createMcpServer(handlers: ToolHandlers, lifetime: AbortSignal): McpServer {
-  const server = new McpServer({ name: 'web-research-mcp', version: '0.3.0' })
+  const server = new McpServer({ name: 'web-research-mcp', version: '0.4.0' })
   const annotations = {
     readOnlyHint: true,
     destructiveHint: false,

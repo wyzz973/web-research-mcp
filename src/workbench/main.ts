@@ -39,11 +39,14 @@ async function main(): Promise<void> {
       uiDirectory: new URL('../../ui/', import.meta.url),
       websearch: runtime.websearch,
       webfetch: runtime.webfetch,
+      ...(runtime.traces ? { traces: runtime.traces } : {}),
       status: () => ({
         service: 'ready',
-        package_version: '0.3.0',
+        package_version: '0.4.0',
         schema_version: '0.3-draft',
         search_configured: Boolean(runtime.provider),
+        tracing: runtime.traceStatus,
+        request_policy: runtime.resilient?.inspect() ?? null,
         ...(runtime.provider?.inspect() ?? { status: 'unconfigured', engines: [], endpoint: null }),
       }),
       async evaluation() {

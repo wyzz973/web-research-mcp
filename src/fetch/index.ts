@@ -1,3 +1,4 @@
+import { noOpTraceRecorder, type TraceRecorder } from '../shared/trace.ts'
 import { parseRobots } from './robots.ts'
 import { AppError, throwIfAborted } from '../shared/errors.ts'
 import type { DocumentLoader, DomainScope, LoadedDocument } from '../shared/types.ts'
@@ -15,6 +16,7 @@ import { createSourceMetadata } from '../shared/source-metadata.ts'
 
 export type { FetchDependencies } from './network.ts'
 export interface FetchOptions {
+  readonly tracer?: TraceRecorder
   readonly deadlineMs: number
   readonly maxCompressedBytes: number
   readonly maxDecompressedBytes: number
@@ -37,6 +39,7 @@ export function createDocumentLoader(
   options: FetchOptions,
   dependencies: FetchDependencies = {},
 ): DocumentLoader {
+  const trace = options.tracer ?? noOpTraceRecorder
   const global = new Limiter(options.globalConcurrency)
   const parsers = new Limiter(options.parserConcurrency)
   const hostLimits = new Map<string, { limiter: Limiter; users: number }>()
@@ -48,6 +51,26 @@ export function createDocumentLoader(
   const connect = dependencies.connect ?? connectPinned
 
   async function requestUrl(url: URL, signal: AbortSignal, bodyLimit?: number) {
+    return trace.span(
+      'fetch.http',
+      { url: url.href, purpose: url.pathname === '/robots.txt' ? 'robots' : 'document' },
+      async () => {
+        const response = await requestUrlInner(url, signal, bodyLimit)
+        if (
+          response.status >= 400 &&
+          !(url.pathname === '/robots.txt' && [404, 410].includes(response.status))
+        )
+          trace.annotate({ http_status: response.status }, 'error')
+        return response
+      },
+      (result) => ({
+        http_status: result.status,
+        bytes: result.body.length,
+        content_type: result.contentType,
+      }),
+    )
+  }
+  async function requestUrlInner(url: URL, signal: AbortSignal, bodyLimit?: number) {
     let host = hostLimits.get(url.hostname)
     if (!host) {
       host = { limiter: new Limiter(options.perHostConcurrency), users: 0 }
@@ -67,7 +90,12 @@ export function createDocumentLoader(
       if (interval) boundedSet(cooldowns, url.hostname, until + interval)
       else if (until <= now) cooldowns.delete(url.hostname)
       if (until > now) await delay(until - now, signal)
-      const address = await resolvePublic(url, signal, dependencies.resolve)
+      const address = await trace.span(
+        'fetch.dns',
+        { hostname: url.hostname },
+        () => resolvePublic(url, signal, dependencies.resolve),
+        () => ({ public_address_verified: true, connection_pinned: true }),
+      )
       const response = await connect(url, address, signal, options.userAgent)
       try {
         throwIfAborted(signal)
@@ -123,6 +151,7 @@ export function createDocumentLoader(
         const response = await requestUrl(target, signal, 512_000)
         if (REDIRECTS.has(response.status)) {
           target = redirect(target, response.location, redirects, scope)
+          trace.event('fetch.redirect', 'ok', { url: target.href, redirect_number: redirects + 1 })
           continue
         }
         if (response.status === 404 || response.status === 410) break
@@ -176,65 +205,111 @@ export function createDocumentLoader(
     signal: AbortSignal,
     scope?: DomainScope,
   ): Promise<LoadedDocument> {
-    const initial = validateUrl(raw, scope)
+    const initial = await trace.span(
+      'fetch.validate',
+      { url: raw, scope },
+      async () => validateUrl(raw, scope),
+      () => ({ url_policy_passed: true }),
+    )
     let target = initial
     const release = await global.acquire(signal)
     try {
       for (let redirects = 0; ; redirects++) {
         // Validate the page address before even making the robots request.
-        await resolvePublic(target, signal, dependencies.resolve)
-        await checkRobots(target, signal, scope)
+        await trace.span(
+          'fetch.dns',
+          { hostname: target.hostname, purpose: 'before_robots' },
+          () => resolvePublic(target, signal, dependencies.resolve),
+          () => ({ public_address_verified: true }),
+        )
+        await trace.span(
+          'fetch.robots',
+          {
+            url: target.href,
+            cached:
+              robots.has(target.origin) && (robots.get(target.origin)?.expires ?? 0) > Date.now(),
+          },
+          () => checkRobots(target, signal, scope),
+          () => ({ allowed: true }),
+        )
         const response = await requestUrl(target, signal)
         if (REDIRECTS.has(response.status)) {
           target = redirect(target, response.location, redirects, scope)
+          trace.event('fetch.redirect', 'ok', { url: target.href, redirect_number: redirects + 1 })
           continue
         }
-        if (response.status === 429)
-          throw new AppError(
-            'RATE_LIMITED',
-            'The origin rate limited this request.',
-            true,
-            response.status,
-          )
-        if (response.status === 403)
-          throw new AppError(
-            'UPSTREAM_BLOCKED',
-            'The origin refused anonymous access.',
-            false,
-            response.status,
-          )
-        if (response.status < 200 || response.status >= 300)
-          throw new AppError(
-            'HTTP_ERROR',
-            'The origin returned an unsuccessful HTTP status.',
-            response.status >= 500,
-            response.status,
-          )
-        const contentType = response.contentType.split(';')[0]?.trim().toLowerCase() ?? ''
+        const contentType = await trace.span(
+          'fetch.content_check',
+          { http_status: response.status, content_type: response.contentType },
+          async () => {
+            if (response.status === 429)
+              throw new AppError(
+                'RATE_LIMITED',
+                'The origin rate limited this request.',
+                true,
+                response.status,
+              )
+            if (response.status === 403)
+              throw new AppError(
+                'UPSTREAM_BLOCKED',
+                'The origin refused anonymous access.',
+                false,
+                response.status,
+              )
+            if (response.status < 200 || response.status >= 300)
+              throw new AppError(
+                'HTTP_ERROR',
+                'The origin returned an unsuccessful HTTP status.',
+                response.status >= 500,
+                response.status,
+              )
+            const contentType = response.contentType.split(';')[0]?.trim().toLowerCase() ?? ''
+            if (contentType === 'text/html' || contentType === 'application/xhtml+xml') {
+              const sample = response.body.subarray(0, 30_000).toString('utf8')
+              if (
+                /<title[^>]*>\s*(?:just a moment|attention required|access denied|verify (?:you|your)|captcha)/i.test(
+                  sample,
+                ) ||
+                /cf-chl-|challenge-platform|id=["']captcha/i.test(sample)
+              ) {
+                throw new AppError(
+                  'UPSTREAM_BLOCKED',
+                  'The origin returned an anti-bot challenge page.',
+                )
+              }
+            }
+            return contentType
+          },
+          (value) => ({ content_type: value, challenge_detected: false }),
+        )
         const fetchedAt = new Date().toISOString()
         let extracted
         if (contentType === 'text/html' || contentType === 'application/xhtml+xml') {
-          const sample = response.body.subarray(0, 30_000).toString('utf8')
-          if (
-            /<title[^>]*>\s*(?:just a moment|attention required|access denied|verify (?:you|your)|captcha)/i.test(
-              sample,
-            ) ||
-            /cf-chl-|challenge-platform|id=["']captcha/i.test(sample)
-          ) {
-            throw new AppError(
-              'UPSTREAM_BLOCKED',
-              'The origin returned an anti-bot challenge page.',
-            )
-          }
           const releaseParser = await parsers.acquire(signal)
           try {
-            extracted = await extractHtml(
-              response.body,
-              target.href,
-              response.contentType,
-              signal,
-              options.parserTimeoutMs,
-              options.parserMemoryMb,
+            extracted = await trace.span(
+              'fetch.parse',
+              {
+                url: target.href,
+                bytes: response.body.length,
+                technology: 'JSDOM + Readability + Turndown',
+                parser_timeout_ms: options.parserTimeoutMs,
+              },
+              () =>
+                extractHtml(
+                  response.body,
+                  target.href,
+                  response.contentType,
+                  signal,
+                  options.parserTimeoutMs,
+                  options.parserMemoryMb,
+                ),
+              (value) => ({
+                title: value.title,
+                text_chars: Array.from(value.text).length,
+                text_preview: value.text.slice(0, 1800),
+                warnings: value.warnings,
+              }),
             )
           } finally {
             releaseParser()
@@ -253,6 +328,12 @@ export function createDocumentLoader(
           }
           if (!text || /^\s*(?:<!doctype\s+html|<html)/i.test(text))
             throw new AppError('EXTRACTION_FAILED', 'No plain text content was extracted.')
+          trace.event('fetch.parse', 'ok', {
+            technology: 'TextDecoder',
+            content_type: contentType,
+            text_chars: Array.from(text).length,
+            text_preview: text.slice(0, 1800),
+          })
           // Text/Markdown input is rendered literally: no raw HTML or reference
           // links can sneak executable URL schemes into the rendered output.
           const markdown = text.replace(/[\\`*_{}[\]()<>#+.!|~-]/g, '\\$&')

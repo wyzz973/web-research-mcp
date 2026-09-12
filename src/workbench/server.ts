@@ -4,6 +4,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { AppError } from '../shared/errors.ts'
 import { parseContract } from '../shared/contracts.ts'
+import type { TraceRun, TraceRunOptions } from '../shared/trace.ts'
 import { toolError } from '../tools/common.ts'
 import type { WebSearchOutput } from '../generated/websearch.output.ts'
 import type { WebFetchOutput } from '../generated/webfetch.output.ts'
@@ -11,16 +12,29 @@ import type { WebFetchOutput } from '../generated/webfetch.output.ts'
 interface WorkbenchOptions {
   port: number
   uiDirectory: URL
-  websearch(input: unknown, signal: AbortSignal): Promise<WebSearchOutput>
-  webfetch(input: unknown, signal: AbortSignal): Promise<WebFetchOutput>
+  websearch(
+    input: unknown,
+    signal: AbortSignal,
+    traceOptions?: TraceRunOptions,
+  ): Promise<WebSearchOutput>
+  webfetch(
+    input: unknown,
+    signal: AbortSignal,
+    traceOptions?: TraceRunOptions,
+  ): Promise<WebFetchOutput>
   status(): unknown
   evaluation(): Promise<unknown>
+  traces?: { list(): TraceRun[]; get(id: string): TraceRun | undefined }
 }
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/index.html', ['index.html', 'text/html; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+  ['/trace', ['trace.html', 'text/html; charset=utf-8']],
+  ['/trace.html', ['trace.html', 'text/html; charset=utf-8']],
+  ['/trace.js', ['trace.js', 'text/javascript; charset=utf-8']],
+  ['/trace.css', ['trace.css', 'text/css; charset=utf-8']],
 ])
 
 async function readJson(request: IncomingMessage, signal: AbortSignal): Promise<unknown> {
@@ -87,7 +101,7 @@ export async function startWorkbench(options: WorkbenchOptions) {
       const [filename, contentType] = asset
       if (!filename || !contentType) throw new Error('Invalid static asset definition')
       let content = await readFile(new URL(filename, options.uiDirectory), 'utf8')
-      if (filename === 'index.html') {
+      if (filename.endsWith('.html')) {
         content = content.replace(
           '</head>',
           `<meta name="workbench-token" content="${token}"></head>`,
@@ -123,6 +137,27 @@ export async function startWorkbench(options: WorkbenchOptions) {
       json(response, 200, await options.evaluation())
       return
     }
+    if (request.method === 'GET' && route === '/api/traces') {
+      const runs = options.traces?.list() ?? []
+      json(response, 200, {
+        available: Boolean(options.traces),
+        runs: runs.map(({ spans, output: _output, ...run }) => ({
+          ...run,
+          span_count: run.span_count ?? spans.length,
+        })),
+      })
+      return
+    }
+    const traceRoute = /^\/api\/traces\/([a-f0-9-]{36})$/u.exec(route)
+    if (request.method === 'GET' && traceRoute?.[1]) {
+      const run = options.traces?.get(traceRoute[1])
+      if (!run)
+        json(response, 404, {
+          error: { code: 'NOT_FOUND', message: 'Trace expired, unavailable, or unknown.' },
+        })
+      else json(response, 200, { run, spans: run.spans })
+      return
+    }
     if (request.method !== 'POST' || !['/api/search', '/api/fetch'].includes(route)) {
       json(response, 404, { error: { code: 'NOT_FOUND', message: 'Route not found.' } })
       return
@@ -145,12 +180,27 @@ export async function startWorkbench(options: WorkbenchOptions) {
     response.once('close', onClose)
     const signal = AbortSignal.any([lifetime.signal, disconnected.signal])
     try {
+      const correlation = request.headers['x-trace-request']
+      const capture = request.headers['x-trace-content']
+      if (
+        (correlation !== undefined &&
+          (typeof correlation !== 'string' ||
+            !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u.test(
+              correlation,
+            ))) ||
+        (capture !== undefined && capture !== 'true' && capture !== 'false')
+      )
+        throw new AppError('INVALID_ARGUMENT', 'Invalid trace correlation or capture option.')
+      const traceOptions: TraceRunOptions = {
+        ...(typeof correlation === 'string' ? { clientRequestId: correlation } : {}),
+        ...(capture !== undefined ? { captureContent: capture === 'true' } : {}),
+      }
       const input = await readJson(request, signal)
       const name = route === '/api/search' ? 'websearch' : 'webfetch'
       const output =
         name === 'websearch'
-          ? await options.websearch(input, signal)
-          : await options.webfetch(input, signal)
+          ? await options.websearch(input, signal, traceOptions)
+          : await options.webfetch(input, signal, traceOptions)
       parseContract(`${name}.output`, output)
       json(response, 200, output)
     } catch (error) {

@@ -40,7 +40,7 @@ pnpm searxng:start
 
 ```sh
 pnpm searxng:start --port 18889
-SEARXNG_URL=http://127.0.0.1:18889 SEARXNG_ENGINES=brave,google pnpm call websearch '{"query":"MCP tools"}'
+SEARXNG_URL=http://127.0.0.1:18889 SEARXNG_ENGINES=brave,duckduckgo pnpm call websearch '{"query":"MCP tools"}'
 ```
 
 原生服务已经运行时，切换端口需先 stop。Windows 原生管理暂不支持；MCP 可连接其他机器提供的 SearXNG，不能把 WSL/Windows 运行视为已验证。
@@ -66,7 +66,7 @@ setup 已完成时会核查安装凭据、配置哈希、Python 版本/虚拟环
 
 ```sh
 node scripts/searxng-native-smoke.mjs
-SEARXNG_URL=http://127.0.0.1:18888 SEARXNG_ENGINES=brave,google pnpm test:live
+SEARXNG_URL=http://127.0.0.1:18888 SEARXNG_ENGINES=brave,duckduckgo pnpm test:live
 ```
 
 native-smoke 检查受控进程身份、health、HTML、CSS、私有缓存和引擎配置，不访问搜索上游。test:live 才验证真实 MCP 搜索/原文链路。Linux CI 单独执行无 Docker 的首次安装、启动、smoke 和停止；本机实测见 [验证记录](../../docs/verification/2026-09-10-native-searxng.md)。
