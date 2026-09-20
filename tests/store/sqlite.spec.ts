@@ -103,6 +103,50 @@ describe('sqlite store', () => {
     store.close()
   })
 
+  it('books calls only while the day stays within the cap, from the very first call', async () => {
+    const store = await createSqliteStore(':memory:')
+    expect(store.reserveUsage('exa', 3, 2)).toBe(false)
+    expect(store.usageTodayBySource('exa').calls).toBe(0)
+    expect(store.reserveUsage('exa', 2, 3)).toBe(true)
+    expect(store.reserveUsage('exa', 1, 3)).toBe(true)
+    expect(store.reserveUsage('exa', 1, 3)).toBe(false)
+    expect(store.usageTodayBySource('exa').calls).toBe(3)
+    // Another source has its own count, and giving a call back makes room again.
+    expect(store.reserveUsage('tavily', 1, 3)).toBe(true)
+    store.addUsage('exa', -1, 0)
+    expect(store.reserveUsage('exa', 1, 3)).toBe(true)
+    store.close()
+  })
+
+  it('books paid calls only while the whole day stays within the budget', async () => {
+    const store = await createSqliteStore(':memory:')
+    expect(store.reservePaid('exa', 1, 0.6, 1)).toBe(true)
+    // The budget is shared: another source cannot spend what the first one already took.
+    expect(store.reservePaid('tavily', 1, 0.6, 1)).toBe(false)
+    expect(store.reservePaid('tavily', 1, 0.4, 1)).toBe(true)
+    expect(store.reservePaid('exa', 1, 0.01, 1)).toBe(false)
+    expect(store.usageToday().cost_usd).toBeCloseTo(1, 6)
+    expect(store.usageTodayBySource('tavily').calls).toBe(1)
+    // The real cost turned out lower: correcting it makes room again.
+    store.addUsage('exa', 0, -0.5)
+    expect(store.reservePaid('exa', 1, 0.01, 1)).toBe(true)
+    store.close()
+  })
+
+  it('holds the cap when several processes race for the last calls', async () => {
+    const location = temporaryDatabase()
+    ;(await createSqliteStore(location)).close()
+    const reserver = fileURLToPath(new URL('../helpers/store-reserver.ts', import.meta.url))
+    const outputs = await Promise.all(
+      Array.from({ length: 6 }, () => run(process.execPath, [reserver, location, '20', '40'])),
+    )
+    const granted = outputs.reduce((sum, output) => sum + Number(output.stdout), 0)
+    const store = await createSqliteStore(location)
+    expect(granted).toBe(20)
+    expect(store.usageTodayBySource('shared').calls).toBe(20)
+    store.close()
+  }, 60_000)
+
   it('lets two processes write the same database at once without losing rows', async () => {
     const location = temporaryDatabase()
     const writer = fileURLToPath(new URL('../helpers/store-writer.ts', import.meta.url))

@@ -268,6 +268,17 @@ export interface Store {
   getSnapshot(id: string): Snapshot | undefined
   latestSnapshotForUrl(url: string): Snapshot | undefined
   addUsage(source: string, calls: number, costUsd: number): void
+  /**
+   * Books `calls` for today only if the day's total stays within `cap`, as one atomic statement,
+   * so processes that share the state file cannot pass the cap together. False means refused.
+   */
+  reserveUsage(source: string, calls: number, cap: number): boolean
+  /**
+   * Books `calls` with their estimated cost only if today's spend across all sources stays within
+   * `budgetUsd`, as one atomic statement. The caller corrects the estimate with `addUsage` once
+   * the real cost is known. False means refused.
+   */
+  reservePaid(source: string, calls: number, estimatedCostUsd: number, budgetUsd: number): boolean
   usageToday(): { calls: number; cost_usd: number }
   usageTodayBySource(source: string): { calls: number; cost_usd: number }
   close(): void

@@ -196,6 +196,20 @@ export async function createSqliteStore(location: string): Promise<Store> {
      ON CONFLICT (day, source) DO UPDATE SET calls = calls + excluded.calls,
        cost_usd = cost_usd + excluded.cost_usd`,
   )
+  // The condition lives inside the statement: a read followed by a write would let two processes
+  // both see room for the last call. The first call of the day has no row to conflict with.
+  const reserveUsage = db.prepare(
+    `INSERT INTO usage (day, source, calls, cost_usd) SELECT ?1, ?2, ?3, 0 WHERE ?3 <= ?4
+     ON CONFLICT (day, source) DO UPDATE SET calls = calls + excluded.calls
+       WHERE usage.calls + excluded.calls <= ?4`,
+  )
+  // The budget spans every source, so the guard sums the day inside the same statement.
+  const reservePaid = db.prepare(
+    `INSERT INTO usage (day, source, calls, cost_usd) SELECT ?1, ?2, ?3, ?4
+       WHERE (SELECT COALESCE(SUM(cost_usd), 0) FROM usage WHERE day = ?1) + ?4 <= ?5
+     ON CONFLICT (day, source) DO UPDATE SET calls = calls + excluded.calls,
+       cost_usd = cost_usd + excluded.cost_usd`,
+  )
   const selectUsage = db.prepare(
     'SELECT COALESCE(SUM(calls), 0) AS calls, COALESCE(SUM(cost_usd), 0) AS cost FROM usage WHERE day = ?',
   )
@@ -290,6 +304,13 @@ export async function createSqliteStore(location: string): Promise<Store> {
     },
     addUsage(source, calls, costUsd) {
       upsertUsage.run(today(), source, calls, costUsd)
+    },
+    reserveUsage(source, calls, cap) {
+      return Number(reserveUsage.run(today(), source, calls, cap).changes) > 0
+    },
+    reservePaid(source, calls, estimatedCostUsd, budgetUsd) {
+      const result = reservePaid.run(today(), source, calls, estimatedCostUsd, budgetUsd)
+      return Number(result.changes) > 0
     },
     usageToday() {
       return usageRow(selectUsage.get(today()))

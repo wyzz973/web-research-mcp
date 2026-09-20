@@ -84,7 +84,7 @@ For dependable capacity add your own keys; the same adapter switches from the an
 | `EXA_API_KEY` | https://dashboard.exa.ai | one-off credit on sign-up, then a monthly credit |
 | `PARALLEL_API_KEY` | https://platform.parallel.ai | monthly credit, card required |
 
-Spending is bounded: paid sources stop being selected once the day's estimated cost reaches `WEB_RESEARCH_DAILY_BUDGET_USD` (default 1). Search pages served from a cursor or from the cache cost nothing. See [.env.example](.env.example) for every setting.
+Spending is bounded: paid sources stop being selected once the day's estimated cost reaches `WEB_RESEARCH_DAILY_BUDGET_USD` (default 1). Known limitation in this alpha: when several processes share the state file, the daily cap and the budget are checked and booked in two steps, so processes racing for the last calls can pass them by a few calls (measured: 1 to 5 over a cap of 20 with 6 processes). The fix is in progress. Search pages served from a cursor or from the cache cost nothing. See [.env.example](.env.example) for every setting.
 
 `depth` controls how many sources one search uses: `fast` uses one, `standard` (default) adds a second only when the results look weak, and `deep` merges up to three.
 
