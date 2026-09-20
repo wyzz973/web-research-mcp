@@ -90,7 +90,11 @@ describe('sqlite store', () => {
     const raw = new DatabaseSync(location)
     raw.exec('PRAGMA user_version = 99')
     raw.close()
+    // The refused handle has to be closed: Windows cannot delete a database that is still open.
+    const closed = vi.spyOn(DatabaseSync.prototype, 'close')
     await expect(createSqliteStore(location)).rejects.toThrow(/newer version/u)
+    expect(closed).toHaveBeenCalledTimes(1)
+    closed.mockRestore()
   })
 
   it('reports the journal mode it ended up with', async () => {

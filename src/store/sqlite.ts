@@ -159,11 +159,18 @@ export async function createSqliteStore(location: string): Promise<Store> {
   const { DatabaseSync } = await loadSqlite()
   if (location !== ':memory:') mkdirSync(path.dirname(location), { recursive: true })
   const db = new DatabaseSync(location)
-  db.exec('PRAGMA busy_timeout = 5000')
-  const journalMode =
-    location === ':memory:' ? 'memory' : await withBusyRetry(() => chooseJournalMode(db))
-  db.exec('PRAGMA synchronous = NORMAL')
-  await withBusyRetry(() => migrate(db))
+  let journalMode: string
+  try {
+    db.exec('PRAGMA busy_timeout = 5000')
+    journalMode =
+      location === ':memory:' ? 'memory' : await withBusyRetry(() => chooseJournalMode(db))
+    db.exec('PRAGMA synchronous = NORMAL')
+    await withBusyRetry(() => migrate(db))
+  } catch (error) {
+    // A refused database must not stay open: Windows keeps an open file locked against deletion.
+    db.close()
+    throw error
+  }
 
   const insertRecord = db.prepare(
     'INSERT INTO records (kind, id, value, created_at, expires_at) VALUES (?, ?, ?, ?, ?)',

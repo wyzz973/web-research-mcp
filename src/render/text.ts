@@ -10,7 +10,7 @@ import { charsWithinTokens, estimateTokens } from '../tokens.ts'
 
 const ENVELOPE_TAG = /<(\/?)\s*(results|page)\b/giu
 const PROTOCOL_LINE =
-  /^\s*(web_search |web_fetch |page \d+ |sources:|note:|error |more:|read:|read more:|outline |size ~|\[output clamped|\[\.\.\. skipped |(\d+\. (exact|normalized) (\| )?)?\[(s_[a-z0-9]+:)?\d+-\d+\])/u
+  /^\s*(web_search |web_fetch |page \d+ |sources:|note:|error |more:|read:|read more:|outline |size ~|\[output clamped|\[\.\.\. skipped |(\d+\. (exact|normalized|closest \(not a match\)) (\| )?)?\[(s_[a-z0-9]+:)?\d+-\d+\])/u
 
 interface Neutralized {
   text: string
@@ -134,7 +134,8 @@ function partHeader(page: PageResult, part: PagePart, index: number): string {
     .map(oneLine)
     .join(' ')
   return joined([
-    page.mode === 'find' ? `${index + 1}. ${part.match ?? 'exact'}` : undefined,
+    // A find passage without a match is only the closest wording, and must not read as a hit.
+    page.mode === 'find' ? `${index + 1}. ${part.match ?? 'closest (not a match)'}` : undefined,
     `[${location(page, part.start, part.end)}]`,
     page.mode === 'find' ? matchNote(page, part) : undefined,
     where ? `section ${where}` : undefined,
@@ -144,7 +145,7 @@ function partHeader(page: PageResult, part: PagePart, index: number): string {
 }
 
 function coveredMatches(page: PageResult): number {
-  return page.parts.reduce((sum, part) => sum + (part.match_count ?? 1), 0)
+  return page.parts.reduce((sum, part) => sum + (part.match ? (part.match_count ?? 1) : 0), 0)
 }
 
 /** Returns the body lines and how many spots of page text had to be neutralized. */

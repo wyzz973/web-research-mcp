@@ -253,6 +253,18 @@ describe('renderFetch', () => {
     expect(text).not.toContain('skipped')
   })
 
+  it('never presents the closest wording as a match', () => {
+    const near = fetchResult()
+    const page = near.pages[0]!
+    page.mode = 'find'
+    page.find_total = 0
+    page.parts = [{ start: 40, end: 300, text: 'Something similar but worded differently.' }]
+    const text = renderFetch(near)
+    expect(text).toContain('0 matches, showing 0 in 1 passages')
+    expect(text).toContain('1. closest (not a match) | [s_k2m9qx:40-300]')
+    expect(text).not.toMatch(/^\d+\. (exact|normalized)/mu)
+  })
+
   it('says when a passage was cut inside a block and when another page repeats it', () => {
     const result = fetchResult()
     result.pages[0]!.parts = [
