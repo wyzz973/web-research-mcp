@@ -6,11 +6,47 @@ export interface Budget {
   chars: number
 }
 
-/** Measured against render/text.ts: location label line, page header lines, first and last lines. */
+/**
+ * What the text view adds around the content, measured against render/text.ts and checked by
+ * tests/fetch/budget.spec.ts against the real rendering. Lines whose length depends on the page
+ * (address, title, error message, notes) are priced by their text; the rest is a fixed base.
+ */
 export const PART_OVERHEAD: Budget = { tokens: 30, chars: 90 }
-export const PAGE_OVERHEAD: Budget = { tokens: 200, chars: 700 }
-export const ERROR_PAGE_OVERHEAD: Budget = { tokens: 90, chars: 300 }
-export const CALL_OVERHEAD: Budget = { tokens: 60, chars: 220 }
+/** Status line, size line, block tags, and the "read more" line of a readable page. */
+const PAGE_BASE: Budget = { tokens: 165, chars: 520 }
+/** Status line and the three-line block that carries the address of a page that failed. */
+const FAILED_PAGE_BASE: Budget = { tokens: 60, chars: 150 }
+/** The first line of the response. */
+const CALL_BASE: Budget = { tokens: 35, chars: 110 }
+/** Room kept for up to three notes, which are only known after reading. */
+const NOTES_ALLOWANCE: Budget = { tokens: 105, chars: 360 }
+
+export function plus(left: Budget, right: Budget): Budget {
+  return { tokens: left.tokens + right.tokens, chars: left.chars + right.chars }
+}
+
+/** One line of the text view: a label we print, the text after it, and the line break. */
+function lineCost(label: string, text: string): Budget {
+  if (text === '') return { tokens: 0, chars: 0 }
+  const line = `${label}${text}\n`
+  return { tokens: estimateTokens(line), chars: line.length }
+}
+
+/** A readable page, without its parts and outline: those are priced by what is shown. */
+export function pageOverhead(address: string, title: string): Budget {
+  return plus(PAGE_BASE, plus(lineCost('url: ', address), lineCost('title: ', title)))
+}
+
+export function failedPageOverhead(address: string, message: string): Budget {
+  return plus(FAILED_PAGE_BASE, plus(lineCost('url: ', address), lineCost('', message)))
+}
+
+/** The response line plus its notes. Before reading, the notes are not known yet: pass none. */
+export function callOverhead(notes?: readonly string[]): Budget {
+  if (!notes) return plus(CALL_BASE, NOTES_ALLOWANCE)
+  return notes.reduce((sum, note) => plus(sum, lineCost('note: ', note)), CALL_BASE)
+}
+
 /** The smallest useful unit is one paragraph; budgets never shrink below room for it. */
 export const MIN_CONTENT: Budget = { tokens: 150, chars: 500 }
 

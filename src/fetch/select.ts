@@ -1,5 +1,5 @@
 import type { PagePart } from '../contract.ts'
-import { fits, minus, partCost, share, type Budget } from './budget.ts'
+import { fits, minus, partCost, plus, share, type Budget } from './budget.ts'
 import type { PageDocument } from './document.ts'
 import type { Candidate } from './goal.ts'
 import { clipEnd, makePart } from './range.ts'
@@ -44,10 +44,6 @@ function byScore(left: Candidate, right: Candidate): number {
 
 function smaller(left: Budget, right: Budget): Budget {
   return { tokens: Math.min(left.tokens, right.tokens), chars: Math.min(left.chars, right.chars) }
-}
-
-function plus(left: Budget, right: Budget): Budget {
-  return { tokens: left.tokens + right.tokens, chars: left.chars + right.chars }
 }
 
 function whole(candidate: Priced): Span {

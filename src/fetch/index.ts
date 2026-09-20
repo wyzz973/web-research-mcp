@@ -9,11 +9,12 @@ import type { NetworkDependencies } from '../net/safe-http.ts'
 import { buildResult, failedPage, failedResult, okPage, type PageSource } from './assemble.ts'
 import {
   atLeast,
-  CALL_OVERHEAD,
-  ERROR_PAGE_OVERHEAD,
+  callOverhead,
+  failedPageOverhead,
   MIN_CONTENT,
   minus,
-  PAGE_OVERHEAD,
+  pageOverhead,
+  plus,
   type Budget,
 } from './budget.ts'
 import { CURSOR_KIND, parseCursorState, type CursorState } from './cursor.ts'
@@ -105,29 +106,26 @@ export function createReader(dependencies: ReaderDependencies): Reader {
     }
   }
 
-  function overhead(okPages: number, failedPages: number): Budget {
-    return {
-      tokens:
-        CALL_OVERHEAD.tokens +
-        okPages * PAGE_OVERHEAD.tokens +
-        failedPages * ERROR_PAGE_OVERHEAD.tokens,
-      chars:
-        CALL_OVERHEAD.chars +
-        okPages * PAGE_OVERHEAD.chars +
-        failedPages * ERROR_PAGE_OVERHEAD.chars,
-    }
+  /** What the text view prints besides content: the response line, notes, and every page's frame. */
+  function overhead(sources: PageSource[], failed: PageResult[]): Budget {
+    let total = callOverhead()
+    for (const { snapshot } of sources)
+      total = plus(total, pageOverhead(snapshot.final_url, snapshot.title))
+    for (const page of failed)
+      total = plus(total, failedPageOverhead(page.url, page.error?.message ?? ''))
+    return total
   }
 
-  /** Headers, footers, and error lines are paid first; every readable page keeps room for a paragraph. */
-  function contentBudget(maxTokens: number, okPages: number, failedPages: number): Budget {
+  /** The frame is paid first; every readable page keeps room for a paragraph. */
+  function contentBudget(maxTokens: number, sources: PageSource[], failed: PageResult[]): Budget {
     const total: Budget = { tokens: maxTokens, chars: config.limits.maxOutputChars }
-    const room = minus(total, overhead(okPages, failedPages))
-    return atLeast(room, scaled(MIN_CONTENT, Math.max(1, okPages)))
+    const room = minus(total, overhead(sources, failed))
+    return atLeast(room, scaled(MIN_CONTENT, Math.max(1, sources.length)))
   }
 
-  function budgetTooSmall(maxTokens: number, okPages: number, failedPages: number): boolean {
-    const room = maxTokens - overhead(okPages, failedPages).tokens
-    return okPages > 0 && room < MIN_CONTENT.tokens * okPages
+  function budgetTooSmall(maxTokens: number, sources: PageSource[], failed: PageResult[]): boolean {
+    const room = maxTokens - overhead(sources, failed).tokens
+    return sources.length > 0 && room < MIN_CONTENT.tokens * sources.length
   }
 
   function saveCursor(state: CursorState | undefined): string | undefined {
@@ -165,8 +163,8 @@ export function createReader(dependencies: ReaderDependencies): Reader {
       targets.map((target) => loadTarget(target, plan.fresh, signal)),
     )
     const sources = outcomes.flatMap((outcome) => ('source' in outcome ? [outcome.source] : []))
-    const failed = outcomes.length - sources.length
-    const budget = contentBudget(plan.maxTokens, sources.length, failed)
+    const failed = outcomes.flatMap((outcome) => ('failed' in outcome ? [outcome.failed] : []))
+    const budget = contentBudget(plan.maxTokens, sources, failed)
     const {
       reads,
       goal,
@@ -179,7 +177,10 @@ export function createReader(dependencies: ReaderDependencies): Reader {
         reads,
       ),
     ]
-    if (budgetTooSmall(plan.maxTokens, sources.length, failed))
+    // The goal itself is the caller's or a search's text and is never repeated in a note.
+    if (goal !== undefined && plan.goal === undefined && plan.find === undefined)
+      notes.push('no goal was given, so the goal of the search these refs came from was used')
+    if (budgetTooSmall(plan.maxTokens, sources, failed))
       notes.push(
         `max_tokens is too small for ${sources.length} pages; each page got the minimum, so the response is larger than requested`,
       )
@@ -201,7 +202,7 @@ export function createReader(dependencies: ReaderDependencies): Reader {
     signal: AbortSignal,
   ): Promise<PageRead> {
     const page = { n: 1, snapshot: source.snapshot.id, document: source.document }
-    const budget = contentBudget(maxTokens, 1, 0)
+    const budget = contentBudget(maxTokens, [source], [])
     if (state.kind === 'read') return readOnward(page, state, budget)
     if (state.kind === 'find') {
       const folded = await fold(page.snapshot, page.document.markdown, signal)

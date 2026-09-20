@@ -1,7 +1,7 @@
 /** Builds the public result objects. Nothing here reads the network or decides what to show. */
 import type { FetchResult, PageResult, Snapshot, ToolError } from '../contract.ts'
 import { estimateTokens } from '../tokens.ts'
-import { CALL_OVERHEAD, ERROR_PAGE_OVERHEAD, PAGE_OVERHEAD, PART_OVERHEAD } from './budget.ts'
+import { callOverhead, failedPageOverhead, pageOverhead, PART_OVERHEAD } from './budget.ts'
 import type { PageDocument } from './document.ts'
 import type { PageRead } from './read.ts'
 
@@ -81,8 +81,9 @@ export function okPage(
   return page
 }
 
+/** Estimated size of one page in the text view. */
 function pageTokens(page: PageResult): number {
-  if (page.status === 'error') return ERROR_PAGE_OVERHEAD.tokens
+  if (page.status === 'error') return failedPageOverhead(page.url, page.error?.message ?? '').tokens
   const parts = page.parts.reduce(
     (sum, part) => sum + estimateTokens(part.text) + PART_OVERHEAD.tokens,
     0,
@@ -91,7 +92,7 @@ function pageTokens(page: PageResult): number {
     (sum, entry) => sum + estimateTokens(`${entry.id} ${entry.title} ~${entry.tokens}t | `),
     0,
   )
-  return PAGE_OVERHEAD.tokens + parts + outline
+  return pageOverhead(page.final_url ?? page.url, page.title ?? '').tokens + parts + outline
 }
 
 function overallError(pages: PageResult[]): ToolError | undefined {
@@ -122,16 +123,32 @@ export function buildResult(
   const ok = pages.filter((page) => page.status === 'ok').length
   const result: FetchResult = {
     status: ok === pages.length ? 'ok' : ok > 0 ? 'partial' : 'error',
-    tokens: CALL_OVERHEAD.tokens + pages.reduce((sum, page) => sum + pageTokens(page), 0),
+    tokens: 0,
     pages,
     notes: capNotes(notes),
   }
   if (goal !== undefined) result.goal = goal
   const error = ok === 0 ? overallError(pages) : undefined
   if (error) result.error = error
+  result.tokens = responseTokens(result)
   return result
 }
 
+/** The whole response as the text view will print it: first line, error line, notes, pages. */
+function responseTokens(result: FetchResult): number {
+  const errorLine = result.error ? estimateTokens(`error ${result.error.message}\n`) + 10 : 0
+  const pages = result.pages.reduce((sum, page) => sum + pageTokens(page), 0)
+  return callOverhead(result.notes).tokens + errorLine + pages
+}
+
 export function failedResult(error: ToolError, notes: string[] = []): FetchResult {
-  return { status: 'error', tokens: CALL_OVERHEAD.tokens, pages: [], notes: capNotes(notes), error }
+  const result: FetchResult = {
+    status: 'error',
+    tokens: 0,
+    pages: [],
+    notes: capNotes(notes),
+    error,
+  }
+  result.tokens = responseTokens(result)
+  return result
 }
