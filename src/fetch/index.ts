@@ -123,11 +123,6 @@ export function createReader(dependencies: ReaderDependencies): Reader {
     return atLeast(room, scaled(MIN_CONTENT, Math.max(1, sources.length)))
   }
 
-  function budgetTooSmall(maxTokens: number, sources: PageSource[], failed: PageResult[]): boolean {
-    const room = maxTokens - overhead(sources, failed).tokens
-    return sources.length > 0 && room < MIN_CONTENT.tokens * sources.length
-  }
-
   function saveCursor(state: CursorState | undefined): string | undefined {
     if (!state) return undefined
     return store.insertRecord(CURSOR_KIND, 'c_', state, config.ttl.searchSeconds, CURSOR_ID_LENGTH)
@@ -180,15 +175,11 @@ export function createReader(dependencies: ReaderDependencies): Reader {
     // The goal itself is the caller's or a search's text and is never repeated in a note.
     if (goal !== undefined && plan.goal === undefined && plan.find === undefined)
       notes.push('no goal was given, so the goal of the search these refs came from was used')
-    if (budgetTooSmall(plan.maxTokens, sources, failed))
-      notes.push(
-        `max_tokens is too small for ${sources.length} pages; each page got the minimum, so the response is larger than requested`,
-      )
     const pages = outcomes.map((outcome) => {
       if ('failed' in outcome) return outcome.failed
       return finish(outcome.source, reads[sources.indexOf(outcome.source)] ?? emptyRead())
     })
-    return buildResult(pages, goal, [...notes, ...plan.notes])
+    return buildResult(pages, goal, [...notes, ...plan.notes], plan.maxTokens)
   }
 
   function emptyRead(): PageRead {
@@ -238,6 +229,7 @@ export function createReader(dependencies: ReaderDependencies): Reader {
       [finish(source, read)],
       state.kind === 'goal' ? state.goal : undefined,
       notes,
+      plan.maxTokens,
     )
   }
 

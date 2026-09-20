@@ -70,6 +70,16 @@ function isDigit(code: number): boolean {
   return code >= 48 && code <= 57
 }
 
+/** Joiners and variation selectors change how text is drawn, not what it says. */
+function isShaping(point: number): boolean {
+  return (
+    point === 0x200c ||
+    point === 0x200d ||
+    (point >= 0xfe00 && point <= 0xfe0f) ||
+    (point >= 0xe0100 && point <= 0xe01ef)
+  )
+}
+
 function foldWide(char: string): string {
   if (/\s/u.test(char)) return ' '
   if (DOUBLE_QUOTES.test(char)) return '"'
@@ -358,6 +368,7 @@ class Projection {
     const point = this.source.codePointAt(at) ?? 0
     const end = at + (point > 0xffff ? 2 : 1)
     this.index = end
+    if (isShaping(point)) return
     if (isPlainWide(point)) return this.output.unit(point, at, end)
     const folded = this.foldedWide(point)
     if (folded === ' ') this.output.space(at, end)

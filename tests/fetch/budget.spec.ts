@@ -128,6 +128,9 @@ describe('the reported size of a fetch response', () => {
         harness.config.limits.maxOutputTokens,
       )
       expect(result.tokens).toBeGreaterThanOrEqual(rendered)
+      // None of these budgets is too small for its frame, so nobody is told that it was.
+      expect(result.tokens).toBeLessThanOrEqual(budget)
+      expect(result.notes.join(' ')).not.toContain('is below what reporting')
       expect(rendered).toBeLessThanOrEqual(budget)
       expect(renderFetch(result).length).toBeLessThanOrEqual(harness.config.limits.maxOutputChars)
       // The estimate is a promise, not a guess: it may overstate, but not wildly.
@@ -149,5 +152,56 @@ describe('the reported size of a fetch response', () => {
     expect(inherited.notes.join(' ')).not.toContain('billing')
     const given = await harness.fetch({ refs: ['k7f2m9qx:r1'], goal: 'storage', max_tokens: 2500 })
     expect(given.notes.join(' ')).not.toContain('no goal was given')
+  })
+})
+
+describe('a budget smaller than the frame of the response', () => {
+  const longAddress = (n: number): string =>
+    `${at('/gone')}/${'a-long-path-segment-'.repeat(12)}${n}`
+
+  it('says so when failing pages alone need more than max_tokens, and cuts nothing', async () => {
+    harness = await createHarness(routes)
+    const result = await harness.fetch({
+      urls: [1, 2, 3, 4].map(longAddress),
+      goal: 'anything',
+      max_tokens: 500,
+    })
+    const rendered = estimateTokens(renderFetch(result))
+    expect(rendered).toBeGreaterThan(500)
+    expect(result.tokens).toBeGreaterThanOrEqual(rendered)
+    expect(rendered).toBeLessThanOrEqual(harness.config.limits.maxOutputTokens)
+    expect(result.pages).toHaveLength(4)
+    expect(result.notes[0]).toMatch(
+      /^max_tokens 500 is below what reporting these 4 pages needs \(~\d+ tokens\); nothing was cut$/u,
+    )
+    const stated = Number(/~(\d+) tokens/u.exec(result.notes[0] ?? '')?.[1])
+    expect(Math.abs(stated - result.tokens)).toBeLessThanOrEqual(15)
+  })
+
+  it('says so when a readable page only gets its minimum next to failing pages', async () => {
+    harness = await createHarness(routes)
+    const result = await harness.fetch({
+      urls: [at('/manual'), ...[1, 2, 3, 4].map(longAddress)],
+      goal: 'billing',
+      max_tokens: 900,
+    })
+    const rendered = estimateTokens(renderFetch(result))
+    expect(result.tokens).toBeGreaterThanOrEqual(rendered)
+    expect(rendered).toBeLessThanOrEqual(harness.config.limits.maxOutputTokens)
+    expect(result.pages[0]?.parts.length).toBeGreaterThan(0)
+    expect(result.notes[0]).toMatch(
+      /^max_tokens 900 is below what reporting these 5 pages needs \(~\d+ tokens\); each readable page was given the minimum$/u,
+    )
+  })
+
+  it('stays silent when the response fits', async () => {
+    harness = await createHarness(routes)
+    const result = await harness.fetch({
+      urls: [at('/manual'), at('/gone')],
+      goal: 'billing',
+      max_tokens: 2000,
+    })
+    expect(result.tokens).toBeLessThanOrEqual(2000)
+    expect(result.notes.join(' ')).not.toContain('max_tokens')
   })
 })

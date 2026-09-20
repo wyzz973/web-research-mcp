@@ -1,4 +1,5 @@
 /** Text-level helpers shared by extraction and by the snapshot readers. */
+import { stripInvisible } from '../invisible.ts'
 
 export interface MarkdownLine {
   /** UTF-16 offset of the first character of the line. */
@@ -63,32 +64,6 @@ export function scanLines(markdown: string): MarkdownLine[] {
     const step = steps.next()
     if (step.done) return step.value
   }
-}
-
-const INVISIBLE =
-  /[\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]|[\u{E0000}-\u{E007F}]/gu
-const PICTOGRAPH_BEFORE = /(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\uFE0F)$/u
-const PICTOGRAPH_AFTER = /^\p{Extended_Pictographic}/u
-
-function joinsEmoji(text: string, offset: number): boolean {
-  return (
-    PICTOGRAPH_BEFORE.test(text.slice(Math.max(0, offset - 2), offset)) &&
-    PICTOGRAPH_AFTER.test(text.slice(offset + 1, offset + 3))
-  )
-}
-
-/**
- * Removes characters a reader cannot see: zero-width and bidi controls, soft hyphens, and the
- * Unicode tag block used to smuggle ASCII. A joiner inside an emoji sequence is visible, so it stays.
- */
-export function stripInvisible(text: string): { text: string; removed: number } {
-  let removed = 0
-  const cleaned = text.replace(INVISIBLE, (match: string, offset: number) => {
-    if (match === '\u200D' && joinsEmoji(text, offset)) return match
-    removed += 1
-    return ''
-  })
-  return { text: cleaned, removed }
 }
 
 /** The `<` that opens anything a reader could take for our untrusted-block tags, in any case. */

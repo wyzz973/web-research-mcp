@@ -1,11 +1,7 @@
 import { WebError } from '../errors.ts'
-import {
-  ATX_HEADING,
-  cleanTitle,
-  neutralizeEnvelope,
-  scanLines,
-  stripInvisible,
-} from './markdown.ts'
+import { stripInvisible } from '../invisible.ts'
+import { bomCharset, headerCharset, isValidUtf8 } from './charset.ts'
+import { ATX_HEADING, cleanTitle, neutralizeEnvelope, scanLines } from './markdown.ts'
 
 export interface TextExtraction {
   title: string
@@ -13,18 +9,28 @@ export interface TextExtraction {
   hiddenRemoved: number
 }
 
-function charsetOf(contentType: string): string {
-  return /charset\s*=\s*["']?([\w.:-]{1,40})/iu.exec(contentType)?.[1] ?? 'utf-8'
+function undecodable(): WebError {
+  return new WebError(
+    'parse_failed',
+    'The response is not valid text in its declared encoding, so it cannot be read verbatim.',
+  )
 }
 
+/**
+ * A declared encoding is taken at its word, and bytes that contradict it are an error. Without
+ * one, a byte order mark decides; then UTF-8 when the bytes are valid UTF-8; then windows-1252,
+ * which can read anything and is what the undeclared web was written in.
+ */
 function decode(body: Uint8Array, contentType: string): string {
+  const declared = headerCharset(contentType)
+  if (declared === undefined) {
+    const sniffed = bomCharset(body) ?? (isValidUtf8(body) ? 'utf-8' : 'windows-1252')
+    return new TextDecoder(sniffed).decode(body)
+  }
   try {
-    return new TextDecoder(charsetOf(contentType), { fatal: true }).decode(body)
+    return new TextDecoder(declared, { fatal: true }).decode(body)
   } catch {
-    throw new WebError(
-      'parse_failed',
-      'The response is not valid text in its declared encoding, so it cannot be read verbatim.',
-    )
+    throw undecodable()
   }
 }
 

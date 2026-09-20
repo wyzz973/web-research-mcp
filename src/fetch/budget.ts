@@ -19,7 +19,7 @@ const FAILED_PAGE_BASE: Budget = { tokens: 60, chars: 150 }
 /** The first line of the response. */
 const CALL_BASE: Budget = { tokens: 35, chars: 110 }
 /** Room kept for up to three notes, which are only known after reading. */
-const NOTES_ALLOWANCE: Budget = { tokens: 105, chars: 360 }
+const NOTES_ALLOWANCE: Budget = { tokens: 140, chars: 480 }
 
 export function plus(left: Budget, right: Budget): Budget {
   return { tokens: left.tokens + right.tokens, chars: left.chars + right.chars }

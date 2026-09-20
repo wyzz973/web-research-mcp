@@ -13,7 +13,9 @@ import {
   rewriteLinks,
 } from './clean.ts'
 import { createConverter } from './convert.ts'
-import { cleanTitle, neutralizeEnvelope, stripInvisible, tidyMarkdown } from './markdown.ts'
+import { stripInvisible } from '../invisible.ts'
+import { htmlCharset } from './charset.ts'
+import { cleanTitle, neutralizeEnvelope, tidyMarkdown } from './markdown.ts'
 import type { ExtractInput, ExtractReply, PageSignals } from './types.ts'
 
 const MIN_ARTICLE_CHARS = 200
@@ -27,8 +29,8 @@ function collapse(text: string | null | undefined): string {
 }
 
 /** jsdom only needs the charset; any other parameter of a hostile header is dropped. */
-function parserContentType(header: string): string {
-  const charset = /charset\s*=\s*["']?([\w.:-]{1,40})/iu.exec(header)?.[1]
+function parserContentType(header: string, bytes: Uint8Array): string {
+  const charset = htmlCharset(header, bytes)
   return charset ? `text/html; charset=${charset}` : 'text/html'
 }
 
@@ -156,7 +158,7 @@ export function extractFromHtml(input: ExtractInput): ExtractReply {
   // An unconnected virtual console keeps page-controlled diagnostics away from stdout and stderr.
   const dom = new JSDOM(Buffer.from(input.html), {
     url: input.url,
-    contentType: parserContentType(input.contentType),
+    contentType: parserContentType(input.contentType, input.html),
     virtualConsole: new VirtualConsole(),
   })
   try {

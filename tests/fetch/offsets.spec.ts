@@ -158,13 +158,17 @@ async function serve(
 }
 
 describe('snapshot text', () => {
-  it('is final before any offset exists: no CR, no invisible characters, all of them counted', async () => {
+  it('is final before any offset exists: no CR, nothing invisible but honest joiners, every removal counted', async () => {
     const source = generate(7, 6)
     const { markdown, h, url } = await serve(7, 6)
-    expect(markdown).not.toMatch(/\r|[\u200B\u200C\uFEFF\u00AD\u202E]/u)
-    const stripped = [...source.matchAll(/[\u200B\u200C\uFEFF\u00AD\u202E]/gu)].length
-    expect(stripped).toBeGreaterThan(10)
-    expect((await h.fetch({ url })).pages[0]?.hidden_removed).toBe(stripped)
+    // A zero width non-joiner between two letters spells a word (Persian does this), so it stays.
+    expect(markdown).not.toMatch(/\r|[\u200B\uFEFF\u00AD\u202E]/u)
+    const removed = [...source.matchAll(/[\u200B\uFEFF\u00AD\u202E]/gu)].length
+    const kept = [...source.matchAll(/zero\u200Cwidth/gu)].length
+    expect(removed).toBeGreaterThan(10)
+    expect(kept).toBeGreaterThan(2)
+    expect([...markdown.matchAll(/zero\u200Cwidth/gu)]).toHaveLength(kept)
+    expect((await h.fetch({ url })).pages[0]?.hidden_removed).toBe(removed)
     // Joiners inside emoji sequences are visible text and survive.
     expect(markdown).toContain('\u{1F468}\u200D\u{1F469}\u200D\u{1F467}')
     expect(markdown).toContain('e\u0301')
@@ -205,7 +209,7 @@ describe.each([11, 23, 42])('corpus %i', (seed) => {
       expect(page.find_total).toBeGreaterThan(0)
       for (const part of page.parts) {
         const hit = markdown.slice(part.match_start, part.match_end)
-        expect(hit.normalize('NFKC').toLowerCase()).toBe(needle.normalize('NFKC').toLowerCase())
+        expect(foldText(hit).text.trim()).toBe(foldText(needle).text.trim())
       }
     }
     for (const goal of [

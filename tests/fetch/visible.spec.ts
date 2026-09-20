@@ -165,3 +165,24 @@ describe('foldText', () => {
     expect(Date.now() - started).toBeLessThan(3000)
   })
 })
+
+describe('characters that only shape the text', () => {
+  const ZWNJ = '\u200C'
+  const persian = `\u0645\u06CC${ZWNJ}\u062E\u0648\u0627\u0647\u0645`
+  const page = `I ${persian} a \u2764\uFE0F and a 1\uFE0F\u20E3 key.`
+
+  it('finds a word whether or not the quote carries its joiner or its emoji selector', () => {
+    const folded = foldText(page)
+    const withJoiner = findMatches(page, persian, folded)
+    expect(withJoiner).toHaveLength(1)
+    expect(withJoiner[0]?.kind).toBe('exact')
+    const without = findMatches(page, persian.replace(ZWNJ, ''), folded)
+    expect(without).toHaveLength(1)
+    expect(without[0]?.kind).toBe('normalized')
+    expect(page.slice(without[0]?.start, without[0]?.end)).toBe(persian)
+    const heart = findMatches(page, 'a \u2764 and a 1\u20E3 key', folded)
+    expect(page.slice(heart[0]?.start, heart[0]?.end)).toBe(
+      'a \u2764\uFE0F and a 1\uFE0F\u20E3 key',
+    )
+  })
+})

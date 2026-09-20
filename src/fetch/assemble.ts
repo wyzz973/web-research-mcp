@@ -15,6 +15,8 @@ export interface PageSource {
 }
 
 const MAX_NOTES = 3
+/** About what the oversize note adds to the size it reports. */
+const NOTE_ITSELF_TOKENS = 35
 
 const MAX_URL_CHARS = 300
 
@@ -115,10 +117,23 @@ export function capNotes(notes: string[]): string[] {
   ]
 }
 
+/**
+ * The frame of a response (status lines, addresses, error messages) is not negotiable, so a small
+ * `max_tokens` with several pages can be exceeded by the frame alone. The header then shows an
+ * honest, larger number; this note says why, so the model does not take it for a bug.
+ */
+function oversizeNote(result: FetchResult, maxTokens: number): string {
+  const count = result.pages.length
+  const readable = result.pages.some((page) => page.status === 'ok')
+  const needed = result.tokens + NOTE_ITSELF_TOKENS
+  return `max_tokens ${maxTokens} is below what reporting ${count === 1 ? 'this page' : `these ${count} pages`} needs (~${needed} tokens); ${readable ? 'each readable page was given the minimum' : 'nothing was cut'}`
+}
+
 export function buildResult(
   pages: PageResult[],
   goal: string | undefined,
   notes: string[],
+  maxTokens?: number,
 ): FetchResult {
   const ok = pages.filter((page) => page.status === 'ok').length
   const result: FetchResult = {
@@ -131,6 +146,11 @@ export function buildResult(
   const error = ok === 0 ? overallError(pages) : undefined
   if (error) result.error = error
   result.tokens = responseTokens(result)
+  if (maxTokens !== undefined && result.tokens > maxTokens) {
+    // First, so that the cap on the number of notes never drops it.
+    result.notes = capNotes([oversizeNote(result, maxTokens), ...notes])
+    result.tokens = responseTokens(result)
+  }
   return result
 }
 
