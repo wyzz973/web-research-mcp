@@ -220,15 +220,27 @@ function resolveGoal(value: unknown, notes: string[]): string | undefined {
   return clip(goal, MAX_GOAL_CHARS)
 }
 
+const MAX_NAMES_IN_NOTE = 5
+const MAX_NAME_CHARS = 32
+
+/**
+ * Notes are printed outside the untrusted block, so nothing a web page wrote may reach them. An
+ * argument name comes from the model, but models copy from pages: only identifier characters
+ * survive, in a bounded number of bounded names. A name made of nothing else is counted, not shown.
+ */
 function unknownArguments(request: SearchRequest): string | undefined {
-  const names = Object.keys(request)
-    .filter((name) => !KNOWN_ARGUMENTS.has(name) && present(request[name]))
-    .map((name) => name.replace(/[^\w.-]/gu, '').slice(0, 24))
+  const unknown = Object.keys(request).filter(
+    (name) => !KNOWN_ARGUMENTS.has(name) && present(request[name]),
+  )
+  if (unknown.length === 0) return undefined
+  const names = unknown
+    .map((name) => name.replace(/[^A-Za-z0-9_]/gu, '').slice(0, MAX_NAME_CHARS))
     .filter(Boolean)
-  if (names.length === 0) return undefined
-  const shown = names.slice(0, 5).join(', ')
-  const more = names.length > 5 ? ` and ${names.length - 5} more` : ''
-  return `Unknown arguments were ignored: ${shown}${more}.`
+  const shown = names.slice(0, MAX_NAMES_IN_NOTE)
+  const hidden = unknown.length - shown.length
+  if (shown.length === 0) return `${unknown.length} unknown arguments were ignored.`
+  const more = hidden > 0 ? ` and ${hidden} more` : ''
+  return `Unknown arguments were ignored: ${shown.join(', ')}${more}.`
 }
 
 const CURSOR_GONE = 'The cursor was not valid or had expired, so the query was searched again.'

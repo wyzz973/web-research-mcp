@@ -25,6 +25,8 @@
  * A CJK character counts as two letters: three of them can already be a sentence.
  */
 
+import { withoutInvisible } from './invisible.ts'
+
 const MIN_LETTERS_BESIDE_URL = 8
 const MIN_TRAIL_SEGMENTS = 3
 const MAX_TRAIL_CHARS = 160
@@ -114,7 +116,9 @@ export function lowInformationLines(lines: readonly string[]): boolean[] {
 /** How much of these passages is content: the length of their lines that are not low-information. */
 export function informativeLength(passages: readonly string[]): number {
   return passages.reduce((total, passage) => {
-    const lines = passage.split('\n').filter((line) => line.trim().length > 0)
+    const lines = withoutInvisible(passage)
+      .split('\n')
+      .filter((line) => line.trim().length > 0)
     const low = lowInformationLines(lines)
     return (
       total + lines.reduce((sum, line, index) => sum + (low[index] ? 0 : line.trim().length), 0)

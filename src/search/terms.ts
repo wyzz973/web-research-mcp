@@ -1,4 +1,5 @@
 /** Query and goal words used to pick excerpts and to judge whether results match the query. */
+import { withoutInvisible } from './invisible.ts'
 
 export interface Term {
   text: string
@@ -88,6 +89,6 @@ export function buildTerms(queries: readonly string[], goal: string | undefined)
 export function queryCoverage(terms: readonly Term[], texts: readonly string[]): number {
   const own = terms.filter((term) => term.weight >= 2)
   if (own.length === 0) return 1
-  const haystack = texts.join('\n').toLowerCase()
+  const haystack = withoutInvisible(texts.join('\n')).toLowerCase()
   return own.filter((term) => term.matches(haystack)).length / own.length
 }

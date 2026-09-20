@@ -28,16 +28,14 @@ describe('toIsoDate', () => {
 
 describe('cleanText', () => {
   it('normalizes line endings and blank runs without touching words', () => {
-    expect(cleanText('  a\r\nb  \n\n\n\nc\u0000\u200B ')).toBe('a\nb\n\nc')
+    expect(cleanText('  a\r\nb  \n\n\n\nc ')).toBe('a\nb\n\nc')
     expect(cleanText(42)).toBe('')
   })
 
-  it('keeps the joiners that Persian and Indic words are spelled with', () => {
-    expect(cleanText('می\u200Cخواهم')).toBe('می\u200Cخواهم')
-  })
-
-  it('strips bidirectional overrides', () => {
-    expect(cleanTitle('safe\u202Eevil\u202C  title')).toBe('safeevil title')
+  it('leaves invisible characters for the search core, which removes and counts them where text is shown', () => {
+    const text = 'safe\u200B\u202Eevil\u202C\u0000 title'
+    expect(cleanText(text)).toBe(text)
+    expect(cleanTitle(`${text}  again`)).toBe(`${text} again`)
   })
 })
 

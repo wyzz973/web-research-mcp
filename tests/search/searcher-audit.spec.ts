@@ -381,6 +381,94 @@ describe('should-fix items', () => {
   })
 })
 
+describe('invisible characters (hidden_removed)', () => {
+  const ZERO_WIDTH = '\u200B'
+  const OVERRIDE = '\u202E'
+
+  /** A hit with `inTitle` invisible characters in its title and `inText` in its text. */
+  function tainted(index: number, inTitle: number, inText: number) {
+    const title = `Page ${index}${ZERO_WIDTH.repeat(inTitle)} about fetch abort`
+    const text = `Fetch can be${OVERRIDE.repeat(inText)} aborted with a signal, page ${index}.`
+    return hit(`https://example.com/page-${index}`, text, title)
+  }
+
+  it('removes them from titles and excerpts and says how many, per response', async () => {
+    const exa = fakeSource('exa', [tainted(1, 2, 3), tainted(2, 0, 1), tainted(3, 0, 0)])
+    const result = await searcherWith([exa]).search({ query: 'fetch abort', depth: 'fast' }, never)
+
+    expect(result.hidden_removed).toBe(6)
+    expect(result.results[0]).toMatchObject({
+      title: 'Page 1 about fetch abort',
+      excerpt: 'Fetch can be aborted with a signal, page 1.',
+    })
+    const shown = result.results.map((entry) => `${entry.title}${entry.excerpt}`).join('')
+    expect(shown).not.toContain(ZERO_WIDTH)
+    expect(shown).not.toContain(OVERRIDE)
+  })
+
+  it('counts only what the page shows: a cursor page reports its own results, and so does the cache', async () => {
+    const pages = [
+      ...Array.from({ length: 10 }, (_, index) => tainted(index + 1, 1, 0)),
+      ...Array.from({ length: 5 }, (_, index) => tainted(index + 11, 0, 2)),
+    ]
+    const exa = fakeSource('exa', pages)
+    const searcher = searcherWith([exa])
+    const first = await searcher.search({ query: 'fetch abort', depth: 'fast' }, never)
+    expect([first.returned, first.hidden_removed]).toEqual([10, 10])
+
+    const second = await searcher.search({ cursor: first.next_cursor }, never)
+    expect([second.returned, second.hidden_removed]).toEqual([5, 10])
+    expect(second.results.every((entry) => !entry.excerpt.includes(OVERRIDE))).toBe(true)
+
+    const cached = await searcher.search(
+      { query: 'fetch abort', depth: 'fast', max_results: 3 },
+      never,
+    )
+    expect([cached.cache, cached.returned, cached.hidden_removed]).toEqual(['hit', 3, 3])
+    expect(exa.requests).toHaveLength(1)
+  })
+
+  it('counts what was cut out of view as not removed: only the shown part of a long text counts', async () => {
+    const shownPart = `Fetch abort${ZERO_WIDTH} is covered in this opening sentence of the page.`
+    const farAway = `Unrelated closing remark${ZERO_WIDTH.repeat(5)} that the budget will never reach. `
+    const filler = Array.from(
+      { length: 40 },
+      (_, index) => `Filler sentence number ${index + 1} says nothing of interest. `,
+    ).join('')
+    const long = `${shownPart} ${filler}${farAway}`
+    const exa = fakeSource('exa', [hit('https://example.com/long', long, 'Long page')])
+    const result = await searcherWith([exa]).search(
+      { query: 'fetch abort', depth: 'fast', max_tokens: 300 },
+      never,
+    )
+    expect(result.results[0]?.excerpt.startsWith('Fetch abort is covered')).toBe(true)
+    expect(result.hidden_removed).toBe(1)
+  })
+
+  it('leaves the field out when there was nothing to remove', async () => {
+    const result = await searcherWith([fakeSource('exa', hits('e', 3))]).search(
+      { query: 'fetch abort', depth: 'fast' },
+      never,
+    )
+    expect(result).not.toHaveProperty('hidden_removed')
+  })
+
+  it('still finds a query word that invisible characters were used to break up', async () => {
+    const broken = `Abort${ZERO_WIDTH}Controller cancels a fet${ZERO_WIDTH}ch request in flight.`
+    const filler = Array.from(
+      { length: 12 },
+      (_, index) => `Opening remark ${index + 1} has nothing to do with the question at all. `,
+    ).join('')
+    const exa = fakeSource('exa', [hit('https://example.com/split', `${filler}${broken}`, 'Split')])
+    const result = await searcherWith([exa]).search(
+      { query: 'AbortController fetch', depth: 'fast', max_tokens: 250 },
+      never,
+    )
+    expect(result.results[0]?.excerpt).toContain('AbortController cancels a fetch request')
+    expect(result.hidden_removed).toBe(2)
+  })
+})
+
 describe('a cursor that is gone', () => {
   it('searches the query that came with it instead of sending the model away', async () => {
     const exa = fakeSource('exa', hits('e', 12))

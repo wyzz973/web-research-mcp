@@ -50,6 +50,16 @@ export function realErrors(outcomes: readonly CallOutcome[]): WebError[] {
   )
 }
 
+const MAX_DETAIL_CHARS = 160
+
+/**
+ * The built-in adapters word their own failures, but an adapter supplied by the embedding
+ * application may pass on what an upstream said. One bounded line is all that is kept of it.
+ */
+function boundedDetail(message: string): string {
+  return message.replace(/\s+/gu, ' ').trim().slice(0, MAX_DETAIL_CHARS)
+}
+
 /** One status line per source, however many calls the search made to it. */
 export function sourceStatus(source: string, outcomes: readonly CallOutcome[]): SourceStatus {
   const ms = Math.max(0, ...outcomes.map((outcome) => outcome.ms))
@@ -65,7 +75,7 @@ export function sourceStatus(source: string, outcomes: readonly CallOutcome[]): 
       ...(failure.retryAfterSeconds === undefined
         ? {}
         : { retry_after_s: failure.retryAfterSeconds }),
-      detail: `${partial}${failure.message}`,
+      detail: `${partial}${boundedDetail(failure.message)}`,
     }
   }
   const answered = outcomes.filter((outcome) => !outcome.error)

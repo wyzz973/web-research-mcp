@@ -10,6 +10,7 @@
  *  - a prose sentence that already occurs earlier in the same excerpt is shown once.
  */
 import { charsWithinTokens, estimateTokens } from '../tokens.ts'
+import { withoutInvisible } from './invisible.ts'
 import { contentWeight, lowInformationLines } from './low-information.ts'
 import type { Term } from './terms.ts'
 
@@ -131,11 +132,13 @@ function sentenceOf(body: string, span: Span, following: string): string | undef
 function segment(text: string, passage: number, terms: readonly Term[]): Omit<Unit, 'index'>[] {
   const spans = spansOf(text)
   const bodies = spans.map((span) => text.slice(span.start, span.end))
-  const low = lowInformationLines(bodies)
+  // Judged as a reader would see it: invisible characters must not split a word or hide a match.
+  const visible = bodies.map(withoutInvisible)
+  const low = lowInformationLines(visible)
   return spans.map((span, position) => {
     const body = bodies[position] ?? ''
     const lowInformation = low[position] === true
-    const lower = body.toLowerCase()
+    const lower = (visible[position] ?? '').toLowerCase()
     return {
       passage,
       start: span.start,
@@ -148,7 +151,11 @@ function segment(text: string, passage: number, terms: readonly Term[]): Omit<Un
       lowInformation,
       sentence: lowInformation
         ? undefined
-        : sentenceOf(body, span, text.slice(span.end, span.end + LOOKAHEAD_CHARS)),
+        : sentenceOf(
+            visible[position] ?? '',
+            span,
+            text.slice(span.end, span.end + LOOKAHEAD_CHARS),
+          ),
       opensPassage: position === 0,
       closesPassage: position === spans.length - 1,
     }
@@ -242,7 +249,7 @@ function cutUnit(text: string, unit: Unit, limit: ExcerptLimit): string {
 
 /** Scores only what survives the cut, so a match beyond the cut cannot win the comparison. */
 function cutScore(cut: string, terms: readonly Term[]): number {
-  const lower = cut.toLowerCase()
+  const lower = withoutInvisible(cut).toLowerCase()
   const distinct = terms.reduce((sum, term) => sum + (term.matches(lower) ? term.weight : 0), 0)
   return distinct * 1000 + (distinct > 0 ? 1 : 0)
 }

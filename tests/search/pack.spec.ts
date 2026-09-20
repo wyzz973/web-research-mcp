@@ -141,7 +141,11 @@ describe('packPage', () => {
       Array.from({ length: 10 }, (_, index) => `k7f2:r${index + 11}`),
     )
     expect(page(pool, { offset: 20 }).results).toHaveLength(5)
-    expect(page(pool, { offset: 25 })).toEqual({ results: [], tokens: RESERVED_TOKENS })
+    expect(page(pool, { offset: 25 })).toEqual({
+      results: [],
+      tokens: RESERVED_TOKENS,
+      hiddenRemoved: 0,
+    })
   })
 
   it('splits the spare budget evenly and leaves short texts whole', () => {

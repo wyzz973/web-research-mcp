@@ -92,6 +92,14 @@ describe('sourceStatus', () => {
     )
   })
 
+  it('keeps one bounded line of whatever a custom adapter put into its error', () => {
+    const message = `upstream said:\n${'very long text '.repeat(40)}`
+    const { detail } = sourceStatus('custom', [outcome(new WebError('upstream_error', message))])
+    expect(detail?.startsWith('upstream said: very long text')).toBe(true)
+    expect(detail).not.toContain('\n')
+    expect(detail?.length).toBeLessThanOrEqual(160)
+  })
+
   it('maps error codes to source outcomes', () => {
     const statusOf = (code: ConstructorParameters<typeof WebError>[0]) =>
       sourceStatus('exa', [outcome(new WebError(code, 'm'))]).status

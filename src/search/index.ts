@@ -208,6 +208,7 @@ export function createSearcher(deps: SearcherDeps): Searcher {
       cache: view.cache,
       ...(view.cache === 'hit' ? { cache_age_s: Math.max(0, age) } : {}),
       results: page.results,
+      ...(page.hiddenRemoved > 0 ? { hidden_removed: page.hiddenRemoved } : {}),
       sources: pool.sources,
       usage: view.usage,
       ...(cursor ? { next_cursor: cursor } : {}),

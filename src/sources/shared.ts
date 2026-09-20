@@ -16,16 +16,15 @@ export function parseJson(text: string, source: string): unknown {
   }
 }
 
-// Control characters break line handling; zero-width spaces and bidi overrides hide or reorder
-// text. Joiners (U+200C, U+200D) stay: Persian and Indic scripts need them to spell words.
-const INVISIBLE = /(?![\n\t])\p{Cc}|[\u200B\u2060\uFEFF\u202A-\u202E\u2066-\u2069]/gu
-
-/** Whitespace hygiene only; words and their order are never changed. */
+/**
+ * Whitespace hygiene only; words and their order are never changed. Invisible characters are
+ * deliberately left in: the search core removes them where text is shown, because only there
+ * can the removal be counted against what the reader actually gets (src/search/invisible.ts).
+ */
 export function cleanText(value: unknown): string {
   if (typeof value !== 'string') return ''
   return value
     .replace(/\r\n?/gu, '\n')
-    .replace(INVISIBLE, '')
     .replace(/[ \t]+\n/gu, '\n')
     .replace(/\n{3,}/gu, '\n\n')
     .trim()

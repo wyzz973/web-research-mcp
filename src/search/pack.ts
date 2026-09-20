@@ -7,6 +7,7 @@
 import type { SearchHit } from '../contract.ts'
 import { estimateTokens } from '../tokens.ts'
 import { PASSAGE_GAP, pickExcerpt, type ExcerptLimit } from './excerpt.ts'
+import { stripInvisible } from './invisible.ts'
 import type { Term } from './terms.ts'
 
 /** Header, the block markers, and the two footer lines of the text view. */
@@ -31,6 +32,8 @@ export interface Page {
   results: SearchHit[]
   /** Estimated size of the rendered response, reserve included. */
   tokens: number
+  /** Invisible characters taken out of the titles and excerpts of `results`, and of nothing else. */
+  hiddenRemoved: number
 }
 
 /** Mirrors the two lines render/text.ts prints above an excerpt, plus the blank separator line. */
@@ -96,20 +99,25 @@ function evenShare(slots: readonly Slot[], room: ExcerptLimit): ExcerptLimit {
 export function packPage(request: PageRequest): Page {
   const reserved = RESERVED_TOKENS + (request.extraTokens ?? 0)
   const wanted = request.pool.slice(request.offset, request.offset + request.count).map(slotFor)
-  if (wanted.length === 0) return { results: [], tokens: reserved }
+  if (wanted.length === 0) return { results: [], tokens: reserved, hiddenRemoved: 0 }
   const room = {
     tokens: request.maxTokens - reserved,
     chars: request.maxChars - RESERVED_CHARS,
   }
   const slots = fittingPrefix(wanted, room)
   const share = evenShare(slots, room)
-  const results = slots.map((slot) => ({
-    ...slot.hit,
-    excerpt: pickExcerpt(slot.passages, request.terms, share),
-  }))
+  // The pool keeps the text as the source gave it. What is shown is cleaned here, so the count
+  // covers exactly this page, whether it comes from a fresh search, the cache, or a cursor.
+  let hiddenRemoved = 0
+  const results = slots.map((slot) => {
+    const title = stripInvisible(slot.hit.title)
+    const excerpt = stripInvisible(pickExcerpt(slot.passages, request.terms, share))
+    hiddenRemoved += title.removed + excerpt.removed
+    return { ...slot.hit, title: title.text, excerpt: excerpt.text }
+  })
   const used = results.reduce(
     (total, hit, index) => total + (slots[index]?.fixed.tokens ?? 0) + estimateTokens(hit.excerpt),
     reserved,
   )
-  return { results, tokens: used }
+  return { results, tokens: used, hiddenRemoved }
 }
