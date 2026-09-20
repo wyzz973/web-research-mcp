@@ -5,7 +5,10 @@ import { headingPath, type PageDocument } from './document.ts'
 export interface Candidate {
   /** Index of the page in the request, used to keep selection order deterministic. */
   page: number
+  /** The block that was scored. */
   block: number
+  /** First block shown: the section heading when `block` directly follows it, else `block`. */
+  from: number
   start: number
   end: number
   score: number
@@ -24,10 +27,15 @@ const STOPWORDS = new Set(
   ),
 )
 const K1 = 1.2
-const B = 0.75
+/** Mild: long blocks are penalized a little, and short ones never rewarded (see `bodyScore`). */
+const B = 0.5
 const HEADING_WEIGHTS = [0.6, 0.3, 0.15]
 const MIN_DEDUPE_CHARS = 40
-/** Passages scoring below this share of the best one are padding, not evidence. */
+/**
+ * Passages scoring below this share of the best one are padding, not evidence. Unused budget is
+ * spent on context around the good passages (see select.ts), not on lowering this bar: on a real
+ * API reference, 0.25 let in an unrelated history table and an option that only shared "default".
+ */
 const RELEVANCE_FLOOR = 0.35
 
 let segmenter: Intl.Segmenter | undefined
@@ -106,10 +114,16 @@ function inverseFrequencies(scored: Scored[], terms: string[]): Map<string, numb
   return idf
 }
 
+/**
+ * BM25 with one change: a block shorter than average is scored as if it were average. Plain
+ * length normalization lets a two-line table that mentions one goal word outrank the paragraph
+ * that answers the question, only because it is short.
+ */
 function bodyScore(item: Scored, idf: Map<string, number>, average: number): number {
+  const relativeLength = Math.max(item.length, average) / average
   let score = 0
   for (const [term, count] of item.counts) {
-    const saturation = (count * (K1 + 1)) / (count + K1 * (1 - B + (B * item.length) / average))
+    const saturation = (count * (K1 + 1)) / (count + K1 * (1 - B + B * relativeLength))
     score += (idf.get(term) ?? 0) * saturation
   }
   return score
@@ -123,10 +137,19 @@ function headingScore(item: Scored, idf: Map<string, number>): number {
   return score
 }
 
-/** A passage that touches more distinct goal terms beats one that repeats a single term. */
-function coverage(item: Scored, termCount: number): number {
-  const distinct = new Set([...item.counts.keys(), ...item.headingTerms.flatMap((set) => [...set])])
-  return 1 + (0.5 * Math.max(0, distinct.size - 1)) / Math.max(1, termCount - 1)
+/**
+ * Share of the goal a passage covers, weighted by rarity, as a multiplier in (0, 1]. A passage
+ * that touches most of the distinctive goal words beats one that repeats a single word.
+ */
+function coverage(item: Scored, idf: Map<string, number>): number {
+  const matched = new Set([...item.counts.keys(), ...item.headingTerms.flatMap((set) => [...set])])
+  let total = 0
+  let covered = 0
+  for (const [term, weight] of idf) {
+    total += weight
+    if (matched.has(term)) covered += weight
+  }
+  return total > 0 ? Math.sqrt(covered / total) : 1
 }
 
 /** A block counts as a hit when it mentions a goal term, or sits directly under a heading that does. */
@@ -149,6 +172,7 @@ function toCandidate(document: PageDocument, item: Scored, score: number): Candi
   return {
     page: item.page,
     block: item.block,
+    from: before?.kind === 'heading' ? item.block - 1 : item.block,
     start,
     end,
     score,
@@ -174,10 +198,31 @@ export function rankPassages(documents: PageDocument[], goal: string): Candidate
     const document = documents[page]
     if (!document) return []
     return items.filter(isHit).map((item) => {
-      const score =
-        (bodyScore(item, idf, average) + headingScore(item, idf)) * coverage(item, terms.length)
+      const score = (bodyScore(item, idf, average) + headingScore(item, idf)) * coverage(item, idf)
       return toCandidate(document, item, score)
     })
+  })
+}
+
+/** Every passage of a page that is shown whole, so that reposts of it elsewhere are recognized. */
+export function wholePagePassages(document: PageDocument, page: number): Candidate[] {
+  return document.blocks.flatMap((block, index) => {
+    if (block.kind === 'heading') return []
+    const key = passageKey(document.markdown.slice(block.start, block.end))
+    const cost = { tokens: 0, chars: 0 }
+    return [
+      {
+        page,
+        block: index,
+        from: index,
+        start: block.start,
+        end: block.end,
+        score: 0,
+        cost,
+        key,
+        alsoIn: [],
+      },
+    ]
   })
 }
 

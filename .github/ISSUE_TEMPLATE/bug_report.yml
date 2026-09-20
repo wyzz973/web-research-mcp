@@ -1,0 +1,34 @@
+name: Bug report
+description: A search or a page read that went wrong
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security problems do not belong here: see SECURITY.md.
+        `web-research doctor` never prints API keys, so its output is safe to paste.
+  - type: textarea
+    id: what
+    attributes:
+      label: What did you run, and what came back?
+      description: The exact tool call or command line, and the first lines of the output (the header lines matter most).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `web-research doctor`
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: harness
+    attributes:
+      label: MCP client or harness, and its version
+      placeholder: Claude Code 2.1, Codex CLI 0.144, a script using the library, ...

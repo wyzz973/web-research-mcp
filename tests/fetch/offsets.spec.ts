@@ -58,6 +58,28 @@ function sentence(next: () => number): string {
   return `${parts.join(' ')}.`
 }
 
+/** Long enough to be divided at item boundaries: nested items, a fence inside an item, a loose item. */
+function longList(next: () => number, index: number): string {
+  const items = Array.from(
+    { length: 8 },
+    (_, item) => `-   item ${index}.${item} ${sentence(next)}`,
+  )
+  items[2] += ['', '    -   nested ' + sentence(next), '    -   nested ' + sentence(next)].join(
+    '\r\n',
+  )
+  items[4] += [
+    '',
+    '',
+    '    ```yaml',
+    '    - name: not an item ' + pick(next, EMOJI),
+    '',
+    '    - run: neither',
+    '    ```',
+  ].join('\r\n')
+  items[6] += ['', '', '    loose continuation ' + sentence(next)].join('\r\n')
+  return items.join('\r\n')
+}
+
 function block(next: () => number, index: number): string {
   const roll = next()
   if (roll < 0.15)
@@ -78,6 +100,7 @@ function block(next: () => number, index: number): string {
       ),
     ].join('\r\n')
   if (roll < 0.4) return Array.from({ length: 3 }, () => `-   ${sentence(next)}`).join('\r\n')
+  if (roll < 0.5) return longList(next, index)
   return Array.from({ length: 1 + Math.floor(next() * 3) }, () => sentence(next)).join(' ')
 }
 
@@ -107,7 +130,7 @@ function check(result: FetchResult, markdown: string): PageResult {
       expect(part.match_end).toBeLessThanOrEqual(part.end)
     }
     if (!part.clipped && page.mode !== 'find') {
-      expect((part.text.match(/^```/gmu) ?? []).length % 2).toBe(0)
+      expect((part.text.match(/^\s*```/gmu) ?? []).length % 2).toBe(0)
       for (const line of part.text.split('\n'))
         if (line.startsWith('|')) expect(line.endsWith('|')).toBe(true)
     }

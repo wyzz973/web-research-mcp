@@ -117,7 +117,12 @@ function itemRanges(
   if (spanChars(lines, from, to) <= LONG_LIST_CHARS) return [[from, to]]
   const nested = itemStarts(lines, from, to, indent, Number.POSITIVE_INFINITY)
   if (nested.length === 0) return [[from, to]]
-  const childIndent = Math.min(...nested.map((index) => indentOf(lines[index] ?? lines[from]!)))
+  const childIndent = Math.min(
+    ...nested.flatMap((index) => {
+      const line = lines[index]
+      return line ? [indentOf(line)] : []
+    }),
+  )
   const children = itemStarts(lines, from, to, indent, childIndent)
   return [
     [from, children[0] ?? to],

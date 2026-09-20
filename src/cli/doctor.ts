@@ -4,6 +4,7 @@
  */
 import { EnvHttpProxyAgent, fetch as undiciFetch, type Dispatcher } from 'undici'
 import { databasePath, loadConfig, type Config } from '../config.ts'
+import { createCooldowns } from '../search/cooldown.ts'
 import { createSqliteStore } from '../store/sqlite.ts'
 import { VERSION } from '../version.ts'
 
@@ -41,12 +42,18 @@ async function storeCheck(config: Config): Promise<{ check: Check; usage: Check[
   try {
     const store = await createSqliteStore(location)
     try {
+      const cooldowns = createCooldowns(() => new Date(), store)
       const usage = ['exa', 'parallel', 'tavily'].map((source) => {
         const today = store.usageTodayBySource(source)
+        const cooling = cooldowns.get(source)
+        // A source that is being left alone explains "why was it not used" better than any log.
+        const paused = cooling
+          ? `; paused for ${Math.ceil(cooling.retryAfterS / 60)} min after ${cooling.code}`
+          : ''
         return {
           name: `usage.${source}`,
-          ok: true,
-          detail: `${today.calls} calls today, est. $${today.cost_usd.toFixed(3)}`,
+          ok: !cooling,
+          detail: `${today.calls} calls today, est. $${today.cost_usd.toFixed(3)}${paused}`,
         }
       })
       const journal = store.journalMode ?? 'unknown'
@@ -124,7 +131,9 @@ export async function runDoctor(options: { json: boolean }): Promise<number> {
   const healthy =
     checks
       .filter((check) => !check.name.startsWith('reach.'))
-      .every((check) => check.ok || check.name.startsWith('source.')) && anySource
+      .every(
+        (check) => check.ok || check.name.startsWith('source.') || check.name.startsWith('usage.'),
+      ) && anySource
   if (options.json) {
     process.stdout.write(`${JSON.stringify({ version: VERSION, healthy, checks })}\n`)
   } else {

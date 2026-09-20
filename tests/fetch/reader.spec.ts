@@ -270,20 +270,36 @@ describe('goal', () => {
     const h = await manual()
     const result = await h.fetch({
       url: MANUAL,
-      goal: 'inspect the billing subsystem chapter 14',
-      max_tokens: 1500,
+      goal: 'inspect the billing subsystem',
+      max_tokens: 2500,
     })
     const page = only(result)
     expect(page).toMatchObject({ mode: 'goal', truncated: true })
+    // Billing is the topic of chapters 6, 14, 22, 30, and 38: passages come from several of them.
     expect(page.parts.length).toBeGreaterThan(1)
     const starts = page.parts.map((part) => part.start)
     expect(starts).toEqual(starts.toSorted((a, b) => a - b))
     expect(page.parts.every((part) => /billing/iu.test(part.text))).toBe(true)
-    expect(page.parts.some((part) => part.section?.startsWith('14'))).toBe(true)
-    expect(
-      page.parts.every((part) => part.section !== undefined && part.heading !== undefined),
-    ).toBe(true)
+    expect(page.parts.every((part) => /^(?:6|14|22|30|38)(?:\.|$)/u.test(part.section ?? ''))).toBe(
+      true,
+    )
+    expect(page.parts.every((part) => part.heading !== undefined)).toBe(true)
     expect(page.outline?.length).toBeGreaterThan(0)
+    expect(result.tokens).toBeLessThanOrEqual(2500)
+    expectVerbatim(result, h.store)
+  })
+
+  it('narrows to the one chapter the goal names, as a single passage with its surroundings', async () => {
+    const h = await manual()
+    const result = await h.fetch({
+      url: MANUAL,
+      goal: 'inspect the billing subsystem chapter 14',
+      max_tokens: 1500,
+    })
+    const page = only(result)
+    expect(page.mode).toBe('goal')
+    expect(page.parts.every((part) => part.section?.startsWith('14'))).toBe(true)
+    expect(page.parts.map((part) => part.text).join('\n')).toContain('--chapter 14')
     expect(result.tokens).toBeLessThanOrEqual(1500)
     expectVerbatim(result, h.store)
   })

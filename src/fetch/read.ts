@@ -5,7 +5,13 @@ import { atLeast, fits, minus, MIN_CONTENT, PART_OVERHEAD, share, type Budget } 
 import { MAX_SHOWN_RANGES, type CursorState } from './cursor.ts'
 import type { PageDocument } from './document.ts'
 import { readMatches, type FoldCache } from './find.ts'
-import { dropReposts, keepRelevant, rankPassages, type Candidate } from './goal.ts'
+import {
+  dropReposts,
+  keepRelevant,
+  rankPassages,
+  wholePagePassages,
+  type Candidate,
+} from './goal.ts'
 import { fitOutline } from './outline.ts'
 import { makePart, readRange } from './range.ts'
 import { findSection, nearestSectionIds } from './section.ts'
@@ -197,10 +203,27 @@ function goalCursor(
     : { kind: 'goal', snapshot: page.snapshot, goal, shown }
 }
 
-function fitsTogether(pages: ReadablePage[], budget: Budget): boolean {
+/**
+ * A page whose whole text costs no more than its fair share is shown whole: a complete short
+ * page beats excerpts of it. Each grant frees room, so the share is recomputed until no further
+ * page fits.
+ */
+function pagesShownWhole(
+  pages: ReadablePage[],
+  budget: Budget,
+): { whole: Set<ReadablePage>; room: Budget } {
+  const whole = new Set<ReadablePage>()
   let room = budget
-  for (const page of pages) room = minus(room, fullCost(page.document))
-  return room.tokens >= 0 && room.chars >= 0
+  for (;;) {
+    const pending = pages.filter((page) => !whole.has(page))
+    const fair = share(room, pending.length)
+    const fitting = pending.filter((page) => fits(fair, fullCost(page.document)))
+    if (fitting.length === 0) return { whole, room }
+    for (const page of fitting) {
+      whole.add(page)
+      room = minus(room, fullCost(page.document))
+    }
+  }
 }
 
 export interface GoalOptions {
@@ -212,28 +235,69 @@ export interface GoalOptions {
 }
 
 /**
- * Evidence mode. Pages that fit are returned whole, because a complete short page beats excerpts;
- * otherwise the best passages are chosen under one shared budget and listed in document order.
+ * Candidates per page, in page order. Pages shown whole contribute all their passages, so that a
+ * repost of them on another page is recognized; they take no part in the ranking itself.
+ */
+function goalCandidates(
+  pages: ReadablePage[],
+  whole: Set<ReadablePage>,
+  options: GoalOptions,
+): Candidate[][] {
+  const shown = options.shown ?? []
+  const documents = pages.map((page) => page.document)
+  const isWhole = (index: number): boolean => isShownWhole(pages, whole, index)
+  const ranked = rankPassages(documents, options.goal).map((list, index) =>
+    isWhole(index) ? [] : list,
+  )
+  // The floor is taken before removing what was already shown, so a cursor chain ends when
+  // relevance runs out instead of sliding down to ever weaker passages.
+  const lists = keepRelevant(ranked).map((list, index) => {
+    const document = documents[index]
+    if (document && isWhole(index)) return wholePagePassages(document, index)
+    return list.filter((candidate) => !overlapsShown(candidate, shown))
+  })
+  return dropReposts(
+    lists,
+    pages.map((page) => page.n),
+  )
+}
+
+function isShownWhole(pages: ReadablePage[], whole: Set<ReadablePage>, index: number): boolean {
+  const page = pages[index]
+  return page !== undefined && whole.has(page)
+}
+
+function readWhole(page: ReadablePage, passages: Candidate[]): PageRead {
+  const read = readFull(page.document)
+  const alsoIn = [...new Set(passages.flatMap((passage) => passage.alsoIn))]
+  const part = read.parts[0]
+  if (part && alsoIn.length > 0) part.also_in = alsoIn.sort((left, right) => left - right)
+  return read
+}
+
+/**
+ * Evidence mode. Pages that fit are returned whole; for the others the best passages are chosen
+ * under one shared budget, widened with context when there is room, and listed in document order.
  */
 export function readGoal(pages: ReadablePage[], options: GoalOptions): PageRead[] {
   const shown = options.shown ?? []
-  if (shown.length === 0 && fitsTogether(pages, options.budget))
-    return pages.map((page) => readFull(page.document))
+  const granted =
+    shown.length === 0
+      ? pagesShownWhole(pages, options.budget)
+      : { whole: new Set<ReadablePage>(), room: options.budget }
+  const candidates = goalCandidates(pages, granted.whole, options)
   const single = pages.length === 1 ? pages[0] : undefined
-  const outlined = single
-    ? reserveOutline(single.document.outline, options.budget, options.maxTokens)
-    : undefined
-  const documents = pages.map((page) => page.document)
-  const ranked = dropReposts(
-    // The floor is taken before removing what was already shown, so a cursor chain ends when
-    // relevance runs out instead of sliding down to ever weaker passages.
-    keepRelevant(rankPassages(documents, options.goal)).map((list) =>
-      list.filter((candidate) => !overlapsShown(candidate, shown)),
-    ),
-    pages.map((page) => page.n),
+  const outlined =
+    single && !granted.whole.has(single)
+      ? reserveOutline(single.document.outline, granted.room, options.maxTokens)
+      : undefined
+  const selections = selectPassages(
+    pages.map((page) => page.document),
+    candidates.map((list, index) => (isShownWhole(pages, granted.whole, index) ? [] : list)),
+    outlined?.room ?? granted.room,
   )
-  const selections = selectPassages(documents, ranked, outlined?.room ?? options.budget)
   return pages.map((page, index) => {
+    if (granted.whole.has(page)) return readWhole(page, candidates[index] ?? [])
     const selection = selections[index] ?? { parts: [], more: false }
     const read: PageRead = { mode: 'goal', parts: selection.parts, truncated: true }
     if (selection.parts.length === 0 && shown.length === 0) read.nothingRelevant = true
