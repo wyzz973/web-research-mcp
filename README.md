@@ -51,7 +51,13 @@ node dist/cli/main.js fetch https://www.rfc-editor.org/rfc/rfc9110.html --sectio
 }
 ```
 
-For Claude Code: `claude mcp add web-research -- node /absolute/path/to/web-research-mcp/dist/mcp/stdio.js`
+For Claude Code: `claude mcp add web-research -- node /absolute/path/to/web-research-mcp/dist/mcp/stdio.js`. Inside this repository a project-level [.mcp.json](.mcp.json) already points at the build, so `pnpm build` and approving the server is enough.
+
+Keys and settings are read from the server's environment, so pass them in the client's `env` block (or export them before starting the client):
+
+```json
+{ "command": "node", "args": ["/absolute/path/dist/mcp/stdio.js"], "env": { "TAVILY_API_KEY": "tvly-..." } }
+```
 
 The server returns a compact text view by default, because several harnesses pass only one of `content` / `structuredContent` to the model and JSON-escaped page text is hard to read. Set `WEB_RESEARCH_MCP_OUTPUT=json` to receive the result object instead.
 
