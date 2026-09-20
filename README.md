@@ -26,37 +26,48 @@ Node.js 22.13 or newer on Windows, macOS, or Linux. No Python, no Docker, no nat
 
 ## Quick start
 
+No clone needed. The package is not on npm yet, so build a tarball from GitHub and install that (npm cannot build a Git dependency during a global install), then check the setup and try both tools:
+
 ```sh
-git clone -b v2 https://github.com/wyzz973/web-research-mcp.git
-cd web-research-mcp
-pnpm install
-pnpm build
-node dist/cli/main.js doctor
-node dist/cli/main.js search "AbortSignal timeout fetch Node.js" --max-results 8
-node dist/cli/main.js fetch https://www.rfc-editor.org/rfc/rfc9110.html --section 13.1.2
+npm pack github:wyzz973/web-research-mcp#v2          # about 30 s; writes web-research-mcp-2.0.0-alpha.1.tgz
+npm install -g ./web-research-mcp-2.0.0-alpha.1.tgz
+web-research doctor
+web-research search "AbortSignal timeout fetch Node.js" --max-results 8
+web-research fetch https://www.rfc-editor.org/rfc/rfc9110.html --section 13.1.2
 ```
 
-`doctor` explains what will be used and why something does not work, without spending any search quota.
+npm may warn that the package's `prepare` script was not run; that is expected, the tarball is already built. `doctor` explains what will be used and why something does not work, without spending any search quota.
 
 ## Use it from an MCP client
+
+After the global install the server command is `web-research-mcp`:
 
 ```json
 {
   "mcpServers": {
-    "web-research": {
-      "command": "node",
-      "args": ["/absolute/path/to/web-research-mcp/dist/mcp/stdio.js"]
-    }
+    "web-research": { "command": "web-research-mcp" }
   }
 }
 ```
 
-For Claude Code: `claude mcp add web-research -- node /absolute/path/to/web-research-mcp/dist/mcp/stdio.js`. Inside this repository a project-level [.mcp.json](.mcp.json) already points at the build, so `pnpm build` and approving the server is enough.
+For Claude Code: `claude mcp add web-research -- web-research-mcp`
+
+Without installing anything, `npx` can start it straight from GitHub (about 15 seconds the first time, 4 seconds afterwards):
+
+```json
+{
+  "mcpServers": {
+    "web-research": { "command": "npx", "args": ["-y", "github:wyzz973/web-research-mcp#v2"] }
+  }
+}
+```
+
+Working on the code instead? `pnpm install && pnpm build`, then point the client at `node /absolute/path/to/web-research-mcp/dist/mcp/stdio.js`. Inside this repository a project-level [.mcp.json](.mcp.json) already does that.
 
 Keys and settings are read from the server's environment, so pass them in the client's `env` block (or export them before starting the client):
 
 ```json
-{ "command": "node", "args": ["/absolute/path/dist/mcp/stdio.js"], "env": { "TAVILY_API_KEY": "tvly-..." } }
+{ "command": "web-research-mcp", "env": { "TAVILY_API_KEY": "tvly-..." } }
 ```
 
 The server returns a compact text view by default, because several harnesses pass only one of `content` / `structuredContent` to the model and JSON-escaped page text is hard to read. Set `WEB_RESEARCH_MCP_OUTPUT=json` to receive the result object instead.
