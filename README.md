@@ -105,7 +105,7 @@ Both methods never throw; failures are part of the returned object.
 ## Safety
 
 - Fetching resolves the host, requires every address to be public, pins the connection to the verified address, and re-checks each redirect. Private, loopback, link-local, and cloud-metadata addresses are refused.
-- robots.txt is honored and requests to one host are rate limited.
+- robots.txt is honored, and a group that names `web-research-mcp` takes precedence over `*`. Requests to one host are limited to two at a time, half a second apart. One deliberate departure from RFC 9309: when robots.txt cannot be retrieved because of a server error or a timeout, the page is still read and the rules are asked for again after a minute. The RFC tells crawlers to treat that case as "disallow everything"; this tool reads single pages that a person or their agent asked for, and treating a broken robots.txt as the site's refusal would misreport what happened. A robots.txt that answers 4xx means no restrictions, as the RFC says.
 - The default configuration cannot stop a prompt-injected model from leaking data through a URL it chooses to fetch. If that matters in your setting, restrict the tool at the harness level.
 - CAPTCHAs, paywalls, and logins are reported, never bypassed.
 

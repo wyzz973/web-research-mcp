@@ -111,6 +111,11 @@ export interface SearchResult {
   cache: 'miss' | 'hit'
   cache_age_s?: number
   results: SearchHit[]
+  /**
+   * Invisible characters (zero-width, bidirectional controls) removed from the titles and
+   * excerpts shown in `results`. Nothing is removed without being counted.
+   */
+  hidden_removed?: number
   sources: SourceStatus[]
   usage: SearchUsage
   next_cursor?: string

@@ -133,6 +133,7 @@ export function renderSearch(result: SearchResult): string {
       used.length ? `sources ${used.join('+')}` : undefined,
       `cache ${result.cache}${age(result.cache_age_s)}`,
       result.id ? `id ${result.id}` : undefined,
+      result.hidden_removed ? `hidden_removed ${result.hidden_removed}` : undefined,
       hits.neutralized ? `neutralized ${hits.neutralized}` : undefined,
     ]),
   )

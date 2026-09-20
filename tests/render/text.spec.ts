@@ -99,6 +99,13 @@ describe('renderSearch', () => {
     expect(text).toContain('| web_search ok | 1 of 1 results')
   })
 
+  it('says how many invisible characters were removed, and stays silent when none were', () => {
+    expect(renderSearch(search()).split('\n')[0]).not.toContain('hidden_removed')
+    expect(renderSearch(search({ hidden_removed: 3 })).split('\n')[0]).toContain(
+      '| id k7f2 | hidden_removed 3',
+    )
+  })
+
   it('counts what remains from the position in the pool, not from the page size', () => {
     const page = (first: number) =>
       search({
