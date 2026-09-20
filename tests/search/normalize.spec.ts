@@ -190,23 +190,53 @@ describe('normalizeSearch', () => {
   })
 
   it('lets a cursor stand alone and carry page-shape overrides', () => {
-    expect(normalizeSearch({ cursor: ' "c_k7f2" ' }, config)).toEqual({
-      kind: 'cursor',
-      cursor: 'c_k7f2',
-      maxResults: undefined,
-      maxTokens: undefined,
-      notes: [],
-    })
-    expect(normalizeSearch({ cursor: 'c_k7f2', query: 'q', max_results: '5' }, config)).toEqual({
+    expect(normalizeSearch({ cursor: ' "c_k7f2" ', max_results: '5' }, config)).toEqual({
       kind: 'cursor',
       cursor: 'c_k7f2',
       maxResults: 5,
       maxTokens: undefined,
-      notes: ['cursor was given, so the other search arguments were ignored.'],
+      notes: [],
+      fallback: undefined,
     })
   })
 
-  it('reports a malformed cursor as expired, with the way to recover', () => {
+  it('keeps the query sent along with a cursor as the search to fall back on', () => {
+    const gone = 'The cursor was not valid or had expired, so the query was searched again.'
+    const normalized = normalizeSearch(
+      { cursor: 'c_k7f2', query: 'fetch abort', sites: 'nodejs.org', max_results: 5 },
+      config,
+    )
+    expect(normalized).toMatchObject({
+      kind: 'cursor',
+      cursor: 'c_k7f2',
+      notes: ['cursor was given, so the other search arguments were ignored.'],
+      fallback: { queries: ['fetch abort'], sites: ['nodejs.org'], maxResults: 5 },
+    })
+    expect(normalized.kind === 'cursor' && normalized.fallback?.notes).toEqual([
+      gone,
+      'sites was a string and was read as a list.',
+    ])
+
+    // While the cursor works the other arguments do not matter, so their flaws must not either.
+    expect(
+      normalizeSearch({ cursor: 'c_k7f2', query: 'q', recency: 'fortnight' }, config),
+    ).toMatchObject({
+      kind: 'cursor',
+      fallback: undefined,
+    })
+  })
+
+  it('searches the query straight away when the cursor is not even shaped like one', () => {
+    expect(normalizeSearch({ cursor: 'page-2', query: 'fetch abort' }, config)).toMatchObject({
+      kind: 'query',
+      search: {
+        queries: ['fetch abort'],
+        notes: ['The cursor was not valid or had expired, so the query was searched again.'],
+      },
+    })
+  })
+
+  it('reports a malformed cursor as expired when there is nothing else to go on', () => {
     expect(rejection({ cursor: 'page-2' })).toMatchObject({
       code: 'expired_ref',
       message: 'This cursor is not valid or has expired; run web_search again.',

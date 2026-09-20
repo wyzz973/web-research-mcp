@@ -106,19 +106,34 @@ describe('siteFromInput', () => {
 })
 
 describe('mirrorIdentity', () => {
-  it('gives translated mirrors of one page the same key', () => {
-    const farsi = mirrorIdentity('https://fa.javascript.info/fetch-abort/')
-    const chinese = mirrorIdentity('https://zh-cn.javascript.info/fetch-abort')
-    expect(farsi).toEqual({ key: 'javascript.info||/fetch-abort', language: 'fa' })
-    expect(chinese).toEqual({ key: farsi?.key, language: 'zh' })
-    expect(mirrorIdentity('https://www.ko.javascript.info/fetch-abort')?.key).toBe(farsi?.key)
+  it('gives a page and its translated mirrors the same key', () => {
+    const plain = mirrorIdentity('https://javascript.info/fetch-abort')
+    expect(plain).toEqual({ key: 'javascript.info||/fetch-abort', language: '', certain: false })
+    expect(mirrorIdentity('https://fa.javascript.info/fetch-abort/')).toEqual({
+      key: plain?.key,
+      language: 'fa',
+      certain: true,
+    })
+    expect(mirrorIdentity('https://www.ko.javascript.info/fetch-abort')?.key).toBe(plain?.key)
+    expect(mirrorIdentity('https://www.javascript.info/fetch-abort')).toEqual(plain)
   })
 
-  it('gives a host without a language label no identity, so nothing is ever folded into it', () => {
-    expect(mirrorIdentity('https://javascript.info/fetch-abort')).toBeUndefined()
-    expect(mirrorIdentity('https://www.javascript.info/fetch-abort')).toBeUndefined()
-    expect(mirrorIdentity('https://api.example.com/guide')).toBeUndefined()
-    expect(mirrorIdentity('https://my.example.com/guide')).toBeUndefined()
+  it('knows which labels can hardly be anything but a language', () => {
+    const certain = (host: string) => mirrorIdentity(`https://${host}/pricing`)?.certain
+    for (const host of ['fr.example.com', 'zh.example.com', 'ko.example.com', 'uk.example.com'])
+      expect(certain(host)).toBe(true)
+    // A region or script subtag settles it, whatever the primary code is.
+    for (const host of ['zh-cn.example.com', 'pt-br.example.com', 'it-it.example.com'])
+      expect(certain(host)).toBe(true)
+    // Codes that are just as often a region, a department, or a product.
+    for (const code of 'eu it is no id ml hr ga ca be pa te sk bg cs da'.split(' '))
+      expect(certain(`${code}.example.com`)).toBe(false)
+    // Not a language label at all: the host is its own page.
+    expect(mirrorIdentity('https://api.example.com/guide')).toMatchObject({
+      key: 'example.com|api|/guide',
+      language: '',
+    })
+    expect(mirrorIdentity('https://my.example.com/guide')?.language).toBe('')
   })
 
   it('keeps different pages and sites apart', () => {

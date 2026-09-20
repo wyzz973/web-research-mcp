@@ -4,7 +4,11 @@
  */
 import { describe, expect, it } from 'vitest'
 import { pickExcerpt } from '../../src/search/excerpt.ts'
-import { isLowInformation } from '../../src/search/low-information.ts'
+import {
+  informativeLength,
+  isLowInformation,
+  lowInformationLines,
+} from '../../src/search/low-information.ts'
 import { buildTerms } from '../../src/search/terms.ts'
 import { estimateTokens } from '../../src/tokens.ts'
 
@@ -160,6 +164,66 @@ describe('low-information lines in excerpts', () => {
       '… Plain opening sentence of the page. Second sentence.',
     )
     expect(pickExcerpt([passage], nothingMatches, { tokens: 8, chars: 1000 })).toBe('… Plain…')
+  })
+})
+
+describe('metadata cards', () => {
+  // The shape Parallel puts in front of GitHub pages; the first is the case that was reported.
+  const CODE_CARD = [
+    '* Page: GitHub code file',
+    '* URL: https://github.com/nodejs/node/blob/master/src/node_sqlite.cc',
+    '* Repository: nodejs/node',
+    '* Ref: master',
+    '* Lines: 1496',
+  ]
+  const ISSUE_CARD = [
+    'Page: GitHub issue',
+    'URL: https://github.com/Gentleman-Programming/engram/issues/140',
+    'State: closed (completed)',
+    'Author: nono-GON',
+    'Created: 2026-04-01T08:57:06Z',
+    'Linked PRs: #924 (merged)',
+  ]
+
+  it('sees a card in a run of "Key: value" lines that includes an address', () => {
+    expect(lowInformationLines(CODE_CARD)).toEqual([true, true, true, true, true])
+    expect(lowInformationLines(ISSUE_CARD)).toEqual([true, true, true, true, true, true])
+    const around = ['Busy timeout handling in DatabaseSync.', ...CODE_CARD, 'int busy_timeout = 0;']
+    expect(lowInformationLines(around)).toEqual([false, true, true, true, true, true, false])
+  })
+
+  it('does not take ordinary "Key: value" text for a card', () => {
+    const notCards = [
+      ['Note: read this first.', 'Warning: this API is experimental.', 'Tip: use WAL mode.'],
+      ['Default: 0', 'Type: number'],
+      ['Host: example.com', 'Connection: keep-alive', 'Accept: text/html'],
+      ['HTTP/1.1 301 Moved', 'Location: https://example.com/new', 'Content-Length: 0'],
+      ['Name: DatabaseSync', 'Since: v22.5.0', 'Stability: 1.1 - Active development'],
+    ]
+    for (const lines of notCards) expect(lowInformationLines(lines)).toEqual(lines.map(() => false))
+    // The address line of a would-be card is low-information on its own account, nothing more.
+    expect(lowInformationLines(['Source: docs', 'URL: https://example.com/x'])).toEqual([
+      false,
+      true,
+    ])
+  })
+
+  it('does not spend the excerpt on a card, even though its address repeats the query', () => {
+    const passage = [
+      ...CODE_CARD,
+      'DatabaseSync opens the database with the busy timeout given in the options.',
+      'In WAL mode a reader never waits for the writer.',
+    ].join('\n')
+    const sqlite = buildTerms(['node sqlite DatabaseSync busy timeout'], undefined)
+    expect(pickExcerpt([passage], sqlite, { tokens: 40, chars: 1000 })).toBe(
+      '… DatabaseSync opens the database with the busy timeout given in the options.\nIn WAL mode a reader never waits for the writer.',
+    )
+    expect(pickExcerpt([CODE_CARD.join('\n')], sqlite, roomy)).toBe('')
+  })
+
+  it('measures content, not length', () => {
+    expect(informativeLength([CODE_CARD.join('\n')])).toBe(0)
+    expect(informativeLength(['A sentence.\n\n---\nAnother one.'])).toBe(23)
   })
 })
 

@@ -147,6 +147,26 @@ describe('fuse', () => {
     expect(entry?.passages).toEqual(['text </results> more'])
   })
 
+  it("prefers another source's text over a longer metadata card for the same page", () => {
+    const card = [
+      '* Page: GitHub code file',
+      '* URL: https://github.com/nodejs/node/blob/master/src/node_sqlite.cc',
+      '* Repository: nodejs/node',
+      '* Ref: master',
+      '* Lines: 1496',
+    ].join('\n')
+    const url = 'https://github.com/nodejs/node/blob/master/src/node_sqlite.cc'
+    const prose = 'Implements DatabaseSync and its busy timeout.'
+    const either = (first: string, second: string) =>
+      fuse([list('parallel', [hit(url, first)]), list('exa', [hit(url, second)])], english)[0]
+        ?.passages
+    expect(card.length).toBeGreaterThan(prose.length)
+    expect(either(card, prose)).toEqual([prose])
+    expect(either(prose, card)).toEqual([prose])
+    // With nobody else to ask, the card is all there is; the excerpt rules deal with it later.
+    expect(fuse([list('parallel', [hit(url, card)])], english)[0]?.passages).toEqual([card])
+  })
+
   it('skips hits without a usable address', () => {
     expect(
       urls([
@@ -197,7 +217,41 @@ describe('translated mirrors', () => {
     expect(fused.findIndex((entry) => entry.site === 'fa.javascript.info')).toBe(5)
   })
 
-  it('never folds a labelled host into the unlabelled one: many language codes are also functional subdomains', () => {
+  it('folds a translation into the original, and keeps the original for an English query (seen live)', () => {
+    // Real result list for "javascript fetch abort tutorial": r1 and r3 were the same page.
+    const fused = fuse(
+      [
+        list('exa', [
+          hit('https://javascript.info/fetch-abort'),
+          hit('https://developer.mozilla.org/en-US/docs/Web/API/AbortController'),
+          hit('https://fr.javascript.info/fetch-abort'),
+        ]),
+      ],
+      english,
+    )
+    expect(fused.map((entry) => entry.url)).toEqual([
+      'https://javascript.info/fetch-abort',
+      'https://developer.mozilla.org/en-US/docs/Web/API/AbortController',
+    ])
+  })
+
+  it('keeps the translation instead when the query is written in its language', () => {
+    const lists = [
+      list('exa', [
+        hit('https://javascript.info/fetch-abort'),
+        hit('https://zh.javascript.info/fetch-abort'),
+      ]),
+    ]
+    expect(urls(lists, { ...english, languages: new Set(['zh']) })).toEqual([
+      'https://zh.javascript.info/fetch-abort',
+    ])
+    // No Korean mirror in the list: the original beats a translation nobody asked for.
+    expect(urls(lists, { ...english, languages: new Set(['ko']) })).toEqual([
+      'https://javascript.info/fetch-abort',
+    ])
+  })
+
+  it('does not fold a lone ambiguous label into the unlabelled host: it may be a functional subdomain', () => {
     const fused = fuse(
       [
         list('exa', [
@@ -222,31 +276,57 @@ describe('translated mirrors', () => {
     expect(fused.every((entry) => entry.foundBy.length === 1)).toBe(true)
   })
 
-  it('keeps the untranslated page as its own result next to one folded translation', () => {
+  it('takes two different labels on one path as a locale scheme, and folds them with the original', () => {
+    // "eu." alone proves nothing, and neither does "it."; both at once, mirroring the same path
+    // of the main site, are far more likely locales than two unrelated functional subdomains.
+    const fused = fuse(
+      [
+        list('exa', [hit('https://eu.example.com/pricing'), hit('https://example.com/pricing')]),
+        list('parallel', [hit('https://it.example.com/pricing')]),
+      ],
+      english,
+    )
+    expect(fused).toHaveLength(1)
+    expect(fused[0]).toMatchObject({
+      url: 'https://example.com/pricing',
+      foundBy: ['exa', 'parallel'],
+    })
+  })
+
+  it('folds a label with a region into the original even when its code alone would be ambiguous', () => {
+    expect(
+      urls([
+        list('exa', [hit('https://example.com/pricing'), hit('https://it-it.example.com/pricing')]),
+      ]),
+    ).toEqual(['https://example.com/pricing'])
+  })
+
+  it('folds the recorded translations into the original when a source also returned it', () => {
     const lists = [
       list('parallel', recorded),
       list('exa', [hit('https://javascript.info/fetch-abort')]),
     ]
     const kept = fuse(lists, english).filter((entry) => entry.site.endsWith('javascript.info'))
     expect(kept.map((entry) => [entry.url, entry.foundBy])).toEqual([
-      ['https://javascript.info/fetch-abort', ['exa']],
-      ['https://fa.javascript.info/fetch-abort', ['parallel']],
+      ['https://javascript.info/fetch-abort', ['parallel', 'exa']],
     ])
   })
 
-  it('prefers the translation in the language of the query, then the English one', () => {
+  it('prefers the translation in the language of the query, then the original, then English', () => {
     const lists = [
       list('exa', [
         hit('https://ko.javascript.info/fetch-abort'),
         hit('https://en.javascript.info/fetch-abort'),
         hit('https://zh.javascript.info/fetch-abort'),
+        hit('https://javascript.info/fetch-abort'),
       ]),
     ]
     const pick = (languages: string[]) => urls(lists, { ...english, languages: new Set(languages) })
     expect(pick(['ko'])).toEqual(['https://ko.javascript.info/fetch-abort'])
     expect(pick(['zh'])).toEqual(['https://zh.javascript.info/fetch-abort'])
+    // "en." and the unlabelled host both answer an English query; the better ranked one stays.
     expect(pick(['en'])).toEqual(['https://en.javascript.info/fetch-abort'])
-    expect(pick(['ru'])).toEqual(['https://en.javascript.info/fetch-abort'])
+    expect(pick(['ru'])).toEqual(['https://javascript.info/fetch-abort'])
   })
 
   it('counts a list once for a folded entry, so mirrors cannot vote a page up', () => {

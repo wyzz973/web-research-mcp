@@ -57,6 +57,10 @@ export interface SearcherDeps {
 }
 
 const NO_USAGE: SearchUsage = { provider_calls: 0, est_cost_usd: 0 }
+const EXPIRED_CURSOR: ToolError = {
+  code: 'expired_ref',
+  message: 'This cursor has expired; run web_search again.',
+}
 const MAX_NOTES = 3
 /** A time-sensitive pool goes stale quickly; an empty one may simply be early. */
 const FRESH_TTL_S: Record<string, number> = { day: 900, week: 3600 }
@@ -288,11 +292,12 @@ export function createSearcher(deps: SearcherDeps): Searcher {
     return presentPool(pool, search, { usage, notes, stored })
   }
 
-  function page(request: Extract<NormalizedSearch, { kind: 'cursor' }>): SearchResult {
+  /** Undefined when the cursor is gone but the caller also said what to search for. */
+  function page(request: Extract<NormalizedSearch, { kind: 'cursor' }>): SearchResult | undefined {
     const cursor = loadCursor(store, request.cursor)
     const pool = cursor ? loadCursorPool(store, cursor) : undefined
-    if (!cursor || !pool)
-      throw new WebError('expired_ref', 'This cursor has expired; run web_search again.')
+    if ((!cursor || !pool) && request.fallback) return undefined
+    if (!cursor || !pool) throw new WebError(EXPIRED_CURSOR.code, EXPIRED_CURSOR.message)
     const result = present({
       pool,
       shape: {
@@ -315,9 +320,10 @@ export function createSearcher(deps: SearcherDeps): Searcher {
     async search(request, signal) {
       try {
         const normalized = normalizeSearch(request, config)
-        return normalized.kind === 'cursor'
-          ? page(normalized)
-          : await fresh(normalized.search, signal)
+        if (normalized.kind === 'query') return await fresh(normalized.search, signal)
+        const paged = page(normalized)
+        if (paged || !normalized.fallback) return paged ?? failure(EXPIRED_CURSOR)
+        return await fresh(normalized.fallback, signal)
       } catch (error) {
         return failure(toToolError(error))
       }

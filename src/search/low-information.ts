@@ -15,6 +15,12 @@
  *     optionally around a bare list number such as "1.".
  *  4. Breadcrumb trail: at least MIN_TRAIL_SEGMENTS short segments separated by one and the same
  *     separator (" > ", " › ", " » ", " → " or " / "), none of them ending like a sentence.
+ *  5. Metadata card (`lowInformationLines` only, because it takes neighbours to see one): at
+ *     least MIN_CARD_LINES consecutive lines of the form "Key: value", optionally bulleted, one of
+ *     which has an address as its value. Sources put such cards in front of GitHub pages
+ *     ("* Page: GitHub code file / * URL: ... / * Repository: ... / * Ref: master"). The key is one
+ *     to three capitalized words without hyphens and the value does not end like a sentence, so
+ *     "Note: read this first." and HTTP header dumps are not cards.
  *
  * A CJK character counts as two letters: three of them can already be a sentence.
  */
@@ -24,6 +30,7 @@ const MIN_TRAIL_SEGMENTS = 3
 const MAX_TRAIL_CHARS = 160
 const MAX_SEGMENT_CHARS = 30
 const MAX_SEGMENT_WORDS = 4
+const MIN_CARD_LINES = 3
 
 const ADDRESS = /(?:https?:\/\/|www\.)[^\s<>()[\]"']+/giu
 /** Not global: a global pattern would carry its position from one `test` to the next. */
@@ -36,6 +43,8 @@ const TRAIL_SEPARATOR = /\s(>|›|»|→|\/)\s/gu
 const LETTER = /[\p{L}\p{N}]/gu
 const WIDE_LETTER = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu
 const SENTENCE_LIKE_END = /[.!?。！？:;]$/u
+const METADATA_LINE = /^[\s*+-]*\p{Lu}[\p{L} ]{0,23}:[ \t]+(\S.{0,79})$/u
+const ONLY_ADDRESS = /^<?(?:https?:\/\/|www\.)\S+>?$/iu
 
 /** Letters and digits, with a CJK character counted twice. */
 export function contentWeight(text: string): number {
@@ -73,4 +82,42 @@ export function isLowInformation(text: string): boolean {
   return (
     LINK_DEFINITION.test(line) || isMostlyAddress(line) || DECORATION.test(line) || isTrail(line)
   )
+}
+
+/** The value of a "Key: value" line, or undefined when the line is not one. */
+function metadataValue(line: string): string | undefined {
+  const value = METADATA_LINE.exec(line.trim())?.[1]?.trim()
+  return value !== undefined && !SENTENCE_LIKE_END.test(value) ? value : undefined
+}
+
+/**
+ * Which of these consecutive lines are low-information. Beyond the per-line rules this sees
+ * metadata cards, which only show as a run of lines.
+ */
+export function lowInformationLines(lines: readonly string[]): boolean[] {
+  const low = lines.map(isLowInformation)
+  let start = 0
+  while (start < lines.length) {
+    let end = start
+    let hasAddress = false
+    for (let value = metadataValue(lines[end] ?? ''); value !== undefined;) {
+      hasAddress ||= ONLY_ADDRESS.test(value)
+      end += 1
+      value = end < lines.length ? metadataValue(lines[end] ?? '') : undefined
+    }
+    if (end - start >= MIN_CARD_LINES && hasAddress) low.fill(true, start, end)
+    start = Math.max(end, start + 1)
+  }
+  return low
+}
+
+/** How much of these passages is content: the length of their lines that are not low-information. */
+export function informativeLength(passages: readonly string[]): number {
+  return passages.reduce((total, passage) => {
+    const lines = passage.split('\n').filter((line) => line.trim().length > 0)
+    const low = lowInformationLines(lines)
+    return (
+      total + lines.reduce((sum, line, index) => sum + (low[index] ? 0 : line.trim().length), 0)
+    )
+  }, 0)
 }

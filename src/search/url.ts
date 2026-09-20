@@ -242,28 +242,44 @@ export function languageOfLabel(label: string): string | undefined {
   return match?.[1] && LANGUAGE_CODES.has(match[1]) ? match[1] : undefined
 }
 
+/**
+ * Codes that are rarely anything but a language or a locale when they lead a host name. Every
+ * other code in LANGUAGE_CODES is also a common functional subdomain ("eu" region, "it" and "hr"
+ * departments, "id" sign-in, "ml", "cs", "ga", ...), so on its own it proves nothing.
+ */
+const UNAMBIGUOUS_LANGUAGE_CODES = new Set(
+  'en fr de es pt ru ja zh ko fa tr pl nl sv fi hu el he ro vi th ar hi uk'.split(' '),
+)
+
 export interface MirrorIdentity {
   /** Equal for pages that differ only by their language subdomain. */
   key: string
-  /** Primary language subtag of the subdomain. */
+  /** Primary language subtag of the subdomain; "" for a host without a language label. */
   language: string
+  /** The label can hardly be anything but a language: an unambiguous code, or one with a region. */
+  certain: boolean
 }
 
 /**
- * Translated mirrors such as fa.javascript.info/fetch-abort and ko.javascript.info/fetch-abort:
- * same registrable domain, same remaining subdomain, same path and query, different language
- * label. Only hosts that carry a language label have an identity. Many language codes double as
- * functional subdomains ("eu", "it", "id", "no"), so a labelled host is never folded into the
- * unlabelled one: eu.example.com/pricing and example.com/pricing may be different pages.
- * Home pages are left alone for the same reason.
+ * Translated mirrors such as fr.javascript.info/fetch-abort and javascript.info/fetch-abort:
+ * same registrable domain, same remaining subdomain, same path and query; only the language
+ * label differs or is absent. Which hosts with the same key are actually folded is decided in
+ * fuse.ts. Home pages get no identity: a two-letter subdomain on a bare "/" is too often
+ * something else.
  */
 export function mirrorIdentity(canonical: string): MirrorIdentity | undefined {
   const url = new URL(canonical)
+  const parsed = parse(url.hostname)
   const path = url.pathname.replace(/\/+$/u, '')
-  const { labels, domain } = subdomainLabels(url.hostname)
-  if (!path || domain === url.hostname) return undefined
+  if (!parsed.domain || parsed.isIp || !path) return undefined
+  const labels = (parsed.subdomain ?? '').split('.').filter(Boolean)
   if (labels[0] === 'www') labels.shift()
-  const language = labels[0] ? languageOfLabel(labels[0]) : undefined
-  if (!language) return undefined
-  return { key: `${domain}|${labels.slice(1).join('.')}|${path}${url.search}`, language }
+  const label = labels[0] ?? ''
+  const language = languageOfLabel(label) ?? ''
+  if (language) labels.shift()
+  return {
+    key: `${parsed.domain}|${labels.join('.')}|${path}${url.search}`,
+    language,
+    certain: language !== '' && (label.includes('-') || UNAMBIGUOUS_LANGUAGE_CODES.has(language)),
+  }
 }

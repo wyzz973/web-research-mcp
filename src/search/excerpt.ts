@@ -10,7 +10,7 @@
  *  - a prose sentence that already occurs earlier in the same excerpt is shown once.
  */
 import { charsWithinTokens, estimateTokens } from '../tokens.ts'
-import { contentWeight, isLowInformation } from './low-information.ts'
+import { contentWeight, lowInformationLines } from './low-information.ts'
 import type { Term } from './terms.ts'
 
 export interface ExcerptLimit {
@@ -130,9 +130,11 @@ function sentenceOf(body: string, span: Span, following: string): string | undef
 
 function segment(text: string, passage: number, terms: readonly Term[]): Omit<Unit, 'index'>[] {
   const spans = spansOf(text)
+  const bodies = spans.map((span) => text.slice(span.start, span.end))
+  const low = lowInformationLines(bodies)
   return spans.map((span, position) => {
-    const body = text.slice(span.start, span.end)
-    const lowInformation = isLowInformation(body)
+    const body = bodies[position] ?? ''
+    const lowInformation = low[position] === true
     const lower = body.toLowerCase()
     return {
       passage,

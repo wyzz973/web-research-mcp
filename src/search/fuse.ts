@@ -3,6 +3,7 @@
  * merging of duplicates, folding of translated mirrors, and reciprocal rank fusion.
  */
 import type { SourceHit } from '../sources/types.ts'
+import { informativeLength } from './low-information.ts'
 import {
   canonicalUrl,
   dedupeKey,
@@ -10,6 +11,7 @@ import {
   hostMatchesSites,
   mirrorIdentity,
   siteOf,
+  type MirrorIdentity,
 } from './url.ts'
 
 /** The result list of one upstream call. */
@@ -58,10 +60,6 @@ interface Candidate {
   order: number
 }
 
-function textLength(passages: readonly string[]): number {
-  return passages.reduce((sum, passage) => sum + passage.length, 0)
-}
-
 function limitText(passages: readonly string[]): string[] {
   const kept: string[] = []
   let used = 0
@@ -85,11 +83,15 @@ function keeps(hit: SourceHit, url: string, options: FuseOptions): boolean {
   return !(options.since && hit.published && hit.published < options.since)
 }
 
-/** Later sightings of the same page add provenance; they replace content only when they know more. */
+/**
+ * Later sightings of the same page add provenance; they replace content only when they know more.
+ * "More" is measured in content: a source's metadata card about a page is long and says nothing.
+ */
 function absorb(target: Candidate, hit: SourceHit, url: string): void {
   if (!target.title && hit.title) target.title = hit.title
   target.published ??= hit.published
-  if (textLength(hit.passages) > textLength(target.passages)) target.passages = hit.passages
+  if (informativeLength(hit.passages) > informativeLength(target.passages))
+    target.passages = hit.passages
   if (displayRank(url) < displayRank(target.url)) target.url = url
 }
 
@@ -125,10 +127,12 @@ function collect(lists: readonly RankedList[], options: FuseOptions): Candidate[
   return [...byKey.values()]
 }
 
-/** Lower is better: the query's language, then English, then whichever ranked first. */
+/** Lower is better: the query's language, then the untranslated host, then English, then the rest. */
 function mirrorPreference(language: string, languages: ReadonlySet<string>): number {
-  if (languages.has(language)) return 0
-  return language === 'en' ? 1 : 2
+  // A host without a language label is the original, which these sites write in English.
+  if (languages.has(language || 'en')) return 0
+  if (!language) return 1
+  return language === 'en' ? 2 : 3
 }
 
 function mergeMirror(kept: Candidate, folded: Candidate): void {
@@ -139,28 +143,51 @@ function mergeMirror(kept: Candidate, folded: Candidate): void {
   kept.order = Math.min(kept.order, folded.order)
 }
 
+interface MirrorMember {
+  candidate: Candidate
+  identity: MirrorIdentity
+}
+
+/**
+ * Which members of one key are the same page in different languages.
+ *
+ * Labelled hosts fold among themselves. The unlabelled host joins them only when the labels prove
+ * that the site really publishes translations under language subdomains: one label that can
+ * hardly be anything else ("fr", "zh-cn"), or two different labels at once. A single ambiguous
+ * label does not: eu.example.com/pricing next to example.com/pricing may be a different page, and
+ * claiming otherwise would hide a result and forge a "2 sources" signal. Two ambiguous labels on
+ * the same path ("eu." and "it." next to the bare host) are taken as a locale scheme: two unrelated
+ * functional subdomains that both mirror a path of the main site are far less likely than that.
+ */
+function mirrorsToFold(members: readonly MirrorMember[]): MirrorMember[] {
+  const labelled = members.filter((member) => member.identity.language !== '')
+  const labels = new Set(labelled.map((member) => member.identity.language))
+  const proven = labelled.some((member) => member.identity.certain) || labels.size >= 2
+  const folding = proven ? members : labelled
+  return folding.length >= 2 ? [...folding] : []
+}
+
 function foldMirrors(candidates: Candidate[], languages: ReadonlySet<string>): Candidate[] {
-  const groups = new Map<string, Array<{ candidate: Candidate; preference: number }>>()
-  const singles: Candidate[] = []
+  const groups = new Map<string, MirrorMember[]>()
   for (const candidate of candidates) {
     const identity = mirrorIdentity(candidate.url)
-    if (!identity) {
-      singles.push(candidate)
-      continue
-    }
-    const group = groups.get(identity.key) ?? []
-    group.push({ candidate, preference: mirrorPreference(identity.language, languages) })
-    groups.set(identity.key, group)
+    if (identity)
+      groups.set(identity.key, [...(groups.get(identity.key) ?? []), { candidate, identity }])
   }
-  for (const group of groups.values()) {
-    const [best, ...rest] = group.toSorted(
-      (a, b) => a.preference - b.preference || a.candidate.order - b.candidate.order,
+  const folded = new Set<Candidate>()
+  for (const members of groups.values()) {
+    const [best, ...rest] = mirrorsToFold(members).toSorted(
+      (a, b) =>
+        mirrorPreference(a.identity.language, languages) -
+          mirrorPreference(b.identity.language, languages) || a.candidate.order - b.candidate.order,
     )
     if (!best) continue
-    for (const other of rest) mergeMirror(best.candidate, other.candidate)
-    singles.push(best.candidate)
+    for (const other of rest) {
+      mergeMirror(best.candidate, other.candidate)
+      folded.add(other.candidate)
+    }
   }
-  return singles
+  return candidates.filter((candidate) => !folded.has(candidate))
 }
 
 function score(candidate: Candidate): number {

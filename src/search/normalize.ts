@@ -17,6 +17,11 @@ export type NormalizedSearch =
       maxResults: number | undefined
       maxTokens: number | undefined
       notes: string[]
+      /**
+       * The search to run when the cursor turns out to be gone. Set when the caller also sent a
+       * usable query: it already told us what it wants, so asking it to search again is a wasted turn.
+       */
+      fallback: ResolvedSearch | undefined
     }
 
 const KNOWN_ARGUMENTS = new Set([
@@ -226,15 +231,14 @@ function unknownArguments(request: SearchRequest): string | undefined {
   return `Unknown arguments were ignored: ${shown}${more}.`
 }
 
-function resolveCursor(value: unknown): string | undefined {
-  if (!present(value)) return undefined
+const CURSOR_GONE = 'The cursor was not valid or had expired, so the query was searched again.'
+
+/** The cursor as written, or undefined when it cannot be one. */
+function resolveCursor(value: unknown): { cursor: string | undefined; given: boolean } {
+  if (!present(value)) return { cursor: undefined, given: false }
   if (typeof value !== 'string') return invalid('cursor must be a string')
   const cursor = value.trim().replace(/^["']+|["']+$/gu, '')
-  if (/^c_[a-z0-9]{3,16}$/u.test(cursor)) return cursor
-  throw new WebError(
-    'expired_ref',
-    'This cursor is not valid or has expired; run web_search again.',
-  )
+  return { cursor: /^c_[a-z0-9]{3,16}$/u.test(cursor) ? cursor : undefined, given: true }
 }
 
 function resolveMaxTokens(value: unknown, config: Config, notes: string[]): number | undefined {
@@ -249,36 +253,72 @@ function resolveMaxResults(value: unknown, config: Config, notes: string[]): num
   return clamp(requested, 1, config.limits.searchMaxResults, 'max_results', notes)
 }
 
+interface PageShape {
+  maxResults: number | undefined
+  maxTokens: number | undefined
+}
+
+function resolveQuerySearch(
+  request: SearchRequest,
+  config: Config,
+  shape: PageShape,
+  notes: string[],
+): ResolvedSearch {
+  const { queries, sites: sitesFromQueries } = resolveQueries(request, notes)
+  if (queries.length === 0) invalid('query is required: pass query, queries, or a cursor')
+  return {
+    queries,
+    maxResults: shape.maxResults ?? config.limits.searchDefaultResults,
+    goal: resolveGoal(request.goal, notes),
+    sites: resolveSites(request.sites, sitesFromQueries, notes),
+    recency: oneOf(request.recency, 'recency', RECENCIES),
+    depth: oneOf(request.depth, 'depth', DEPTHS) ?? 'standard',
+    maxTokens:
+      shape.maxTokens ?? Math.min(config.limits.searchDefaultTokens, config.limits.maxOutputTokens),
+    notes,
+  }
+}
+
+/** The query sent along with a cursor, as a search of its own; undefined when it cannot be one. */
+function fallbackSearch(
+  request: SearchRequest,
+  config: Config,
+  shape: PageShape,
+  notes: readonly string[],
+): ResolvedSearch | undefined {
+  if (!present(request.query) && !present(request.queries)) return undefined
+  try {
+    return resolveQuerySearch(request, config, shape, [CURSOR_GONE, ...notes])
+  } catch {
+    // While the cursor works the other arguments are ignored, so their flaws must not matter.
+    return undefined
+  }
+}
+
 export function normalizeSearch(request: SearchRequest, config: Config): NormalizedSearch {
   if (typeof request !== 'object' || request === null || Array.isArray(request))
     invalid('arguments must be an object such as {"query": "..."}')
   const notes: string[] = []
-  const maxResults = resolveMaxResults(request.max_results, config, notes)
-  const maxTokens = resolveMaxTokens(request.max_tokens, config, notes)
+  const shape = {
+    maxResults: resolveMaxResults(request.max_results, config, notes),
+    maxTokens: resolveMaxTokens(request.max_tokens, config, notes),
+  }
   const ignored = unknownArguments(request)
   if (ignored) notes.push(ignored)
 
-  const cursor = resolveCursor(request.cursor)
+  const { cursor, given } = resolveCursor(request.cursor)
+  if (!given) return { kind: 'query', search: resolveQuerySearch(request, config, shape, notes) }
+  const fallback = fallbackSearch(request, config, shape, notes)
   if (cursor) {
-    if (present(request.query) || present(request.queries))
-      notes.push('cursor was given, so the other search arguments were ignored.')
-    return { kind: 'cursor', cursor, maxResults, maxTokens, notes }
+    const ignoring = fallback
+      ? ['cursor was given, so the other search arguments were ignored.']
+      : []
+    return { kind: 'cursor', cursor, ...shape, notes: [...notes, ...ignoring], fallback }
   }
-
-  const { queries, sites: sitesFromQueries } = resolveQueries(request, notes)
-  if (queries.length === 0) invalid('query is required: pass query, queries, or a cursor')
-  return {
-    kind: 'query',
-    search: {
-      queries,
-      maxResults: maxResults ?? config.limits.searchDefaultResults,
-      goal: resolveGoal(request.goal, notes),
-      sites: resolveSites(request.sites, sitesFromQueries, notes),
-      recency: oneOf(request.recency, 'recency', RECENCIES),
-      depth: oneOf(request.depth, 'depth', DEPTHS) ?? 'standard',
-      maxTokens:
-        maxTokens ?? Math.min(config.limits.searchDefaultTokens, config.limits.maxOutputTokens),
-      notes,
-    },
-  }
+  // Not even shaped like a cursor: nothing to look up.
+  if (fallback) return { kind: 'query', search: fallback }
+  throw new WebError(
+    'expired_ref',
+    'This cursor is not valid or has expired; run web_search again.',
+  )
 }

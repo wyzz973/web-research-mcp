@@ -218,6 +218,21 @@ describe('should-fix items', () => {
     expect(store.usageTodayBySource('exa').calls).toBe(1)
   })
 
+  it('lets exactly N calls through under a cap of N: 25 searches at once, cap 10', async () => {
+    const config = testConfig({ WEB_RESEARCH_ANONYMOUS_DAILY_CAP: '10' })
+    const exa = fakeSource('exa', delayed(10, hits('e', 12)))
+    const searcher = searcherWith([exa], config)
+    const results = await Promise.all(
+      Array.from({ length: 25 }, (_, index) =>
+        searcher.search({ query: `distinct query number ${index}`, depth: 'fast' }, never),
+      ),
+    )
+    expect(results.filter((result) => result.status === 'ok')).toHaveLength(10)
+    expect(results.filter((result) => result.error?.code === 'budget_exhausted')).toHaveLength(15)
+    expect(exa.requests).toHaveLength(10)
+    expect(store.usageTodayBySource('exa').calls).toBe(10)
+  })
+
   it('gives back the reservation of a call that was never sent', async () => {
     const busy = fakeSource('busy', delayed(300, []))
     const fast = fakeSource('fast', delayed(5, hits('f', 12)))
@@ -363,6 +378,44 @@ describe('should-fix items', () => {
       'exa returned few results, and no other source was available to add.',
       'Only 2 results were found.',
     ])
+  })
+})
+
+describe('a cursor that is gone', () => {
+  it('searches the query that came with it instead of sending the model away', async () => {
+    const exa = fakeSource('exa', hits('e', 12))
+    const result = await searcherWith([exa]).search(
+      { cursor: 'c_bcdfghjk', query: 'fetch abort', depth: 'fast' },
+      never,
+    )
+    expect(result).toMatchObject({ status: 'ok', returned: 10, cache: 'miss' })
+    expect(result.notes).toEqual([
+      'The cursor was not valid or had expired, so the query was searched again.',
+    ])
+    expect(exa.requests.map((request) => request.queries)).toEqual([['fetch abort']])
+  })
+
+  it('still pages, and ignores the query, while the cursor is good', async () => {
+    const exa = fakeSource('exa', hits('e', 25))
+    const searcher = searcherWith([exa])
+    const first = await searcher.search({ query: 'fetch abort', depth: 'fast' }, never)
+    const second = await searcher.search(
+      { cursor: first.next_cursor, query: 'another topic' },
+      never,
+    )
+    expect(second.results.map((entry) => entry.rank)).toEqual([
+      11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+    ])
+    expect(second.notes).toEqual(['cursor was given, so the other search arguments were ignored.'])
+    expect(exa.requests).toHaveLength(1)
+  })
+
+  it('is still an expired_ref when no query came with it', async () => {
+    const result = await searcherWith([fakeSource('exa', hits('e', 3))]).search(
+      { cursor: 'c_bcdfghjk' },
+      never,
+    )
+    expect(result).toMatchObject({ status: 'error', error: { code: 'expired_ref' } })
   })
 })
 
