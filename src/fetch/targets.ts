@@ -39,18 +39,19 @@ function expired(n: number, ref: string, what: 'ref' | 'snapshot'): ResolvedTarg
   return { kind: 'error', n, url: '', ref, error: { code: 'expired_ref', message } }
 }
 
-function resolveRef(store: Store, n: number, ref: string): ResolvedTarget {
+function resolveRef(store: Store, n: number, raw: string): ResolvedTarget {
+  const ref = raw.trim()
   if (isSnapshotId(ref)) {
-    const snapshot = store.getSnapshot(ref.trim())
+    const snapshot = store.getSnapshot(ref)
     return snapshot ? { kind: 'snapshot', n, ref, snapshot } : expired(n, ref, 'snapshot')
   }
   const parsed = parseRef(ref)
+  // A malformed ref is arbitrary caller text, often copied from a page: it is not echoed back.
   if (!parsed)
     return {
       kind: 'error',
       n,
       url: '',
-      ref,
       error: {
         code: 'invalid_input',
         message: 'use the full ref from web_search, for example "k7f2:r1"',

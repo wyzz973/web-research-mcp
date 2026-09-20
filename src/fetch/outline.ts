@@ -9,6 +9,7 @@ interface Heading {
   text: string
 }
 
+const MAX_ID_CHARS = 24
 const MULTIPART_NUMBER = /^(\d+(?:\.\d+)+)\.?(?=\s|$)/u
 /** A lone integer only counts with a dot or bracket, so "3 ways to…" and "2024 roadmap" are not numbered. */
 const DOTTED_INTEGER = /^(\d{1,3})[.)](?=\s|$)/u
@@ -27,7 +28,8 @@ function plainTitle(raw: string): string {
 function ownNumber(title: string): { id: string; rest: string } | undefined {
   for (const pattern of [MULTIPART_NUMBER, DOTTED_INTEGER, APPENDIX, LETTERED_NUMBER]) {
     const match = pattern.exec(title)
-    if (!match?.[1]) continue
+    // Ids are quoted back in messages; a "number" of absurd length is not a section number.
+    if (!match?.[1] || match[1].length > MAX_ID_CHARS) continue
     const rest = title.slice(match[0].length).trim()
     return { id: match[1].toUpperCase(), rest: rest === '' ? title : rest }
   }

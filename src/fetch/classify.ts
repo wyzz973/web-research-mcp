@@ -180,11 +180,36 @@ export function mediaType(contentType: string): string {
   return /^[a-z0-9][\w.+-]{0,40}\/[a-z0-9][\w.+-]{0,60}$/u.test(type) ? type : ''
 }
 
+const TOP_LEVEL_TYPES = new Set([
+  'application',
+  'audio',
+  'font',
+  'image',
+  'model',
+  'video',
+  'multipart',
+  'message',
+])
+const KNOWN_SUBTYPES = new Set(
+  'pdf zip gzip x-gzip x-tar x-7z-compressed x-rar-compressed octet-stream msword vnd.ms-excel vnd.ms-powerpoint vnd.openxmlformats-officedocument.wordprocessingml.document vnd.openxmlformats-officedocument.spreadsheetml.sheet vnd.openxmlformats-officedocument.presentationml.presentation epub+zip wasm x-protobuf x-shockwave-flash png jpeg gif webp avif svg+xml bmp tiff x-icon vnd.microsoft.icon mpeg mp4 webm ogg wav flac aac quicktime x-msvideo woff woff2 ttf otf form-data'.split(
+    ' ',
+  ),
+)
+
+/**
+ * The header is written by the site and the message is printed as the server's own words, so a
+ * free-form subtype is never repeated: a well-known type is named, anything else only by family.
+ */
+function describeType(contentType: string): string {
+  const [top = '', subtype = ''] = mediaType(contentType).split('/')
+  if (!TOP_LEVEL_TYPES.has(top)) return 'an unrecognized content type'
+  return KNOWN_SUBTYPES.has(subtype) ? `${top}/${subtype}` : `${top}/* content`
+}
+
 export function unsupportedType(contentType: string, bytes: number | undefined): WebError {
-  const type = mediaType(contentType) || 'an unrecognized content type'
   return new WebError(
     'unsupported_content_type',
-    `${type} (${readableSize(bytes)}) cannot be read as text; look for an HTML or text version.`,
+    `${describeType(contentType)} (${readableSize(bytes)}) cannot be read as text; look for an HTML or text version.`,
   )
 }
 

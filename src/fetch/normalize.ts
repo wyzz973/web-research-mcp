@@ -20,7 +20,8 @@ const KNOWN = new Set([
 const MIN_TOKENS = 500
 const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/iu
 const LOOKS_LIKE_HOST = /^(?:[\w-]+\.)+[a-z]{2,}(?:[/:?#]|$)/iu
-const PARAMETER_NAME = /^[\w-]{1,40}$/u
+const MAX_NAMES_SHOWN = 5
+const MAX_NAME_CHARS = 32
 
 function invalid(message: string): WebError {
   return new WebError('invalid_input', message)
@@ -120,11 +121,22 @@ function resolveFlag(value: unknown): boolean {
   return value === true || value === 1
 }
 
+/**
+ * Names of ignored parameters are the caller's text, and notes are printed as the server's own
+ * words: only a few, short, and reduced to identifier characters.
+ */
 function noteUnknown(request: FetchRequest, notes: Set<string>): void {
   const unknown = Object.keys(request).filter((key) => !KNOWN.has(key))
   if (unknown.length === 0) return
-  const named = unknown.filter((key) => PARAMETER_NAME.test(key)).slice(0, 5)
-  notes.add(`ignored unknown parameters: ${named.join(', ') || `${unknown.length} unnamed`}`)
+  const names = unknown
+    .map((key) => key.replace(/[^A-Za-z0-9_]/gu, '').slice(0, MAX_NAME_CHARS))
+    .filter((name) => name !== '')
+  const shown = [...new Set(names)].slice(0, MAX_NAMES_SHOWN)
+  notes.add(
+    shown.length > 0
+      ? `ignored unknown parameters: ${shown.join(', ')}`
+      : `ignored ${unknown.length} unknown parameters`,
+  )
 }
 
 /** Everything that can be decided without the store or the network. */

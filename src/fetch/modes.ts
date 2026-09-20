@@ -20,18 +20,10 @@ export interface ModeOutcome {
   notes: string[]
 }
 
-const QUOTED_CHARS = 80
-
 /** What reading needs besides the pages: the shared visible-text cache and the caller's signal. */
 export interface ModeContext {
   fold: FoldCache
   signal: AbortSignal
-}
-
-/** The caller's own words, shortened; never page text. */
-function quoted(text: string): string {
-  const flat = text.replace(/\s+/gu, ' ').replaceAll('"', "'").trim()
-  return flat.length > QUOTED_CHARS ? `${flat.slice(0, QUOTED_CHARS - 1)}\u2026` : flat
 }
 
 function goalOptions(
@@ -64,7 +56,8 @@ async function readFound(
     return {
       reads: await readGoal(pages, goalOptions(plan.goal, plan, budget, context)),
       goal: plan.goal,
-      notes: [`find had 0 matches for "${quoted(needle)}"; showing passages for the goal instead`],
+      // The text searched for is usually copied from a page, so it is never repeated in a note.
+      notes: ['find had 0 matches; showing passages for the goal instead'],
     }
   const closest = await readClosest(pages, needle, budget, context.signal)
   const any = closest.some((read) => read.parts.length > 0)

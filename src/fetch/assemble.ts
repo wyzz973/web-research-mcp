@@ -16,13 +16,35 @@ export interface PageSource {
 
 const MAX_NOTES = 3
 
+const MAX_URL_CHARS = 300
+
+/**
+ * The address of a failed page is the caller's text. It is echoed only in its parsed, percent-
+ * encoded form, which cannot carry spaces, line breaks, quotes, or angle brackets; text that is
+ * not a URL at all is dropped, and the page is identified by its number.
+ */
+function echoUrl(raw: string): string {
+  try {
+    return new URL(raw).href.slice(0, MAX_URL_CHARS)
+  } catch {
+    return ''
+  }
+}
+
 export function failedPage(
   n: number,
   url: string,
   ref: string | undefined,
   error: ToolError,
 ): PageResult {
-  const page: PageResult = { n, status: 'error', url, parts: [], truncated: false, error }
+  const page: PageResult = {
+    n,
+    status: 'error',
+    url: echoUrl(url),
+    parts: [],
+    truncated: false,
+    error,
+  }
   if (ref !== undefined) page.ref = ref
   return page
 }

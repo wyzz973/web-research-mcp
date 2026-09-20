@@ -177,6 +177,13 @@ describe('outline', () => {
     expect(tricky.outline.map((entry) => entry.id)).toEqual(['p1', 'p2', '1', '1-2'])
   })
 
+  it('does not take an absurdly long number for a section id', () => {
+    const long = `1.${'2.'.repeat(30)}3`
+    const document = analyze(`## ${long} Title\n\ntext\n\n## 2. Real\n\ntext`)
+    expect(document.outline.map((entry) => entry.id)).toEqual(['p1', '2'])
+    expect(document.outline.every((entry) => entry.id.length <= 24)).toBe(true)
+  })
+
   it('reads plain titles out of linked or emphasized headings', () => {
     const linked = analyze('## [Install](https://example.com/i) the *CLI* `tool`\n\ntext')
     expect(linked.outline[0]?.title).toBe('Install the CLI tool')

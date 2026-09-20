@@ -124,7 +124,11 @@ export function createPageLoader(dependencies: LoaderDependencies): PageLoader {
     const kind = contentKind(response.contentType)
     const untyped = mediaType(response.contentType) === ''
     if (kind === 'unsupported' || response.bodySkipped || (untyped && looksBinary(response.body)))
-      throw unsupportedType(response.contentType, response.declaredBytes ?? response.body.length)
+      // A skipped body has no measured size; saying "0 bytes" would be a guess.
+      throw unsupportedType(
+        response.contentType,
+        response.declaredBytes ?? (response.bodySkipped ? undefined : response.body.length),
+      )
     if (response.body.length === 0) throw unreadable()
     if (kind === 'text') return extractFromText(response.body, response.contentType)
     // One deadline covers the whole page: conversion only gets what the download left over.
