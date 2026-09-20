@@ -55,3 +55,21 @@ describe('version', () => {
     expect(VERSION).toBe(manifest.version)
   })
 })
+
+describe('createWebResearch', () => {
+  it('says which state file could not be opened and how to move it', async () => {
+    const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const path = await import('node:path')
+    const { createWebResearch } = await import('../src/index.ts')
+    const directory = mkdtempSync(path.join(tmpdir(), 'wrm-state-'))
+    // A file where the data directory should be: mkdir fails the same way on every platform.
+    const blocker = path.join(directory, 'not-a-directory')
+    writeFileSync(blocker, '')
+    const storePath = path.join(blocker, 'nested', 'state.sqlite')
+    await expect(createWebResearch({ storePath })).rejects.toThrow(
+      /Cannot open the state database at .*state\.sqlite \(E[A-Z]+\)\. Set WEB_RESEARCH_DATA_DIR/u,
+    )
+    rmSync(directory, { recursive: true, force: true })
+  })
+})

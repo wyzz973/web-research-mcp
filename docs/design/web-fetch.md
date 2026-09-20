@@ -99,7 +99,7 @@ size ~115826 tokens, 443615 chars | showing 3732 chars (0.8%) as lead | truncate
 
 下面的例子都取自 2026-09-21 的真实运行，只删减了正文。方括号里的 `s_xxxxxx:起-止` 是可引用的位置：快照 id 加 UTF-16 偏移，任何时候用 `web_fetch(ref="s_xxxxxx", cursor=…)` 或 `find` 都能复核。
 
-服务器写的行（表头、`note:`、`outline`、`read more:`）在不可信区块之外；网页文字只出现在 `<page untrusted="true" nonce="…">` 与带同一个 nonce 的结束标记之间。
+服务器写的行（表头、`note:`、`read more:`）在不可信区块之外；网页文字只出现在 `<page untrusted="true" nonce="…">` 与带同一个 nonce 的结束标记之间。目录（`outline`）也在区块**里面**：目录项是页面自己的标题，属于网页文字（第五轮审计后从区块外移入）。与我们的字段共用一行的网页文字——结果标题、章节名、目录项——里的 `|` 会换成 `∣`，URL 里的换成 `%7C`，因为 ` | ` 是我们的字段分隔符；改动的处数计入表头的 `neutralized`。
 
 ### 文本视图（证据模式，多个页面）
 
@@ -140,8 +140,9 @@ title: RFC 9110: HTTP Semantics
 [s_jjv54s:0-3732] | section p1 RFC 9110
 # RFC 9110
 ...
-</page nonce="j3p5g7zr">
+
 outline (levels 1-2): p1 RFC 9110 ~39t | ... | 13 Conditional Requests ~6393t | 14 Range Requests ~5010t | 15 Status Codes ~12496t | ...
+</page nonce="j3p5g7zr">
 read more: web_fetch(ref="s_jjv54s", ...) with section="<id from outline>" | find="exact text" | cursor="c_vc6pq9hn"
 ```
 

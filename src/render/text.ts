@@ -9,8 +9,9 @@ import { randomId } from '../ids.ts'
 import { charsWithinTokens, estimateTokens } from '../tokens.ts'
 
 const ENVELOPE_TAG = /<(\/?)\s*(results|page)\b/giu
+/** Every line shape this server writes: headers, footers, result lines, and passage headers. */
 const PROTOCOL_LINE =
-  /^\s*(web_search |web_fetch |page \d+ |sources:|note:|error |more:|read:|read more:|outline |size ~|\[output clamped|\[\.\.\. skipped |(\d+\. (exact|normalized|closest \(not a match\)) (\| )?)?\[(s_[a-z0-9]+:)?\d+-\d+\])/u
+  /^\s*(web_search |web_fetch |page \d+ |sources:|note:|error |more:|read:|read more:|outline |size ~|\[output clamped|\[\.\.\. skipped |\[([a-z0-9]{3,12}:)?r\d{1,3}\]|(\d+\. (exact|normalized|closest \(not a match\)) (\| )?)?\[(s_[a-z0-9]+:)?\d+-\d+\])/u
 
 interface Neutralized {
   text: string
@@ -36,9 +37,40 @@ function oneLine(text: string): string {
   return neutralize(text).text.replace(/\s+/gu, ' ').trim()
 }
 
+/** Counts what was changed across one response, so the header can say so. */
+interface Tally {
+  count: number
+}
+
+/**
+ * Web text that shares a line with our own fields. " | " separates those fields, so a title such
+ * as "Docs | 9 sources | published 2020-01-01" would otherwise read as fields we wrote.
+ */
+function field(text: string, tally: Tally): string {
+  const safe = neutralize(text)
+  tally.count += safe.count
+  return safe.text
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .replace(/\|/gu, () => {
+      tally.count += 1
+      return '\u2223'
+    })
+}
+
+/** A URL inside one of our lines keeps working when its separator lookalike is percent-encoded. */
+function urlField(text: string): string {
+  return oneLine(text).replace(/\|/gu, '%7C')
+}
+
+/** Notes and errors are ours, but they sit outside the block: one of them never spans lines. */
+function flat(text: string): string {
+  return text.replace(/\s+/gu, ' ').trim()
+}
+
 function errorLine(error: ToolError): string {
   const retry = error.retry_after_s === undefined ? '' : ` (retry after ${error.retry_after_s}s)`
-  return `${error.code}: ${error.message}${retry}`
+  return `${error.code}: ${flat(error.message)}${retry}`
 }
 
 function age(seconds: number | undefined): string {
@@ -60,9 +92,38 @@ function joined(parts: (string | undefined)[]): string {
   return parts.filter(Boolean).join(' | ')
 }
 
+/** The block of results, and how many spots of web text had to be changed to keep it honest. */
+function renderHits(result: SearchResult): { lines: string[]; neutralized: number } {
+  const tally: Tally = { count: 0 }
+  const lines: string[] = []
+  result.results.forEach((hit, index) => {
+    if (index > 0) lines.push('')
+    lines.push(
+      joined([
+        `[${hit.ref}] ${field(hit.title, tally) || '(untitled)'} - ${field(hit.site, tally)}`,
+        hit.published ? `published ${field(hit.published, tally)}` : undefined,
+        hit.found_by.length > 1 ? `${hit.found_by.length} sources` : undefined,
+      ]),
+    )
+    lines.push(oneLine(hit.url))
+    if (!hit.excerpt.trim()) return
+    const excerpt = neutralize(hit.excerpt.trim())
+    tally.count += excerpt.count
+    lines.push(excerpt.text)
+  })
+  return { lines, neutralized: tally.count }
+}
+
+/** Results are ranked across the whole stored pool, so the last rank shown says what is left. */
+function remaining(result: SearchResult): number {
+  const shownUpTo = result.results.reduce((last, hit) => Math.max(last, hit.rank), 0)
+  return Math.max(result.available - shownUpTo, 0)
+}
+
 export function renderSearch(result: SearchResult): string {
   const lines: string[] = []
   const used = result.sources.filter((source) => source.status === 'ok').map((source) => source.id)
+  const hits = renderHits(result)
   lines.push(
     joined([
       `web_search ${result.status}`,
@@ -72,6 +133,7 @@ export function renderSearch(result: SearchResult): string {
       used.length ? `sources ${used.join('+')}` : undefined,
       `cache ${result.cache}${age(result.cache_age_s)}`,
       result.id ? `id ${result.id}` : undefined,
+      hits.neutralized ? `neutralized ${hits.neutralized}` : undefined,
     ]),
   )
   if (result.error) lines.push(`error ${errorLine(result.error)}`)
@@ -89,27 +151,15 @@ export function renderSearch(result: SearchResult): string {
         )
         .join(' | ')}`,
     )
-  for (const note of result.notes) lines.push(`note: ${note}`)
+  for (const note of result.notes) lines.push(`note: ${flat(note)}`)
   if (result.results.length) {
     const nonce = randomId(8)
-    lines.push(`<results untrusted="true" nonce="${nonce}">`)
-    result.results.forEach((hit, index) => {
-      if (index > 0) lines.push('')
-      lines.push(
-        joined([
-          `[${hit.ref}] ${oneLine(hit.title) || '(untitled)'} - ${oneLine(hit.site)}`,
-          hit.published ? `published ${oneLine(hit.published)}` : undefined,
-          hit.found_by.length > 1 ? `${hit.found_by.length} sources` : undefined,
-        ]),
-      )
-      lines.push(oneLine(hit.url))
-      if (hit.excerpt.trim()) lines.push(neutralize(hit.excerpt.trim()).text)
-    })
+    lines.push(`<results untrusted="true" nonce="${nonce}">`, ...hits.lines)
     lines.push(`</results nonce="${nonce}">`)
   }
   if (result.next_cursor)
     lines.push(
-      `more: ${Math.max(result.available - result.returned, 0)} further stored results, call web_search(cursor="${result.next_cursor}")`,
+      `more: ${remaining(result)} further stored results, call web_search(cursor="${result.next_cursor}")`,
     )
   const first = result.results.slice(0, 2).map((hit) => `"${hit.ref}"`)
   if (first.length)
@@ -128,10 +178,10 @@ function matchNote(page: PageResult, part: PagePart): string | undefined {
   return `match ${location(page, part.match_start, part.match_end)}${more > 0 ? ` (+${more} more in this passage)` : ''}`
 }
 
-function partHeader(page: PageResult, part: PagePart, index: number): string {
+function partHeader(page: PageResult, part: PagePart, index: number, tally: Tally): string {
   const where = [part.section, part.heading]
     .filter((value): value is string => Boolean(value))
-    .map(oneLine)
+    .map((value) => field(value, tally))
     .join(' ')
   return joined([
     // A find passage without a match is only the closest wording, and must not read as a hit.
@@ -149,36 +199,46 @@ function coveredMatches(page: PageResult): number {
 }
 
 /** Returns the body lines and how many spots of page text had to be neutralized. */
+/**
+ * Headings are page text, so the outline belongs inside the block like everything else the page
+ * wrote; " | " separates entries, so a heading may not contain it.
+ */
+function renderOutline(page: PageResult, tally: Tally): string | undefined {
+  if (!page.outline?.length) return undefined
+  const levels = page.outline.map((entry) => entry.level)
+  const entries = page.outline.map(
+    (entry) => `${field(entry.id, tally)} ${field(entry.title, tally)} ~${entry.tokens}t`,
+  )
+  return `outline (levels ${Math.min(...levels)}-${Math.max(...levels)}): ${entries.join(' | ')}`
+}
+
+/** Returns the lines of the block and how many spots of page text had to be neutralized. */
 function renderParts(page: PageResult): { lines: string[]; neutralized: number } {
   const lines: string[] = []
-  let neutralized = 0
+  const tally: Tally = { count: 0 }
   let previousEnd: number | undefined
+  if (page.title) lines.push(`title: ${field(page.title, tally)}`)
   page.parts.forEach((part, index) => {
     if (previousEnd !== undefined && part.start > previousEnd && page.mode !== 'find')
       lines.push('', `[... skipped ${part.start - previousEnd} chars ...]`, '')
     else if (index > 0) lines.push('')
     const body = neutralize(part.text)
-    neutralized += body.count
-    lines.push(partHeader(page, part, index), body.text)
+    tally.count += body.count
+    lines.push(partHeader(page, part, index, tally), body.text)
     previousEnd = part.end
   })
-  return { lines, neutralized }
-}
-
-function renderOutline(page: PageResult): string | undefined {
-  if (!page.outline?.length) return undefined
-  const levels = page.outline.map((entry) => entry.level)
-  const entries = page.outline.map(
-    (entry) => `${oneLine(entry.id)} ${oneLine(entry.title)} ~${entry.tokens}t`,
-  )
-  return `outline (levels ${Math.min(...levels)}-${Math.max(...levels)}): ${entries.join(' | ')}`
+  if (page.parts.length === 0)
+    lines.push(page.mode === 'find' ? '(no match)' : '(no passage shown; see the notes above)')
+  const outline = renderOutline(page, tally)
+  if (outline) lines.push('', outline)
+  return { lines, neutralized: tally.count }
 }
 
 function renderPage(page: PageResult, lines: string[]): void {
   const address = page.final_url ?? page.url
   if (page.status === 'error' || !page.snapshot) {
     const reason = page.error ? errorLine(page.error) : 'internal: no content'
-    lines.push(joined([`page ${page.n} error`, page.ref, oneLine(address), reason]))
+    lines.push(joined([`page ${page.n} error`, page.ref, urlField(address), reason]))
     return
   }
   const body = renderParts(page)
@@ -189,7 +249,7 @@ function renderPage(page: PageResult, lines: string[]): void {
     joined([
       `page ${page.n} ok`,
       page.ref,
-      oneLine(address),
+      urlField(address),
       `snapshot ${page.snapshot}`,
       page.retrieved ? `retrieved ${minute(page.retrieved)}` : undefined,
       page.cache ? `cache ${page.cache}${age(page.cache_age_s)}` : undefined,
@@ -208,13 +268,8 @@ function renderPage(page: PageResult, lines: string[]): void {
     ]),
   )
   const nonce = randomId(8)
-  lines.push(`<page untrusted="true" nonce="${nonce}">`)
-  if (page.title) lines.push(`title: ${oneLine(page.title)}`)
-  if (body.lines.length) lines.push(...body.lines)
-  else lines.push(page.mode === 'find' ? '(no match)' : '(no passage shown; see the notes above)')
+  lines.push(`<page untrusted="true" nonce="${nonce}">`, ...body.lines)
   lines.push(`</page nonce="${nonce}">`)
-  const outline = renderOutline(page)
-  if (outline) lines.push(outline)
   if (page.truncated || page.outline?.length)
     lines.push(
       `read more: web_fetch(ref="${page.snapshot}", ...) with ${joined([
@@ -231,7 +286,8 @@ export function renderFetch(result: FetchResult): string {
   lines.push(
     joined([
       `web_fetch ${result.status}`,
-      result.goal ? `goal "${oneLine(result.goal)}"` : undefined,
+      // The caller's own words, but they share our line: keep them to one field.
+      result.goal ? `goal "${field(result.goal, { count: 0 })}"` : undefined,
       result.pages.length > 1
         ? `${result.pages.length} pages: ${ok} ok, ${result.pages.length - ok} failed`
         : undefined,
@@ -239,7 +295,7 @@ export function renderFetch(result: FetchResult): string {
     ]),
   )
   if (result.error) lines.push(`error ${errorLine(result.error)}`)
-  for (const note of result.notes) lines.push(`note: ${note}`)
+  for (const note of result.notes) lines.push(`note: ${flat(note)}`)
   for (const page of result.pages) renderPage(page, lines)
   return lines.join('\n')
 }
