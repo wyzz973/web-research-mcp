@@ -104,7 +104,11 @@ describe('packPage', () => {
 
   it('counts the notes and the source line against the budget', () => {
     const plain = page(poolOf(10), { maxTokens: 2000 })
-    const annotated = page(poolOf(10), { maxTokens: 2000, extraTokens: 300 })
+    const notes = Array.from(
+      { length: 3 },
+      (_, index) => `note: ${'a long note about what happened '.repeat(20)}${index}`,
+    )
+    const annotated = page(poolOf(10), { maxTokens: 2000, extraLines: notes })
     expect(annotated.tokens).toBeLessThanOrEqual(2000)
     const size = (results: SearchHit[]) =>
       results.reduce((sum, hit) => sum + estimateTokens(hit.excerpt), 0)

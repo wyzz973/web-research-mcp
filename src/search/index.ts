@@ -9,6 +9,7 @@ import type {
   SearchRequest,
   SearchResult,
   SearchUsage,
+  SourceStatus,
   Status,
   Store,
   StoredSearch,
@@ -101,6 +102,26 @@ function composeNotes(notes: readonly string[], inputNotes: readonly string[]): 
   return [...notes, ...input].slice(0, MAX_NOTES)
 }
 
+function fitNote(returned: number, expected: number, continues: boolean): string {
+  const how = continues ? '; continue with the cursor' : ''
+  return `Returned ${returned} of ${expected} results to fit the output budget${how}.`
+}
+
+/**
+ * The lines of the text view that vary with the response, spelled as render/text.ts prints them,
+ * so that they are counted against the budget: one line per note, and the source line, which
+ * appears only when some source did not simply answer.
+ */
+function variableLines(notes: readonly string[], sources: readonly SourceStatus[]): string[] {
+  const lines = notes.map((note) => `note: ${note}`)
+  if (sources.every((source) => source.status === 'ok' || source.status === 'empty')) return lines
+  const entries = sources.map((source) => {
+    const retry = source.retry_after_s === undefined ? '' : ` retry ${source.retry_after_s}s`
+    return `${source.id} ${source.status}${retry}`
+  })
+  return [...lines, `sources: ${entries.join(' | ')}`]
+}
+
 function emptyAdvice(search: ResolvedSearch): string {
   const tips = [
     search.sites.length ? 'removing sites' : undefined,
@@ -175,27 +196,30 @@ export function createSearcher(deps: SearcherDeps): Searcher {
     }
   }
 
+  /** Packs the page with `notes` counted against the budget, as the text view will print them. */
+  function pack(view: Presentation, notes: readonly string[]) {
+    return packPage({
+      pool: view.pool.hits,
+      ...view.shape,
+      maxChars: config.limits.maxOutputChars,
+      extraLines: variableLines(composeNotes(notes, view.inputNotes), view.pool.sources),
+      terms: buildTerms(view.pool.queries, view.pool.goal),
+    })
+  }
+
   function present(view: Presentation): SearchResult {
     const { pool, shape } = view
-    const variableLines = [
-      ...composeNotes(view.notes, view.inputNotes),
-      ...pool.sources.map((source) => `${source.id} ${source.status}`),
-    ]
-    const page = packPage({
-      pool: pool.hits,
-      ...shape,
-      maxChars: config.limits.maxOutputChars,
-      extraTokens: estimateTokens(variableLines.join('\n')),
-      terms: buildTerms(pool.queries, pool.goal),
-    })
-    const returned = page.results.length
     const expected = Math.min(shape.count, Math.max(pool.hits.length - shape.offset, 0))
+    let page = pack(view, view.notes)
+    // Saying that results were left out takes room as well: pack again with that note counted.
+    if (page.results.length < expected)
+      page = pack(view, [...view.notes, fitNote(page.results.length, expected, true)])
+    const returned = page.results.length
     const cursor = nextCursor(view, returned)
-    const notes = [...view.notes]
-    if (returned < expected)
-      notes.push(
-        `Returned ${returned} of ${expected} results to fit the output budget${cursor ? '; continue with the cursor' : ''}.`,
-      )
+    const notes =
+      returned < expected
+        ? [...view.notes, fitNote(returned, expected, cursor !== undefined)]
+        : view.notes
     const status: Status = overallStatus(returned, pool.sources)
     const age = Math.round((now().getTime() - Date.parse(pool.created_at)) / 1000)
     return {
