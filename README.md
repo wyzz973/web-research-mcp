@@ -92,6 +92,18 @@ Both methods never throw; failures are part of the returned object.
 - The default configuration cannot stop a prompt-injected model from leaking data through a URL it chooses to fetch. If that matters in your setting, restrict the tool at the harness level.
 - CAPTCHAs, paywalls, and logins are reported, never bypassed.
 
+## How well does it search?
+
+`pnpm bench` runs a sample of [evals/queries.json](evals/queries.json) against the live sources and checks whether a domain that ought to answer each query shows up near the top. It is a smoke signal, not a relevance judgment. The first recorded run ([evals/runs/2026-09-21-standard.json](evals/runs/2026-09-21-standard.json): 12 queries in English and Chinese, default `depth`, no API keys, cold cache):
+
+| Measure | Result |
+| --- | --- |
+| Queries answered | 12 of 12 |
+| Latency | median 1.6 s, 90th percentile 2.6 s |
+| Expected domain in the top 3 / top 10 | 10 of 12 / 12 of 12 |
+| Upstream calls | 13 (one escalation to a second source) |
+| Output size for 10 results | about 3,800 tokens on average |
+
 ## Development
 
 ```sh
