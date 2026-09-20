@@ -531,14 +531,15 @@ describe('usage ledger and limits', () => {
     expect(store.usageTodayBySource('tavily')).toEqual({ calls: 1, cost_usd: 0 })
   })
 
-  it('prefers a keyed source, and stops using it once the daily budget is spent', async () => {
+  it('prefers a keyed source, and never books a call that would pass the daily budget', async () => {
     const tavily = fakeSource('tavily', hits('t', 12), { paid: 0.008 })
     const exa = fakeSource('exa', hits('e', 12))
-    const config = testConfig({ WEB_RESEARCH_DAILY_BUDGET_USD: '0.01' })
+    const config = testConfig({ WEB_RESEARCH_DAILY_BUDGET_USD: '0.02' })
     const searcher = searcherWith([exa, tavily], config)
 
     expect((await searcher.search({ query: 'one' }, never)).sources[0]?.id).toBe('tavily')
     expect((await searcher.search({ query: 'two' }, never)).sources[0]?.id).toBe('tavily')
+    // A third call would make 0.024: it is refused before it is sent, not after.
     const third = await searcher.search({ query: 'three' }, never)
     expect(third.sources).toMatchObject([
       { id: 'exa', status: 'ok' },
@@ -549,6 +550,7 @@ describe('usage ledger and limits', () => {
       'The daily budget is spent, so paid sources (tavily) were not used.',
     ])
     expect(tavily.requests).toHaveLength(2)
+    expect(store.usageToday().cost_usd).toBeCloseTo(0.016, 6)
   })
 
   it('reports budget_exhausted when only paid sources exist and the budget is spent', async () => {
@@ -602,17 +604,11 @@ describe('never throws', () => {
   })
 
   it('turns an unexpected failure into an internal error', async () => {
-    const broken: Store = {
-      ...store,
-      usageToday() {
-        throw new Error('database is locked')
-      },
+    const faulty = fakeSource('exa', hits('e', 3))
+    faulty.free = () => {
+      throw new TypeError('bug in a custom adapter')
     }
-    const result = await searcherWith(
-      [fakeSource('exa', hits('e', 3))],
-      testConfig(),
-      broken,
-    ).search({ query: 'q' }, never)
+    const result = await searcherWith([faulty]).search({ query: 'q' }, never)
     expect(result).toMatchObject({
       status: 'error',
       error: { code: 'internal', message: 'An unexpected internal error occurred.' },

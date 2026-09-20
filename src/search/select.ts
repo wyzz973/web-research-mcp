@@ -1,8 +1,12 @@
 /**
- * Source order for one search (docs/design/web-search.md, section 5): keyed sources that are
- * within the daily budget first, anonymous tiers after them, and within a tier whichever was
- * used least today, so load spreads instead of draining one free tier. A source that cannot be
- * used right now keeps its place in the order and is reported as skipped when it is passed over.
+ * Source order for one search (docs/design/web-search.md, section 5): keyed sources first,
+ * anonymous tiers after them, and within a tier whichever was used least today, so load spreads
+ * instead of draining one free tier.
+ *
+ * Whether a source may be used is not decided here by reading the ledger: several processes
+ * share the state file, and they would all read "one call left" together. The caller admits a
+ * source by reserving its calls atomically (`admit`); a refusal puts the source on hold and the
+ * walk moves on to the next one. The ledger is read only to order the sources.
  */
 import type { ErrorCode, SourceStatus } from '../contract.ts'
 import type { SourceAdapter } from '../sources/types.ts'
@@ -11,24 +15,28 @@ import type { Cooldowns } from './cooldown.ts'
 export interface LineupInput {
   sources: readonly SourceAdapter[]
   cooldowns: Cooldowns
-  /** Upstream calls already made or reserved today, per source id. */
+  /** Upstream calls booked today, per source id. Used for the order only, never as a gate. */
   callsToday(source: string): number
-  /** Upstream calls this search would make to the source. */
-  plannedCalls(source: SourceAdapter): number
-  /** False once today's estimated spend reached the budget. */
-  paidAllowed: boolean
-  anonymousDailyCap: number
   /** The request restricts sites or dates; sources that filter upstream serve it better. */
   wantsFilters: boolean
 }
 
 /** Why a source sits this search out. */
 export type Hold =
-  { kind: 'cooling'; code: ErrorCode; retryAfterS: number } | { kind: 'cap' } | { kind: 'budget' }
+  | { kind: 'cooling'; code: ErrorCode; retryAfterS: number }
+  /** The anonymous tier's self-imposed daily cap would be passed. */
+  | { kind: 'cap' }
+  /** Today's paid budget would be passed. */
+  | { kind: 'budget' }
+  /** The ledger could not be written, and money is not spent without a record of it. */
+  | { kind: 'ledger' }
+
+/** Books the calls a source would make. Returns the hold when they cannot be booked. */
+export type Admit = (adapter: SourceAdapter) => Hold | undefined
 
 interface Entry {
   adapter: SourceAdapter
-  hold: Hold | undefined
+  cooling: Hold | undefined
 }
 
 export interface Lineup {
@@ -43,11 +51,8 @@ export function cooldownKey(adapter: SourceAdapter): string {
   return adapter.free() ? adapter.id : `${adapter.id}:keyed`
 }
 
-function holdFor(adapter: SourceAdapter, calls: number, input: LineupInput): Hold | undefined {
-  if (!adapter.free() && !input.paidAllowed) return { kind: 'budget' }
-  if (adapter.free() && calls + input.plannedCalls(adapter) > input.anonymousDailyCap)
-    return { kind: 'cap' }
-  const cooling = input.cooldowns.get(cooldownKey(adapter))
+function coolingHold(adapter: SourceAdapter, cooldowns: Cooldowns): Hold | undefined {
+  const cooling = cooldowns.get(cooldownKey(adapter))
   return cooling ? { kind: 'cooling', ...cooling } : undefined
 }
 
@@ -67,16 +72,21 @@ export function buildLineup(input: LineupInput): Lineup {
         a.index - b.index,
     )
   return {
-    entries: ranked.map(({ adapter, calls }) => ({
+    entries: ranked.map(({ adapter }) => ({
       adapter,
-      hold: holdFor(adapter, calls, input),
+      cooling: coolingHold(adapter, input.cooldowns),
     })),
   }
 }
 
+const HOLD_DETAIL: Record<Exclude<Hold['kind'], 'cooling'>, string> = {
+  cap: 'daily anonymous cap reached',
+  budget: 'daily budget reached',
+  ledger: 'usage ledger unavailable',
+}
+
 function skippedStatus(id: string, hold: Hold): SourceStatus {
-  if (hold.kind === 'cap') return { id, status: 'skipped', detail: 'daily anonymous cap reached' }
-  if (hold.kind === 'budget') return { id, status: 'skipped', detail: 'daily budget reached' }
+  if (hold.kind !== 'cooling') return { id, status: 'skipped', detail: HOLD_DETAIL[hold.kind] }
   const detail =
     hold.code === 'budget_exhausted'
       ? 'quota used up; not tried again before local midnight'
@@ -84,39 +94,30 @@ function skippedStatus(id: string, hold: Hold): SourceStatus {
   return { id, status: 'skipped', retry_after_s: hold.retryAfterS, detail }
 }
 
-/** Hands out usable sources in order and remembers the held ones it had to pass over. */
+/** Hands out admitted sources in order and remembers the ones it had to pass over. */
 export interface LineupCursor {
+  /** The next source whose calls could be booked. Booking happens here, exactly once per source. */
   next(): SourceAdapter | undefined
-  /**
-   * Status lines for the sources that sat this search out: those passed over, plus every source
-   * that is over its cap or budget. Rotation ranks a capped source last, so it is rarely passed
-   * over, yet the caller should still see that it is unavailable today.
-   */
   skipped(): SourceStatus[]
-  /** The sources passed over so far and why: these holds changed what this search could use. */
+  /** The sources passed over so far and why. */
   holds(): ReadonlyArray<{ id: string; hold: Hold }>
 }
 
-export function walkLineup(lineup: Lineup): LineupCursor {
+export function walkLineup(lineup: Lineup, admit: Admit): LineupCursor {
   const passed: Array<{ id: string; hold: Hold }> = []
   let position = 0
   return {
     next() {
       for (let entry = lineup.entries[position]; entry; entry = lineup.entries[position]) {
         position += 1
-        if (!entry.hold) return entry.adapter
-        passed.push({ id: entry.adapter.id, hold: entry.hold })
+        // A cooling source is not even asked: a reservation for it would only have to be undone.
+        const hold = entry.cooling ?? admit(entry.adapter)
+        if (!hold) return entry.adapter
+        passed.push({ id: entry.adapter.id, hold })
       }
       return undefined
     },
-    skipped() {
-      const unreached = lineup.entries
-        .slice(position)
-        .flatMap(({ adapter, hold }) =>
-          hold && hold.kind !== 'cooling' ? [{ id: adapter.id, hold }] : [],
-        )
-      return [...passed, ...unreached].map(({ id, hold }) => skippedStatus(id, hold))
-    },
+    skipped: () => passed.map(({ id, hold }) => skippedStatus(id, hold)),
     holds: () => [...passed],
   }
 }

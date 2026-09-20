@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { Store } from '../../src/contract.ts'
 import { WebError } from '../../src/errors.ts'
 import { createCooldowns } from '../../src/search/cooldown.ts'
-import { buildLineup, cooldownKey, walkLineup, type LineupInput } from '../../src/search/select.ts'
+import {
+  buildLineup,
+  cooldownKey,
+  walkLineup,
+  type Admit,
+  type LineupInput,
+} from '../../src/search/select.ts'
 import { createSqliteStore } from '../../src/store/sqlite.ts'
 import { fakeSource } from './helpers.ts'
 
@@ -26,17 +32,16 @@ function input(overrides: Partial<LineupInput>): LineupInput {
     sources: [],
     cooldowns: createCooldowns(() => new Date(), store),
     callsToday: () => 0,
-    plannedCalls: () => 1,
-    paidAllowed: true,
-    anonymousDailyCap: 100,
     wantsFilters: false,
     ...overrides,
   }
 }
 
-/** The usable sources in order, and what was passed over on the way. */
-function walk(overrides: Partial<LineupInput>) {
-  const cursor = walkLineup(buildLineup(input(overrides)))
+const admitAll: Admit = () => undefined
+
+/** The admitted sources in order, and what was passed over on the way. */
+function walk(overrides: Partial<LineupInput>, admit: Admit = admitAll) {
+  const cursor = walkLineup(buildLineup(input(overrides)), admit)
   const usable: string[] = []
   for (let adapter = cursor.next(); adapter; adapter = cursor.next()) usable.push(adapter.id)
   return { usable, skipped: cursor.skipped() }
@@ -60,24 +65,36 @@ describe('buildLineup', () => {
     expect(usable).toEqual(['tavily', 'parallel', 'exa'])
   })
 
-  it('skips paid sources once the daily budget is spent', () => {
-    const { usable, skipped } = walk({ sources: [exa, tavily], paidAllowed: false })
-    expect(usable).toEqual(['exa'])
-    expect(skipped).toEqual([{ id: 'tavily', status: 'skipped', detail: 'daily budget reached' }])
-  })
-
-  it('skips an anonymous source when its calls would pass the daily cap', () => {
-    const { usable, skipped } = walk({
-      sources: [exa, parallel, tavily],
-      anonymousDailyCap: 100,
-      callsToday: (id) => (id === 'exa' ? 98 : 99),
-      plannedCalls: (adapter) => (adapter.id === 'exa' ? 3 : 1),
-    })
-    // exa: 98 + 3 > 100. parallel: 99 + 1 fits. The cap never applies to a keyed source.
-    expect(usable).toEqual(['tavily', 'parallel'])
+  it('passes over a source whose calls could not be booked, and says why', () => {
+    const refuse: Admit = (adapter) => {
+      if (adapter.id === 'tavily') return { kind: 'budget' }
+      return adapter.id === 'exa' ? { kind: 'cap' } : undefined
+    }
+    const { usable, skipped } = walk({ sources: [exa, parallel, tavily] }, refuse)
+    expect(usable).toEqual(['parallel'])
     expect(skipped).toEqual([
+      { id: 'tavily', status: 'skipped', detail: 'daily budget reached' },
       { id: 'exa', status: 'skipped', detail: 'daily anonymous cap reached' },
     ])
+  })
+
+  it('books a source only when the walk reaches it, and only once', () => {
+    const asked: string[] = []
+    const lineup = buildLineup(input({ sources: [exa, parallel, tavily] }))
+    const cursor = walkLineup(lineup, (adapter) => {
+      asked.push(adapter.id)
+      return undefined
+    })
+    expect(cursor.next()?.id).toBe('tavily')
+    expect(asked).toEqual(['tavily'])
+    expect(cursor.next()?.id).toBe('exa')
+    expect(asked).toEqual(['tavily', 'exa'])
+  })
+
+  it('never reads the ledger to decide: the counts of the day only order the sources', () => {
+    // Far over any cap by the count, yet admitted: the reservation is the only gate.
+    const { usable } = walk({ sources: [exa, parallel], callsToday: () => 1_000_000 })
+    expect(usable).toEqual(['exa', 'parallel'])
   })
 
   it('prefers sources that filter upstream when the request restricts sites or dates', () => {
@@ -94,7 +111,7 @@ describe('walkLineup', () => {
     const cooldowns = createCooldowns(clock().now, store)
     cooldowns.fail('exa', new WebError('rate_limited', 'limited'))
     const sources = [fakeSource('exa', []), fakeSource('parallel', []), fakeSource('tavily', [])]
-    const cursor = walkLineup(buildLineup(input({ sources, cooldowns })))
+    const cursor = walkLineup(buildLineup(input({ sources, cooldowns })), admitAll)
 
     expect(cursor.next()?.id).toBe('parallel')
     expect(cursor.skipped()).toEqual([
@@ -113,7 +130,7 @@ describe('walkLineup', () => {
     const cooldowns = createCooldowns(() => new Date(), store)
     cooldowns.fail('tavily', new WebError('timeout', 'slow'))
     const sources = [fakeSource('exa', []), fakeSource('tavily', [])]
-    const cursor = walkLineup(buildLineup(input({ sources, cooldowns })))
+    const cursor = walkLineup(buildLineup(input({ sources, cooldowns })), admitAll)
     expect(cursor.next()?.id).toBe('exa')
     expect(cursor.skipped()).toEqual([])
   })
@@ -125,7 +142,11 @@ describe('walkLineup', () => {
     expect(cooldownKey(tavily)).toBe('tavily:keyed')
     cooldowns.fail(cooldownKey(tavily), new WebError('budget_exhausted', 'quota is used up'))
     const sources = [tavily, fakeSource('exa', [])]
-    const cursor = walkLineup(buildLineup(input({ sources, cooldowns })))
+    const asked: string[] = []
+    const cursor = walkLineup(buildLineup(input({ sources, cooldowns })), (adapter) => {
+      asked.push(adapter.id)
+      return undefined
+    })
 
     expect(cursor.next()?.id).toBe('exa')
     expect(cursor.skipped()).toEqual([
@@ -136,6 +157,8 @@ describe('walkLineup', () => {
         detail: 'quota used up; not tried again before local midnight',
       },
     ])
+    // A source on hold is not booked at all, so there is nothing to give back.
+    expect(asked).toEqual(['exa'])
     time.advance(5400)
     expect(cooldowns.get(cooldownKey(tavily))).toBeUndefined()
   })

@@ -11,7 +11,14 @@ import type { Cooldowns } from './cooldown.ts'
 import { runCalls, type CallOutcome, type SourceCall } from './execute.ts'
 import { fuse, type FusedHit, type RankedList } from './fuse.ts'
 import { queryLanguages } from './language.ts'
-import { buildLineup, cooldownKey, walkLineup, type Hold, type LineupCursor } from './select.ts'
+import {
+  buildLineup,
+  cooldownKey,
+  walkLineup,
+  type Admit,
+  type Hold,
+  type LineupCursor,
+} from './select.ts'
 import {
   allFailedError,
   realErrors,
@@ -70,6 +77,8 @@ const CAP_REACHED =
   'the daily cap for anonymous sources is reached; set EXA_API_KEY, TAVILY_API_KEY or PARALLEL_API_KEY, or raise WEB_RESEARCH_ANONYMOUS_DAILY_CAP'
 const BUDGET_SPENT =
   'the daily budget for paid sources is spent and no free source is available; raise WEB_RESEARCH_DAILY_BUDGET_USD or enable anonymous sources (WEB_RESEARCH_ANONYMOUS_SOURCES=1)'
+const LEDGER_UNAVAILABLE =
+  'the usage ledger could not be written, so paid sources were not used; check that the state directory is writable, or enable anonymous sources (WEB_RESEARCH_ANONYMOUS_SOURCES=1)'
 
 function perCallResults(search: ResolvedSearch): number {
   const factor = search.depth === 'deep' ? 2 : 1.5
@@ -101,18 +110,54 @@ function callsFor(adapter: SourceAdapter, search: ResolvedSearch, now: Date): So
   return calls
 }
 
+/** Today's call counts only order the sources; a ledger that cannot be read orders them as registered. */
+function callsToday(store: Store, source: string): number {
+  try {
+    return store.usageTodayBySource(source).calls
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Admission is the atomic reservation itself: one conditional statement books the calls only if
+ * the day's cap (anonymous tier) or the day's budget (keyed source) still has room for them, so
+ * processes that share the state file cannot pass a limit together.
+ *
+ * When the ledger cannot be written, the two tiers deliberately differ. An anonymous call costs
+ * nothing, and a search that works matters more than a perfect count: it is let through. A paid
+ * call is real money, and spending it without a record would defeat the budget: it is refused.
+ */
+function admission(context: EngineContext, search: ResolvedSearch): Admit {
+  const { store, config } = context
+  return (adapter) => {
+    const calls = callCount(adapter, search)
+    if (adapter.free()) {
+      try {
+        const booked = store.reserveUsage(adapter.id, calls, config.sources.anonymousDailyCap)
+        return booked ? undefined : { kind: 'cap' }
+      } catch {
+        return undefined
+      }
+    }
+    try {
+      const estimate = calls * (adapter.unitCostUsd?.() ?? 0)
+      const booked = store.reservePaid(adapter.id, calls, estimate, config.limits.dailyBudgetUsd)
+      return booked ? undefined : { kind: 'budget' }
+    } catch {
+      return { kind: 'ledger' }
+    }
+  }
+}
+
 function lineupCursor(context: EngineContext, search: ResolvedSearch): LineupCursor {
-  const { config, store, sources, cooldowns } = context
   const lineup = buildLineup({
-    sources,
-    cooldowns,
-    callsToday: (source) => store.usageTodayBySource(source).calls,
-    plannedCalls: (adapter) => callCount(adapter, search),
-    paidAllowed: store.usageToday().cost_usd < config.limits.dailyBudgetUsd,
-    anonymousDailyCap: config.sources.anonymousDailyCap,
+    sources: context.sources,
+    cooldowns: context.cooldowns,
+    callsToday: (source) => callsToday(context.store, source),
     wantsFilters: search.sites.length > 0 || search.recency !== undefined,
   })
-  return walkLineup(lineup)
+  return walkLineup(lineup, admission(context, search))
 }
 
 type Held = ReadonlyArray<{ id: string; hold: Hold }>
@@ -139,14 +184,12 @@ function unavailable(held: Held): ToolError {
     return { code: 'budget_exhausted', message: CAP_REACHED }
   if (holds.some((hold) => hold.kind === 'budget'))
     return { code: 'budget_exhausted', message: BUDGET_SPENT }
+  if (holds.some((hold) => hold.kind === 'ledger'))
+    return { code: 'internal', message: LEDGER_UNAVAILABLE }
   return { code: 'no_source_available', message: NO_SOURCE }
 }
 
-/**
- * Calls are entered in the ledger before they go out, so searches running at the same time see
- * each other and the anonymous cap holds under concurrency. Best effort: a locked state file
- * must not fail a search.
- */
+/** Corrections to what admission booked. Best effort: a locked state file must not fail a search. */
 function adjustUsage(context: EngineContext, source: string, calls: number, costUsd: number): void {
   try {
     context.store.addUsage(source, calls, costUsd)
@@ -155,23 +198,19 @@ function adjustUsage(context: EngineContext, source: string, calls: number, cost
   }
 }
 
-function reserve(context: EngineContext, calls: readonly SourceCall[]): void {
-  for (const call of calls) adjustUsage(context, call.adapter.id, 1, 0)
-}
-
-/** Gives back what never went out, and prices what did. Returns the estimated cost. */
+/**
+ * Admission booked every planned call, paid ones at their estimated price. This gives back what
+ * never went out and what the vendor did not charge for. Returns the estimated cost of the rest.
+ */
 function settle(context: EngineContext, outcomes: readonly CallOutcome[]): number {
   let cost = 0
   for (const outcome of outcomes) {
     const { adapter } = outcome.call
-    if (!outcome.dispatched) {
-      adjustUsage(context, adapter.id, -1, 0)
-      continue
-    }
-    const billed = !outcome.error || !UNBILLED.has(outcome.error.code)
-    const price = billed && !adapter.free() ? (adapter.unitCostUsd?.() ?? 0) : 0
-    if (price > 0) adjustUsage(context, adapter.id, 0, price)
-    cost += price
+    const estimate = adapter.free() ? 0 : (adapter.unitCostUsd?.() ?? 0)
+    const billed = outcome.dispatched && (!outcome.error || !UNBILLED.has(outcome.error.code))
+    if (!outcome.dispatched) adjustUsage(context, adapter.id, -1, -estimate)
+    else if (!billed && estimate > 0) adjustUsage(context, adapter.id, 0, -estimate)
+    if (billed) cost += estimate
   }
   return cost
 }
@@ -261,7 +300,6 @@ async function runWave(
   signal: AbortSignal,
 ): Promise<Wave> {
   const calls = adapters.flatMap((adapter) => callsFor(adapter, search, context.now()))
-  reserve(context, calls)
   const outcomes = await runCalls(calls, { softMs: context.timeouts.softMs, hardMs }, signal)
   return { adapters, outcomes }
 }
@@ -271,7 +309,13 @@ function heldNotes(held: Held): string[] {
     held.filter((entry) => entry.hold.kind === kind).map((entry) => entry.id)
   const overBudget = named('budget')
   const overCap = named('cap')
+  const unrecorded = named('ledger')
   return [
+    ...(unrecorded.length
+      ? [
+          `The usage ledger could not be written, so paid sources (${unrecorded.join(', ')}) were not used.`,
+        ]
+      : []),
     ...(overBudget.length
       ? [`The daily budget is spent, so paid sources (${overBudget.join(', ')}) were not used.`]
       : []),

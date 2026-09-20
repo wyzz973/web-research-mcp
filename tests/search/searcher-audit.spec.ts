@@ -232,15 +232,105 @@ describe('should-fix items', () => {
   it('reports an anonymous source over its daily cap as skipped, with the agreed detail', async () => {
     const config = testConfig({ WEB_RESEARCH_ANONYMOUS_DAILY_CAP: '2' })
     store.addUsage('exa', 2, 0)
-    const result = await searcherWith(
-      [fakeSource('exa', hits('e', 12)), fakeSource('parallel', hits('p', 12))],
-      config,
-    ).search({ query: 'fetch abort' }, never)
+    const exa = fakeSource('exa', hits('e', 12))
+    const result = await searcherWith([exa, fakeSource('parallel', hits('p', 12))], config).search(
+      { query: 'fetch abort', depth: 'deep' },
+      never,
+    )
     expect(result.status).toBe('ok')
     expect(result.sources).toMatchObject([
       { id: 'parallel', status: 'ok' },
       { id: 'exa', status: 'skipped', detail: 'daily anonymous cap reached' },
     ])
+    expect(result.notes).toContain('The daily cap for anonymous calls is reached for exa.')
+    expect(exa.requests).toHaveLength(0)
+    expect(store.usageTodayBySource('exa').calls).toBe(2)
+  })
+
+  it('books a multi-query search as a whole or not at all', async () => {
+    const config = testConfig({ WEB_RESEARCH_ANONYMOUS_DAILY_CAP: '4' })
+    const exa = fakeSource('exa', hits('e', 12))
+    const searcher = searcherWith([exa], config)
+    const three = { queries: ['one', 'two', 'three'], depth: 'fast' }
+    expect((await searcher.search(three, never)).status).toBe('ok')
+    // Three more calls would make six; one still fits.
+    const refused = await searcher.search(
+      { queries: ['four', 'five', 'six'], depth: 'fast' },
+      never,
+    )
+    expect(refused.error?.code).toBe('budget_exhausted')
+    expect((await searcher.search({ query: 'seven', depth: 'fast' }, never)).status).toBe('ok')
+    expect(exa.requests).toHaveLength(4)
+    expect(store.usageTodayBySource('exa').calls).toBe(4)
+  })
+
+  it('gives back the count and the estimate of paid calls that were never sent', async () => {
+    const busy = fakeSource('tavily', delayed(300, []), { paid: 0.008 })
+    const fast = fakeSource('exa', delayed(5, hits('e', 12)))
+    const queries = ['q1', 'q2', 'q3', 'q4', 'q5']
+    await searcherWith([busy, fast]).search({ queries, depth: 'deep' }, never)
+    expect(busy.requests).toHaveLength(3)
+    const ledger = store.usageTodayBySource('tavily')
+    expect(ledger.calls).toBe(3)
+    expect(ledger.cost_usd).toBeCloseTo(3 * 0.008, 6)
+  })
+
+  it('lets an anonymous search through when the ledger cannot be written', async () => {
+    const locked: Store = {
+      ...store,
+      reserveUsage() {
+        throw new Error('database is locked')
+      },
+      usageTodayBySource() {
+        throw new Error('database is locked')
+      },
+    }
+    const exa = fakeSource('exa', hits('e', 12))
+    const searcher = createSearcher({
+      config: testConfig(),
+      store: locked,
+      sources: [exa],
+      now: () => clock,
+      timeouts: quick,
+    })
+    expect((await searcher.search({ query: 'fetch abort', depth: 'fast' }, never)).status).toBe(
+      'ok',
+    )
+    expect(exa.requests).toHaveLength(1)
+  })
+
+  it('spends no money when the ledger cannot be written, and says why', async () => {
+    const locked: Store = {
+      ...store,
+      reservePaid() {
+        throw new Error('database is locked')
+      },
+    }
+    const tavily = fakeSource('tavily', hits('t', 12), { paid: 0.008 })
+    const exa = fakeSource('exa', hits('e', 12))
+    const make = (sources: SourceAdapter[]) =>
+      createSearcher({
+        config: testConfig(),
+        store: locked,
+        sources,
+        now: () => clock,
+        timeouts: quick,
+      })
+
+    const degraded = await make([tavily, exa]).search({ query: 'fetch abort' }, never)
+    expect(degraded.status).toBe('ok')
+    expect(degraded.sources).toMatchObject([
+      { id: 'exa', status: 'ok' },
+      { id: 'tavily', status: 'skipped', detail: 'usage ledger unavailable' },
+    ])
+    expect(degraded.notes).toEqual([
+      'The usage ledger could not be written, so paid sources (tavily) were not used.',
+    ])
+
+    const alone = await make([tavily]).search({ query: 'something else' }, never)
+    expect(alone).toMatchObject({ status: 'error', error: { code: 'internal' } })
+    expect(alone.error?.message).toContain('usage ledger could not be written')
+    expect(tavily.requests).toHaveLength(0)
   })
 
   it('judges "few results" against what the source could return, not against the wish', async () => {
