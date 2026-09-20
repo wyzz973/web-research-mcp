@@ -1,0 +1,88 @@
+{
+  "search_id": "search_f3b89fc26437b64d8faf54464027a74a",
+  "results": [
+    {
+      "url": "https://github.com/node-fetch/node-fetch/blob/main/README.md",
+      "title": "node-fetch/README.md at main · node-fetch/node-fetch · GitHub",
+      "publish_date": null,
+      "excerpts": [
+        "Request cancellation with AbortSignal\nYou may cancel requests with AbortController. A suggested implementation is abort-controller.\nAn example of timing out a request after 150ms could be achieved as the following:\nimport fetch, { AbortError } from 'node-fetch';\n// AbortController was added in node v14.17.0 globally\nconst AbortController = globalThis.AbortController || await import('abort-controller')\nconst controller = new AbortController();\nconst timeout = setTimeout(() => {\ncontroller.abort();\n}, 150);\ntry {\nconst response = await fetch('https://example.com', {signal: controller.signal});\nconst data = await response.json();\n} catch (error) {\nif (error instanceof AbortError) {\nconsole.log('request was aborted');\n}\n} finally {\nclearTimeout(timeout);\n}\nSee test cases for more examples.\nAPI\nfetch(url[, options])"
+      ]
+    },
+    {
+      "url": "https://developer.mozilla.org/en-US/docs/Web/API/AbortController/abort",
+      "title": "AbortController: abort() method - Web APIs - MDN Web Docs",
+      "publish_date": null,
+      "excerpts": [
+        "* See full compatibility\n* Learn more\n  Note: This feature is available in Web Workers .\n  The abort() method of the AbortController interface aborts an asynchronous operation before it has completed. This is able to abort fetch requests , the consumption of any response bodies, or streams.\nIn this article\nSee the AbortSignal page for usage examples.\nYou can find a full working example on GitHub ; you can also see it running live .\nSpecifications\n* Specification\n* DOM # ref-for-dom-abortcontroller-abortcontroller①\nBrowser compatibility\nSee also\n* Fetch API\nHelp improve MDN"
+      ]
+    },
+    {
+      "url": "https://github.com/nodejs/node/issues/43874",
+      "title": "Request object's AbortSignal does not abort with the expected reason · Issue #43874 · nodejs/node · GitHub",
+      "publish_date": null,
+      "excerpts": [
+        "* abortcontroller\n* fetch\nVersion\nv18.5.0\nPlatform\nLinux foo 5.15.0-41-generic #44-Ubuntu SMP Wed Jun 22 14:20:53 UTC 2022 x86_64 x86_64 x86_64 GNU/Linux\nSubsystem\nNo response\nWhat steps will reproduce the bug?\nconst signal1 = AbortSignal.timeout(100);\nconst request = new Request(\"https://example.com\", {signal: signal1});\nconst signal2 = request.signal;\nconsole.log(\"same?\", signal1 === signal2);  // false\nsignal1.addEventListener(\"abort\", e => console.log(\"1\", e.target.reason));  // TimeoutError\nsignal2.addEventListener(\"abort\", e => console.log(\"2\", e.target.reason));  // AbortError\nsetTimeout(() => {}, 200);  // wait for the abort to happen\nHow often does it reproduce? Is there a required condition?\nAlways.\nWhat is the expected behavior?\nLiviaMedeiros commented on 2022-07-17T02:11:14Z:\nI believe this is spec issue: abort fetch part demands AbortError DOMException and nothing else.\nThere was an ongoing work on throwing signal.reason if it's provided and generic AbortError if not: https://github.com/whatwg/fetch/pull/1343\nAlthough this issue doesn't involve the fetch function, I understand the point about abort fetch demanding AbortError. I haven't been able to find any issues opened against the fetch spec to accommodate AbortSignal.timeout() and TimeoutError, even though that seems to be the primary motivator: https://github.com/whatwg/dom/pull/1032\nLiviaMedeiros commented on 2022-07-17T22:44:25Z:\nnew Request(input, init) should have this behavior\nYep, it seems so. This step should be h"
+      ]
+    },
+    {
+      "url": "https://github.com/node-fetch/node-fetch/issues/523",
+      "title": "Should we deprecate timeout in favor of AbortController? · Issue #523 · node-fetch/node-fetch · GitHub",
+      "publish_date": "2018-09-20",
+      "excerpts": [
+        "Should we deprecate timeout in favor of AbortController?\n* question\nTimeout was a node-fetch only additions in it's early days and was never implemented in the spec. Now that there is a way to control it using the AbortController to be able to control when it should abort a request. One could control whether or not a timeout should affect the hole request and response or one or the other\nTo help out other on a migration path I where thinking maybe of some way to include a helper function that is optional and isn't included in the bundle so it makes it more modular.\nsome proposal:\nconst timeout = require('node-fetch/timeout')\nconst signal = timeout(1000)\n/*\nSame as doing\nconst controller = new AbortController()\nconst { signal } = controller\nsetTimeout(controller.abort, 1000)\n*/\nfetch(url, { signal })\nfetch(url, { signal: timeout(1000) })\nOr if it returns a object then you can use spread to append it\nconst timeout = require('node-fetch/timeout')\nconsole.log( timeout(1000) ) // { signal: signal }\nfetch(url, { headers, ...timeout(1000) })\nOr returning a object that can help you start and stop the a singal to be able to control if the timeout should apply to only the upload part or the download part\n// what node-fetch/timeout would look like\nconst AbortController = require('./AbortController')\nmodule.exports = function timeout(delay) {\nconst controller = new AbortController()\nconst { signal } = controller\nlet timer = null\nreturn {\nsignal,\nstart() {\nclearTimeout(timer)\ntimer = setTimeout(contr"
+      ]
+    },
+    {
+      "url": "https://github.com/node-fetch/timeout-signal",
+      "title": "GitHub - node-fetch/timeout-signal: Create an AbortSignal that aborts after a delay. · GitHub",
+      "publish_date": null,
+      "excerpts": [
+        "node-fetch/timeout-signal\n* Page: GitHub repository\n* URL: https://github.com/node-fetch/timeout-signal\n* Description: Create an AbortSignal that aborts after a delay\n* Stars: 16\n* Forks: 2\n* License: MIT license\n* Default branch: main\n* Created: 2020-05-24T04:09:15.000Z\n* Commits: 11\nTop-level files\n* .github/workflows/\n* .editorconfig\n* .gitattributes\n* .gitignore\n* .npmrc\n* index.d.ts\n* index.js\n* index.test-d.ts\n* license\n* package.json\n* readme.md\n* test.js\nreadme.md\ntimeout-signal\nCreate an AbortSignal that aborts after a delay\nWarning\nDeprecated! Use AbortSignal.timeout(ms) instead!\nInstall\nnpm install timeout-signal\nUsage\nimport timeoutSignal from 'timeout-signal';\nconst signal = timeoutSignal(5000);\ntry {\nconst response = await fetch('https://www.google.com', {signal});\n// Handle response\n} catch (error) {\nif (signal.aborted) {\n// Handle abortion\n}\n}\nAPI\ntimeoutSignal(timeout)\ntimeout\nType: integer\nThe milliseconds to wait."
+      ]
+    },
+    {
+      "url": "https://fa.javascript.info/fetch-abort",
+      "title": "Fetch: Abort",
+      "publish_date": null,
+      "excerpts": [
+        "As we know, fetch returns a promise. And JavaScript generally has no concept of “aborting” a promise. So how can we cancel an ongoing fetch ? E.g. if the user actions on our site indicate that the fetch isn’t needed any more.\nThere’s a special built-in object for such purposes: AbortController .\n1. The one that performs a cancelable operation, it sets a listener on controller.signal .\n2. The one that cancels: it calls controller.abort() when needed.\n  Here’s the full example (without fetch yet):\n  let controller = new AbortController();\n  let signal = controller.signal;\n// The event triggers and signal.aborted becomes true\nalert(signal.aborted); // true\nAs we can see, AbortController is just a mean to pass abort events when abort() is called on it.\nWe could implement the same kind of event listening in our code on our own, without the AbortController object.\nTo be able to cancel fetch , pass the signal property of an AbortController as a fetch option:\nlet controller = new AbortController();\nfetch(url, {\nsignal: controller.signal\n});\nThe fetch method knows how to work with AbortController . It will listen to abort events on signal .\nNow, to abort, call controller.abort() :\ncontroller.abort();\nWe’re done: fetch gets the event from signal and aborts the request.\nWhen a fetch is aborted, its promise rejects with an error AbortError , so we should handle it, e.g. in try..catch .\nHere’s the full example with fetch aborted after 1 second:\n// abort in 1 second\nlet controller = new AbortControll"
+      ]
+    },
+    {
+      "url": "http://10loc.dev/posts/abort-fetch-after-timeout",
+      "title": "AbortController to cancel a fetch cleanly after a timeout — 10LOC",
+      "publish_date": "2026-07-24",
+      "excerpts": [
+        "10LOC\nReact Node.js TypeScript Bun Web Platform Chrome APIs\nNode.js intermediate\nAbortController to cancel a fetch cleanly after a timeout\nPublished July 24, 2026\ncopy\nexport  const  fetchWithTimeout  =  async  ( url :  string ,  timeoutMs :  number )  =>  {   const  signal  =  AbortSignal. timeout (timeoutMs);   try  {     const  response  =  await  fetch (url, { signal });     return  await  response.\ntext ();   }  catch  (err) {     const  timedOut  =  err  instanceof  Error  &&  err.name  ===  \"TimeoutError\" ;     throw  timedOut  ? new  Error ( `Request to ${ url } timed out after ${ timeoutMs }ms` )  :  err;   } };\nWhat\nAbortSignal.timeout(ms) creates a signal that fires on its own after ms milliseconds, no setTimeout / clearTimeout bookkeeping required. Pass it to fetch 's signal option and the request aborts itself if it runs too long.\nWhy it matters\nIt also collapses every abort reason into the same generic AbortError , so a request you cancelled on purpose looks identical to one that timed out.\nAbortSignal.timeout() fixes both.\nNode creates and manages the timer internally, and when it fires, the resulting DOMException has name set to \"TimeoutError\" specifically — not the generic \"AbortError\" you'd get from calling controller.abort() yourself. That distinction is what lets you retry a timeout while still surfacing a manual cancellation immediately.\nHow it works\n* AbortSignal.timeout(timeoutMs) returns a signal already wired to fire after timeoutMs — no controller needed since "
+      ]
+    },
+    {
+      "url": "https://da.javascript.info/fetch-abort",
+      "title": "Fetch: Abort",
+      "publish_date": null,
+      "excerpts": [
+        "As we know, fetch returns a promise. And JavaScript generally has no concept of “aborting” a promise. So how can we cancel an ongoing fetch ? E.g. if the user actions on our site indicate that the fetch isn’t needed any more.\nThere’s a special built-in object for such purposes: AbortController .\nIt can be used to abort not only fetch , but other asynchronous tasks as well.\nThe usage is very straightforward:\nThe AbortController object\nCreate a controller:\nlet controller = new AbortController();\nA controller is an extremely simple object.\n1. The one that performs a cancelable operation, it sets a listener on controller.signal .\n2. The one that cancels: it calls controller.abort() when needed.\n  Here’s the full example (without fetch yet):\n  let controller = new AbortController();\n  let signal = controller.signal;\n// The event triggers and signal.aborted becomes true\nalert(signal.aborted); // true\nAs we can see, AbortController is just a mean to pass abort events when abort() is called on it.\nWe could implement the same kind of event listening in our code on our own, without the AbortController object.\nBut what’s valuable is that fetch knows how to work with the AbortController object. It’s integrated in it.\nTo be able to cancel fetch , pass the signal property of an AbortController as a fetch option:\nlet controller = new AbortController();\nfetch(url, {\nsignal: controller.signal\n});\nThe fetch method knows how to work with AbortController . It will listen to abort events on signal .\nNow, to"
+      ]
+    },
+    {
+      "url": "https://dev.to/saranshk/how-to-cancel-an-http-fetch-request-3p1h",
+      "title": "How to cancel an HTTP fetch request - DEV Community",
+      "publish_date": "2021-01-20",
+      "excerpts": [
+        "How to cancel an HTTP fetch request\njavascript # beginners # tutorial # webdev\nBut now there is a way to do so.\nA new controller known as AbortController has been added to the DOM Standard that allows us to use it as a signal to cancel an HTTP fetch request. It makes use of an AbortSignal property to do so.\njavascript # beginners # tutorial # webdev\nAnd it might so happen that one of these components gets unmounted before the fetch request is completed. This could be fairly common in slow network conditions or if the user jumps is jumping around pages.\njavascript # beginners # tutorial # webdev\nBecause the fetch request is asynchronous, it will keep executing in the background and this might lead to some bugs when it gets completed, if not handled properly.\nThe default fetch timeout is 300 seconds for Chrome and 90 seconds for Firefox.\njavascript # beginners # tutorial # webdev\nAbortController and AbortSignal\njavascript # beginners # tutorial # webdev\nThe AbortController and AbortSignal API are provided by the DOM standard , and have been kept generic so that they can be used by other web standards. To declare a controller:\nconst controller = new AbortController();\nand for the signal:\nconst signal = controller.signal;\njavascript # beginners # tutorial # webdev\nThe controller only has one abort method. And when that is invoked, the signal gets notified.\ncontroller.abort();\nsignal.addEventListener('abort', () => {\nconsole.log(signal.aborted); // true\n});\njavascript # beginners # tutorial "
+      ]
+    },
+    {
+      "url": "https://ko.javascript.info/fetch-abort",
+      "title": "Fetch: Abort",
+      "publish_date": null,
+      "excerpts": [
+        "As we know, fetch returns a promise. And JavaScript generally has no concept of “aborting” a promise. So how can we cancel an ongoing fetch ? E.g. if the user actions on our site indicate that the fetch isn’t needed any more.\nThere’s a special built-in object for such purposes: AbortController .\nIt can be used to abort not only fetch , but other asynchronous tasks as well.\nThe usage is very straightforward:\nThe AbortController object\nCreate a controller:\nlet controller = new AbortController();\nA controller is an extremely simple object.\n1. The one that performs an cancelable operation, it sets a listener on controller.signal .\n2. The one one that cancels: it calls controller.abort() when needed.\n  Here’s the full example (without fetch yet):\n  let controller = new AbortController();\n  let signal = controller.signal;\n// The party that performs a cancelable operation\n// gets \"signal\" object\n// and sets the listener to trigger when controller.abort() is called\nsignal.addEventListener('abort', () => alert(\"abort!\"));\n// The other party, that cancels (at any point later):\ncontroller.abort(); // abort!\n// The event triggers and signal.aborted becomes true\nalert(signal.aborted); // true\nAs we can see, AbortController is just a means to pass abort events when abort() is called on it.\nWe could implement same kind of event listening in our code on our own, without AbortController object at all.\nUsing with fetch\nTo become able to cancel fetch , pass the signal property of an AbortController as a f"
+      ]
+    }
+  ],
+  "warnings": null,
+  "metadata": null,
+  "session_id": "session_f3b89fc26437b64d8faf54464027a74a"
+}
