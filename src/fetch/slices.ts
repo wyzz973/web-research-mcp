@@ -4,8 +4,11 @@
  */
 import { throwIfAborted } from '../errors.ts'
 
-/** Longest stretch of work between two turns of the event loop. */
-const SLICE_MS = 8
+/**
+ * Longest stretch of work between two turns of the event loop. Short enough that even a slow
+ * machine serves other requests every few tens of milliseconds; a turn itself costs microseconds.
+ */
+const SLICE_MS = 4
 
 function nextTurn(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve))

@@ -1,7 +1,9 @@
 import type { OutlineEntry } from '../contract.ts'
 import { estimateTokens } from '../tokens.ts'
-import { splitBlocks, type Block } from './blocks.ts'
-import { buildOutline } from './outline.ts'
+import { throwIfAborted } from '../errors.ts'
+import { splitBlockSteps, type Block } from './blocks.ts'
+import { buildOutlineSteps } from './outline.ts'
+import { runSliced, runToEnd } from './slices.ts'
 
 /** Everything the readers need to know about one immutable snapshot. */
 export interface PageDocument {
@@ -15,11 +17,34 @@ export interface PageDocument {
   totalTokens: number
 }
 
-function tokenPrefix(markdown: string, blocks: Block[]): number[] {
+/** A tile larger than this is measured piece by piece, with a pause between pieces. */
+const MEASURE_CHARS = 1 << 16
+const BLOCKS_PER_STEP = 1024
+
+/** Estimated size of one tile. A page that is one enormous line must not be measured in one go. */
+function* measureTile(markdown: string, from: number, to: number): Generator<void, number> {
+  if (to - from <= MEASURE_CHARS) return estimateTokens(markdown.slice(from, to))
+  let tokens = 0
+  let at = from
+  while (at < to) {
+    let end = Math.min(to, at + MEASURE_CHARS)
+    // A piece never ends between the two halves of a surrogate pair.
+    const code = markdown.charCodeAt(end - 1)
+    if (code >= 0xd800 && code <= 0xdbff && end < to) end += 1
+    tokens += estimateTokens(markdown.slice(at, end))
+    at = end
+    yield
+  }
+  return tokens
+}
+
+function* tokenPrefix(markdown: string, blocks: Block[]): Generator<void, number[]> {
   const prefix = [0]
   let tileStart = 0
-  for (const block of blocks) {
-    prefix.push((prefix.at(-1) ?? 0) + estimateTokens(markdown.slice(tileStart, block.tileEnd)))
+  for (const [index, block] of blocks.entries()) {
+    if (index % BLOCKS_PER_STEP === BLOCKS_PER_STEP - 1) yield
+    const tokens = yield* measureTile(markdown, tileStart, block.tileEnd)
+    prefix.push((prefix.at(-1) ?? 0) + tokens)
     tileStart = block.tileEnd
   }
   return prefix
@@ -35,10 +60,11 @@ function outlineParents(outline: OutlineEntry[]): number[] {
   })
 }
 
-export function analyze(markdown: string): PageDocument {
-  const blocks = splitBlocks(markdown)
-  const prefix = tokenPrefix(markdown, blocks)
-  const outline = buildOutline(markdown, blocks, prefix)
+/** Blocks, sizes, and outline of a snapshot, in steps that a driver may pause between. */
+export function* analyzeSteps(markdown: string): Generator<void, PageDocument> {
+  const blocks = yield* splitBlockSteps(markdown)
+  const prefix = yield* tokenPrefix(markdown, blocks)
+  const outline = yield* buildOutlineSteps(markdown, blocks, prefix)
   return {
     markdown,
     blocks,
@@ -47,6 +73,11 @@ export function analyze(markdown: string): PageDocument {
     prefix,
     totalTokens: prefix.at(-1) ?? 0,
   }
+}
+
+/** For tests and small texts. Snapshots are analyzed through the cache, which can pause and cancel. */
+export function analyze(markdown: string): PageDocument {
+  return runToEnd(analyzeSteps(markdown))
 }
 
 /** Index of the last item whose `start` is at or before the offset, or -1. */
@@ -90,27 +121,61 @@ export function headingPath(document: PageDocument, offset: number): OutlineEntr
 const CACHE_ENTRIES = 8
 const CACHE_CHARS = 8_000_000
 
+export type DocumentCache = (
+  id: string,
+  markdown: string,
+  signal: AbortSignal,
+) => Promise<PageDocument>
+
+type Analyze = (markdown: string, signal: AbortSignal) => Promise<PageDocument>
+
 /**
- * Snapshots never change, so their analysis can be reused across calls. Bounded by count and by
+ * Snapshots never change, so their analysis is reused across calls. Bounded by count and by
  * size: a block list costs memory in proportion to the page, and pages can be megabytes.
+ * Callers that ask for the same snapshot at the same time share one analysis; if its owner is
+ * cancelled, the others start their own.
  */
-export function createDocumentCache(): (id: string, markdown: string) => PageDocument {
-  const cache = new Map<string, PageDocument>()
-  return (id, markdown) => {
-    const hit = cache.get(id)
-    if (hit) {
-      cache.delete(id)
-      cache.set(id, hit)
-      return hit
-    }
-    const document = analyze(markdown)
-    cache.set(id, document)
-    let chars = [...cache.values()].reduce((sum, entry) => sum + entry.markdown.length, 0)
-    for (const [oldest, entry] of cache) {
-      if (cache.size <= CACHE_ENTRIES && (chars <= CACHE_CHARS || cache.size === 1)) break
-      cache.delete(oldest)
+export function createDocumentCache(
+  analyzeSnapshot: Analyze = (markdown, signal) => runSliced(analyzeSteps(markdown), signal),
+): DocumentCache {
+  const ready = new Map<string, PageDocument>()
+  const pending = new Map<string, Promise<PageDocument>>()
+
+  function remember(id: string, document: PageDocument): void {
+    ready.set(id, document)
+    let chars = [...ready.values()].reduce((sum, entry) => sum + entry.markdown.length, 0)
+    for (const [oldest, entry] of ready) {
+      if (ready.size <= CACHE_ENTRIES && (chars <= CACHE_CHARS || ready.size === 1)) break
+      ready.delete(oldest)
       chars -= entry.markdown.length
     }
+  }
+
+  function recall(id: string): PageDocument | undefined {
+    const hit = ready.get(id)
+    if (!hit) return undefined
+    ready.delete(id)
+    ready.set(id, hit)
+    return hit
+  }
+
+  return async (id, markdown, signal) => {
+    for (;;) {
+      const known = recall(id)
+      if (known) return known
+      const shared = pending.get(id)
+      if (!shared) break
+      try {
+        return await shared
+      } catch {
+        // The analysis belonged to a caller that was cancelled; carry on with our own.
+        throwIfAborted(signal)
+      }
+    }
+    const task = analyzeSnapshot(markdown, signal).finally(() => pending.delete(id))
+    pending.set(id, task)
+    const document = await task
+    remember(id, document)
     return document
   }
 }

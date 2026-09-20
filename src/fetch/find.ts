@@ -5,7 +5,7 @@ import type { PageDocument } from './document.ts'
 import { throwIfAborted } from '../errors.ts'
 import { foldText, foldTextSliced, type Folded } from './visible.ts'
 
-export { foldText, foldTextSliced, type Folded } from './visible.ts'
+export { foldSteps, foldText, foldTextSliced, type Folded } from './visible.ts'
 
 export interface Match {
   start: number

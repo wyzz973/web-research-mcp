@@ -28,8 +28,14 @@ function opensFence(text: string): { char: string; size: number } | undefined {
   return { char, size: match[1].length }
 }
 
-/** Splits into lines with offsets and marks fenced code, so `#` inside code is never a heading. */
-export function scanLines(markdown: string): MarkdownLine[] {
+/** Lines scanned between two yields of `scanLineSteps`. */
+const LINES_PER_STEP = 4096
+
+/**
+ * Splits into lines with offsets and marks fenced code, so `#` inside code is never a heading.
+ * A generator, so that a caller on the main thread can pause between steps on megabytes of text.
+ */
+export function* scanLineSteps(markdown: string): Generator<void, MarkdownLine[]> {
   const lines: MarkdownLine[] = []
   let open: { char: string; size: number } | undefined
   let start = 0
@@ -46,8 +52,17 @@ export function scanLines(markdown: string): MarkdownLine[] {
     }
     if (next === -1) break
     start = next + 1
+    if (lines.length % LINES_PER_STEP === 0) yield
   }
   return lines
+}
+
+export function scanLines(markdown: string): MarkdownLine[] {
+  const steps = scanLineSteps(markdown)
+  for (;;) {
+    const step = steps.next()
+    if (step.done) return step.value
+  }
 }
 
 const INVISIBLE =

@@ -6,16 +6,17 @@ import { MAX_SHOWN_RANGES, type CursorState } from './cursor.ts'
 import type { PageDocument } from './document.ts'
 import { MAX_MATCHES, readMatches, type Folded } from './find.ts'
 import {
-  dropReposts,
-  keepRelevant,
-  rankPassagesSliced,
+  dropRepostSteps,
+  rankSteps,
+  relevantSteps,
   wholePagePassages,
   type Candidate,
 } from './goal.ts'
 import { fitOutline } from './outline.ts'
 import { makePart, readRange } from './range.ts'
 import { findSection, nearestSectionIds } from './section.ts'
-import { selectPassages, type PageSelection } from './select.ts'
+import { selectSteps, type PageSelection } from './select.ts'
+import { runSliced } from './slices.ts'
 
 export interface ReadablePage {
   n: number
@@ -201,8 +202,45 @@ export function readFind(
   })
 }
 
-function overlapsShown(candidate: Candidate, shown: [number, number][]): boolean {
-  return shown.some(([start, end]) => candidate.start < end && candidate.end > start)
+/** Ranges sorted by start and free of overlaps, so membership is one binary search. */
+function mergedRanges(shown: [number, number][]): [number, number][] {
+  const merged: [number, number][] = []
+  for (const [start, end] of shown.toSorted((left, right) => left[0] - right[0])) {
+    const last = merged.at(-1)
+    if (last && start <= last[1]) last[1] = Math.max(last[1], end)
+    else merged.push([start, end])
+  }
+  return merged
+}
+
+function overlapsShown(candidate: Candidate, merged: [number, number][]): boolean {
+  let low = 0
+  let high = merged.length - 1
+  while (low <= high) {
+    const middle = (low + high) >> 1
+    const range = merged[middle]
+    if (!range) return false
+    if (range[1] <= candidate.start) low = middle + 1
+    else if (range[0] >= candidate.end) high = middle - 1
+    else return true
+  }
+  return false
+}
+
+/** Items handled between two yields. */
+const ITEMS_PER_STEP = 4096
+
+function* withoutShown(
+  list: Candidate[],
+  merged: [number, number][],
+): Generator<void, Candidate[]> {
+  if (merged.length === 0) return list
+  const fresh: Candidate[] = []
+  for (const [index, candidate] of list.entries()) {
+    if (index % ITEMS_PER_STEP === ITEMS_PER_STEP - 1) yield
+    if (!overlapsShown(candidate, merged)) fresh.push(candidate)
+  }
+  return fresh
 }
 
 function goalCursor(
@@ -257,28 +295,29 @@ interface GoalCandidates {
  * Candidates per page, in page order. Pages shown whole contribute all their passages, so that a
  * repost of them on another page is recognized; they take no part in the ranking itself.
  */
-async function goalCandidates(
+function* goalCandidates(
   pages: ReadablePage[],
   whole: Set<ReadablePage>,
   options: GoalOptions,
-): Promise<GoalCandidates> {
-  const shown = options.shown ?? []
+): Generator<void, GoalCandidates> {
   const documents = pages.map((page) => page.document)
-  const isWhole = (index: number): boolean => memberAt(pages, whole, index)
-  const scored = await rankPassagesSliced(documents, options.goal, options.signal)
-  const ranked = scored.map((list, index) => (isWhole(index) ? [] : list))
+  const scored = yield* rankSteps(documents, options.goal)
+  const ranked = scored.map((list, index) => (memberAt(pages, whole, index) ? [] : list))
   // The floor is taken before removing what was already shown, so a cursor chain ends when
   // relevance runs out instead of sliding down to ever weaker passages.
-  const lists = keepRelevant(ranked).map((list, index) => {
+  const relevant = yield* relevantSteps(ranked)
+  const shown = mergedRanges(options.shown ?? [])
+  const lists: Candidate[][] = []
+  for (const [index, list] of relevant.entries()) {
     const document = documents[index]
-    if (document && isWhole(index)) return wholePagePassages(document, index)
-    return list.filter((candidate) => !overlapsShown(candidate, shown))
-  })
+    const isWhole = document !== undefined && memberAt(pages, whole, index)
+    // A single page has nobody to repeat, so its blocks need not be listed.
+    if (isWhole) lists.push(pages.length > 1 ? yield* wholePagePassages(document, index) : [])
+    else lists.push(yield* withoutShown(list, shown))
+  }
+  const numbers = pages.map((page) => page.n)
   return {
-    lists: dropReposts(
-      lists,
-      pages.map((page) => page.n),
-    ),
+    lists: pages.length > 1 ? yield* dropRepostSteps(documents, lists, numbers) : lists,
     matched: ranked.map((list) => list.length > 0),
   }
 }
@@ -339,17 +378,12 @@ function readSelected(
   return read
 }
 
-/**
- * Evidence mode. Pages that fit are returned whole; pages without any matching passage get the
- * default view; for the others the best passages are chosen under one shared budget, widened
- * with context when there is room, and listed in document order.
- */
-export async function readGoal(pages: ReadablePage[], options: GoalOptions): Promise<PageRead[]> {
+function* goalSteps(pages: ReadablePage[], options: GoalOptions): Generator<void, PageRead[]> {
   const firstCall = (options.shown ?? []).length === 0
   const granted = firstCall
     ? pagesShownWhole(pages, options.budget)
     : { whole: new Set<ReadablePage>(), room: options.budget }
-  const candidates = await goalCandidates(pages, granted.whole, options)
+  const candidates = yield* goalCandidates(pages, granted.whole, options)
   const unmatched = new Set(
     pages.filter(
       (page, index) => firstCall && !granted.whole.has(page) && !candidates.matched[index],
@@ -367,7 +401,7 @@ export async function readGoal(pages: ReadablePage[], options: GoalOptions): Pro
     single && !granted.whole.has(single) && !unmatched.has(single)
       ? reserveOutline(single.document.outline, fallback.room, options.maxTokens)
       : undefined
-  const selections = selectPassages(
+  const selections = yield* selectSteps(
     pages.map((page) => page.document),
     candidates.lists.map((list, index) =>
       memberAt(pages, granted.whole, index) || memberAt(pages, unmatched, index) ? [] : list,
@@ -385,25 +419,54 @@ export async function readGoal(pages: ReadablePage[], options: GoalOptions): Pro
 }
 
 /**
- * find had no match at all. The passages that share the most words with the text are shown in
- * its place, so the call is not a dead end; they carry no `match`, because they are not one.
+ * Evidence mode. Pages that fit are returned whole; pages without any matching passage get the
+ * default view; for the others the best passages are chosen under one shared budget, widened
+ * with context when there is room, and listed in document order. Ranking a page of megabytes
+ * takes a while, so the work pauses for the event loop and stops when the caller cancels.
  */
-export async function readClosest(
+export function readGoal(pages: ReadablePage[], options: GoalOptions): Promise<PageRead[]> {
+  return runSliced(goalSteps(pages, options), options.signal)
+}
+
+/** The `count` highest-scoring candidates, found in one pass. */
+function* bestFew(list: Candidate[], count: number): Generator<void, Candidate[]> {
+  let best: Candidate[] = []
+  for (const [index, candidate] of list.entries()) {
+    if (index % ITEMS_PER_STEP === ITEMS_PER_STEP - 1) yield
+    const weakest = best.at(-1)
+    if (best.length === count && weakest && candidate.score <= weakest.score) continue
+    best = [...best, candidate].sort((left, right) => right.score - left.score).slice(0, count)
+  }
+  return best
+}
+
+function* closestSteps(
   pages: ReadablePage[],
   needle: string,
   budget: Budget,
-  signal: AbortSignal,
-): Promise<PageRead[]> {
+): Generator<void, PageRead[]> {
   const documents = pages.map((page) => page.document)
-  const ranked = await rankPassagesSliced(documents, needle, signal)
-  const closest = keepRelevant(ranked).map((list) =>
-    list.toSorted((left, right) => right.score - left.score).slice(0, CLOSEST_PASSAGES),
-  )
-  const selections = selectPassages(documents, closest, budget, false)
+  const relevant = yield* relevantSteps(yield* rankSteps(documents, needle))
+  const closest: Candidate[][] = []
+  for (const list of relevant) closest.push(yield* bestFew(list, CLOSEST_PASSAGES))
+  const selections = yield* selectSteps(documents, closest, budget, false)
   return pages.map((_, index) => ({
     mode: 'find',
     parts: selections[index]?.parts ?? [],
     truncated: false,
     findTotal: 0,
   }))
+}
+
+/**
+ * find had no match at all. The passages that share the most words with the text are shown in
+ * its place, so the call is not a dead end; they carry no `match`, because they are not one.
+ */
+export function readClosest(
+  pages: ReadablePage[],
+  needle: string,
+  budget: Budget,
+  signal: AbortSignal,
+): Promise<PageRead[]> {
+  return runSliced(closestSteps(pages, needle, budget), signal)
 }

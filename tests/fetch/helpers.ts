@@ -162,3 +162,72 @@ export function manualHtml(chapters: number): string {
   }
   return `<!doctype html><html><head><title>Platform manual</title></head><body><article>${body.join('\n')}</article></body></html>`
 }
+
+/** How many turns the event loop got while `operation` ran. Independent of how fast the machine is. */
+export async function countTurns<T>(
+  operation: () => Promise<T>,
+): Promise<{ value: T; turns: number }> {
+  let turns = 0
+  let running = true
+  const tick = (): void => {
+    turns += 1
+    if (running) setImmediate(tick)
+  }
+  setImmediate(tick)
+  try {
+    return { value: await operation(), turns }
+  } finally {
+    running = false
+  }
+}
+
+/** Counts the steps taken from a generator, so that "how much work was done" needs no clock. */
+export function counting<T>(work: Generator<void, T>): {
+  work: Generator<void, T>
+  steps: () => number
+} {
+  let steps = 0
+  function* counted(): Generator<void, T> {
+    for (;;) {
+      const step = work.next()
+      steps += 1
+      if (step.done) return step.value
+      yield
+    }
+  }
+  return { work: counted(), steps: () => steps }
+}
+
+function fastest(run: () => void, runs = 3): number {
+  let best = Number.POSITIVE_INFINITY
+  for (let attempt = 0; attempt < runs; attempt += 1) {
+    const started = performance.now()
+    run()
+    best = Math.min(best, performance.now() - started)
+  }
+  return best
+}
+
+const MB = 1024 * 1024
+/** Below this the clock is mostly noise. */
+const MEASURABLE_MS = 5
+/** Only a fuse: far above any honest run, it catches a return to tens of seconds. */
+export const FUSE_MS = 30_000
+
+/**
+ * Cost of a fourfold larger input relative to the smaller one: about 4 when the work is linear,
+ * about 16 when it is quadratic. Undefined when even the larger size is too fast to time.
+ */
+export function growth(
+  make: (chars: number) => string,
+  run: (input: string) => void,
+): number | undefined {
+  for (const base of [MB, 2 * MB]) {
+    const small = make(base)
+    const large = make(4 * base)
+    const smallMs = fastest(() => run(small))
+    if (smallMs < MEASURABLE_MS) continue
+    return fastest(() => run(large)) / smallMs
+  }
+  return undefined
+}

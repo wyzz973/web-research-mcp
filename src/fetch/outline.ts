@@ -42,9 +42,13 @@ function ownNumber(title: string): { id: string; rest: string } | undefined {
  */
 export const MAX_HEADINGS = 20_000
 
-function readHeadings(markdown: string, blocks: Block[]): Heading[] {
+/** Blocks looked at between two yields. */
+const BLOCKS_PER_STEP = 4096
+
+function* readHeadings(markdown: string, blocks: Block[]): Generator<void, Heading[]> {
   const headings: Heading[] = []
   for (const [index, block] of blocks.entries()) {
+    if (index % BLOCKS_PER_STEP === BLOCKS_PER_STEP - 1) yield
     if (block.kind !== 'heading') continue
     if (headings.length === MAX_HEADINGS) break
     const match = ATX_HEADING.exec(markdown.slice(block.start, block.end))
@@ -105,9 +109,15 @@ function sectionEndBlock(headings: Heading[], index: number, blockCount: number)
  * One entry per heading. A section runs to the next heading of the same or a higher level, and
  * its size is the sum of per-block estimates so a long document is measured once, not per level.
  */
-export function buildOutline(markdown: string, blocks: Block[], prefix: number[]): OutlineEntry[] {
-  const headings = readHeadings(markdown, blocks)
+export function* buildOutlineSteps(
+  markdown: string,
+  blocks: Block[],
+  prefix: number[],
+): Generator<void, OutlineEntry[]> {
+  const headings = yield* readHeadings(markdown, blocks)
+  yield
   const labels = assignIds(headings)
+  yield
   return headings.map((heading, index) => {
     const endBlock = sectionEndBlock(headings, index, blocks.length)
     return {

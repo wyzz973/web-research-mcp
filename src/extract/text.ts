@@ -28,8 +28,11 @@ function decode(body: Uint8Array, contentType: string): string {
   }
 }
 
+/** A title is at the top. Looking further would mean scanning megabytes of lines for nothing. */
+const TITLE_SEARCH_CHARS = 1 << 16
+
 function firstHeading(markdown: string): string {
-  for (const line of scanLines(markdown)) {
+  for (const line of scanLines(markdown.slice(0, TITLE_SEARCH_CHARS))) {
     const match = line.code ? null : ATX_HEADING.exec(line.text)
     if (match?.[1] === '#') return match[2] ?? ''
   }

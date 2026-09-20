@@ -65,12 +65,16 @@ export function createReader(dependencies: ReaderDependencies): Reader {
   const shutdown = new AbortController()
   const active = new Set<Promise<FetchResult>>()
 
-  function toSource(target: ResolvedTarget, loaded: LoadedSnapshot): PageSource {
+  async function toSource(
+    target: ResolvedTarget,
+    loaded: LoadedSnapshot,
+    signal: AbortSignal,
+  ): Promise<PageSource> {
     const source: PageSource = {
       n: target.n,
       snapshot: loaded.snapshot,
       cache: loaded.cache,
-      document: analyze(loaded.snapshot.id, loaded.snapshot.markdown),
+      document: await analyze(loaded.snapshot.id, loaded.snapshot.markdown, signal),
     }
     if (target.ref !== undefined) source.ref = target.ref
     if (loaded.cacheAgeS !== undefined) source.cacheAgeS = loaded.cacheAgeS
@@ -89,12 +93,13 @@ export function createReader(dependencies: ReaderDependencies): Reader {
   ): Promise<Outcome> {
     if (target.kind === 'error')
       return { failed: failedPage(target.n, target.url, target.ref, target.error) }
-    if (target.kind === 'snapshot' && !fresh)
-      return { source: toSource(target, storedSnapshot(target)) }
     const url = target.kind === 'snapshot' ? target.snapshot.url : target.url
     try {
-      const loaded = await limited(signal, () => loader(url, fresh, signal))
-      return { source: toSource(target, loaded) }
+      const loaded =
+        target.kind === 'snapshot' && !fresh
+          ? storedSnapshot(target)
+          : await limited(signal, () => loader(url, fresh, signal))
+      return { source: await toSource(target, loaded, signal) }
     } catch (error) {
       return { failed: failedPage(target.n, url, target.ref, asWebError(error).toToolError()) }
     }
@@ -223,7 +228,7 @@ export function createReader(dependencies: ReaderDependencies): Reader {
         plan.notes,
       )
     const target: ResolvedTarget = { kind: 'snapshot', n: 1, ref: snapshot.id, snapshot }
-    const source = toSource(target, storedSnapshot(target))
+    const source = await toSource(target, storedSnapshot(target), signal)
     const read = await continueRead(source, state, plan.maxTokens, signal)
     const notes = [...describeReads([source.n], [read]), ...plan.notes]
     if (plan.targets.length > 0 || plan.find !== undefined || plan.section !== undefined)

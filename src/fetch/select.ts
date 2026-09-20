@@ -3,10 +3,16 @@ import { fits, minus, partCost, share, type Budget } from './budget.ts'
 import type { PageDocument } from './document.ts'
 import type { Candidate } from './goal.ts'
 import { clipEnd, makePart } from './range.ts'
+import { runToEnd } from './slices.ts'
+
+/** A candidate whose display cost has been measured; only the strongest few ever are. */
+interface Priced extends Candidate {
+  cost: Budget
+}
 
 /** A run of consecutive blocks chosen on one page: a ranked passage, possibly widened with context. */
 interface Span {
-  candidate: Candidate
+  candidate: Priced
   from: number
   to: number
   /** Where the shown text ends; differs from the last block's end only when that block was cut. */
@@ -44,7 +50,7 @@ function plus(left: Budget, right: Budget): Budget {
   return { tokens: left.tokens + right.tokens, chars: left.chars + right.chars }
 }
 
-function whole(candidate: Candidate): Span {
+function whole(candidate: Priced): Span {
   return {
     candidate,
     from: candidate.from,
@@ -55,7 +61,7 @@ function whole(candidate: Candidate): Span {
 }
 
 /** Best passage that fits the page's fair share; an oversized best passage is cut at a line instead. */
-function firstPick(document: PageDocument, ranked: Candidate[], room: Budget): Span | undefined {
+function firstPick(document: PageDocument, ranked: Priced[], room: Budget): Span | undefined {
   const fitting = ranked.find((candidate) => fits(room, candidate.cost))
   if (fitting) return whole(fitting)
   const best = ranked[0]
@@ -171,20 +177,19 @@ function toParts(document: PageDocument, spans: Span[]): PagePart[] {
 
 function pickFirst(
   documents: PageDocument[],
-  candidates: Candidate[][],
+  candidates: Priced[][],
   fair: Budget,
   ledger: Ledger,
 ): Span[][] {
   return documents.map((document, page) => {
-    const ranked = [...(candidates[page] ?? [])].sort(byScore)
-    const span = firstPick(document, ranked, smaller(fair, ledger.room))
+    const span = firstPick(document, candidates[page] ?? [], smaller(fair, ledger.room))
     if (!span) return []
     charge(ledger, page, spanCost(document, span))
     return [span]
   })
 }
 
-function fillByScore(candidates: Candidate[][], spans: Span[][], ledger: Ledger): void {
+function fillByScore(candidates: Priced[][], spans: Span[][], ledger: Ledger): void {
   const taken = new Set(spans.flat().map((span) => span.candidate))
   for (const candidate of candidates.flat().sort(byScore)) {
     if (ledger.room.tokens < MIN_USEFUL_TOKENS) break
@@ -194,22 +199,131 @@ function fillByScore(candidates: Candidate[][], spans: Span[][], ledger: Ledger)
   }
 }
 
+/** Items handled between two yields. */
+const ITEMS_PER_STEP = 4096
+/**
+ * No budget holds more passages than this: the largest response is 10,000 tokens and every
+ * passage costs at least its label. Only these are sorted, priced, and offered to the budget.
+ */
+const STRONGEST_OVERALL = 2000
+/** Each page's own best few, so its guaranteed first passage can be one that fits. */
+const STRONGEST_PER_PAGE = 32
+
+/** Keeps the `limit` best items seen so far; the root of the heap is the weakest of them. */
+class Strongest {
+  private readonly heap: Candidate[] = []
+  private readonly limit: number
+
+  constructor(limit: number) {
+    this.limit = limit
+  }
+
+  offer(candidate: Candidate): void {
+    const { heap } = this
+    if (heap.length < this.limit) {
+      heap.push(candidate)
+      this.siftUp(heap.length - 1)
+    } else if (heap[0] && byScore(candidate, heap[0]) < 0) {
+      heap[0] = candidate
+      this.siftDown(0)
+    }
+  }
+
+  values(): Candidate[] {
+    return this.heap
+  }
+
+  /** True when the item at `a` is weaker than the item at `b`. */
+  private weaker(a: number, b: number): boolean {
+    const left = this.heap[a]
+    const right = this.heap[b]
+    return left !== undefined && right !== undefined && byScore(left, right) > 0
+  }
+
+  private swap(a: number, b: number): void {
+    const { heap } = this
+    const held = heap[a]
+    const other = heap[b]
+    if (held === undefined || other === undefined) return
+    heap[a] = other
+    heap[b] = held
+  }
+
+  private siftUp(from: number): void {
+    let at = from
+    while (at > 0) {
+      const parent = (at - 1) >> 1
+      if (!this.weaker(at, parent)) return
+      this.swap(at, parent)
+      at = parent
+    }
+  }
+
+  private siftDown(from: number): void {
+    let at = from
+    for (;;) {
+      const left = 2 * at + 1
+      const right = left + 1
+      let weakest = at
+      if (left < this.heap.length && this.weaker(left, weakest)) weakest = left
+      if (right < this.heap.length && this.weaker(right, weakest)) weakest = right
+      if (weakest === at) return
+      this.swap(at, weakest)
+      at = weakest
+    }
+  }
+}
+
+/**
+ * A page can have a million relevant passages. Sorting and pricing them all would stall the
+ * process for nothing, so one linear pass keeps the strongest overall and per page, and only
+ * those go on: best first, with their display cost measured.
+ */
+function* strongestPriced(
+  documents: PageDocument[],
+  candidates: Candidate[][],
+): Generator<void, Priced[][]> {
+  const overall = new Strongest(STRONGEST_OVERALL)
+  const perPage = candidates.map(() => new Strongest(STRONGEST_PER_PAGE))
+  let seen = 0
+  for (const [page, list] of candidates.entries()) {
+    for (const candidate of list) {
+      overall.offer(candidate)
+      perPage[page]?.offer(candidate)
+      seen += 1
+      if (seen % ITEMS_PER_STEP === 0) yield
+    }
+  }
+  const strongest = new Set(overall.values())
+  return candidates.map((_, page) => {
+    const document = documents[page]
+    const kept = new Set(perPage[page]?.values() ?? [])
+    for (const candidate of strongest) if (candidate.page === page) kept.add(candidate)
+    return [...kept].sort(byScore).map((candidate) => ({
+      ...candidate,
+      cost: partCost(document?.markdown.slice(candidate.start, candidate.end) ?? ''),
+    }))
+  })
+}
+
 /**
  * One budget for all pages: every page with a relevant passage gets its best one first, then the
  * remaining room goes to the highest-scoring passages wherever they are, and what is still left
  * widens the passages of pages that received little.
  */
-export function selectPassages(
+export function* selectSteps(
   documents: PageDocument[],
   candidates: Candidate[][],
   budget: Budget,
   widen = true,
-): PageSelection[] {
+): Generator<void, PageSelection[]> {
+  const priced = yield* strongestPriced(documents, candidates)
   const ledger: Ledger = { room: budget, used: [] }
-  const contenders = candidates.filter((list) => list.length > 0).length
+  const contenders = priced.filter((list) => list.length > 0).length
   const fair = share(budget, contenders)
-  const spans = pickFirst(documents, candidates, fair, ledger)
-  fillByScore(candidates, spans, ledger)
+  const spans = pickFirst(documents, priced, fair, ledger)
+  fillByScore(priced, spans, ledger)
+  yield
   const target = {
     tokens: Math.floor(fair.tokens * CONTEXT_TARGET),
     chars: Math.floor(fair.chars * CONTEXT_TARGET),
@@ -218,13 +332,19 @@ export function selectPassages(
     documents.forEach((document, page) =>
       widenPage({ document, page, covered: new Set(), ledger, target }, spans[page] ?? []),
     )
-  return documents.map((document, page) => {
-    const chosen = new Set((spans[page] ?? []).map((span) => span.candidate))
-    return {
-      parts: toParts(document, spans[page] ?? []),
-      more:
-        (candidates[page] ?? []).some((candidate) => !chosen.has(candidate)) ||
-        (spans[page] ?? []).some((span) => span.clipped),
-    }
-  })
+  return documents.map((document, page) => ({
+    parts: toParts(document, spans[page] ?? []),
+    more:
+      (candidates[page]?.length ?? 0) > (spans[page]?.length ?? 0) ||
+      (spans[page] ?? []).some((span) => span.clipped),
+  }))
+}
+
+export function selectPassages(
+  documents: PageDocument[],
+  candidates: Candidate[][],
+  budget: Budget,
+  widen = true,
+): PageSelection[] {
+  return runToEnd(selectSteps(documents, candidates, budget, widen))
 }

@@ -88,6 +88,8 @@ function isPlainWide(code: number): boolean {
 }
 
 const WIDE_CACHE_LIMIT = 4096
+/** UTF-16 units turned into a string at a time; also the most arguments passed to one call. */
+const TEXT_CHUNK = 8192
 
 /** Openers further back than the longest construct can never pair, so the oldest are overwritten. */
 class BoundedStack {
@@ -202,10 +204,16 @@ class Output {
     this.lastWasSpace = true
   }
 
-  finish(): Folded {
+  /** Builds the string piece by piece: a few million units in one call would be a stall of its own. */
+  *finish(): Generator<void, Folded> {
     const chunks: string[] = []
-    for (let at = 0; at < this.length; at += 8192)
-      chunks.push(String.fromCharCode(...this.units.subarray(at, Math.min(this.length, at + 8192))))
+    for (let at = 0; at < this.length; at += TEXT_CHUNK) {
+      chunks.push(
+        String.fromCharCode(...this.units.subarray(at, Math.min(this.length, at + TEXT_CHUNK))),
+      )
+      if ((at / TEXT_CHUNK) % 16 === 15) yield
+    }
+    yield
     return {
       text: chunks.join(''),
       starts: this.starts.slice(0, this.length),
@@ -298,7 +306,7 @@ class Projection {
     return this.index >= this.source.length
   }
 
-  finish(): Folded {
+  finish(): Generator<void, Folded> {
     return this.output.finish()
   }
 
@@ -386,12 +394,12 @@ class Projection {
 }
 
 /** Both passes, yielding after every slice of characters. */
-function* foldSteps(source: string): Generator<void, Folded> {
+export function* foldSteps(source: string): Generator<void, Folded> {
   const pairing = new Pairing(source)
   while (!pairing.advance(SLICE_CHARS)) yield
   const projection = new Projection(source, pairing.partner)
   while (!projection.advance(SLICE_CHARS)) yield
-  return projection.finish()
+  return yield* projection.finish()
 }
 
 /** For short texts such as the quote being searched for. Snapshots use `foldTextSliced`. */

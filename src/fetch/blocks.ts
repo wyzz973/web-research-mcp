@@ -1,4 +1,5 @@
-import { ATX_HEADING, scanLines, type MarkdownLine } from '../extract/markdown.ts'
+import { ATX_HEADING, scanLineSteps, type MarkdownLine } from '../extract/markdown.ts'
+import { runToEnd } from './slices.ts'
 
 export type BlockKind = 'heading' | 'code' | 'table' | 'list' | 'paragraph'
 
@@ -21,6 +22,17 @@ const INDENTED = /^(?: {2,}|\t)/u
 const NESTED_FENCE = /^\s*(`{3,}|~{3,})/u
 /** Lists and list items longer than this are divided at item boundaries. */
 const LONG_LIST_CHARS = 600
+/** Items are divided this many levels deep; pages that nest deeper are not written by people. */
+const MAX_LIST_DEPTH = 8
+/** Lines handled between two yields. */
+const LINES_PER_STEP = 2048
+
+/** Everything the splitter asks about lines, with the look-ahead answered in constant time. */
+interface Lines {
+  all: MarkdownLine[]
+  /** nextContent[i] is the index of the first line at or after i that is not blank. */
+  nextContent: Int32Array
+}
 
 function isBlank(line: MarkdownLine | undefined): boolean {
   return line !== undefined && !line.code && line.text.trim() === ''
@@ -37,11 +49,24 @@ function kindOf(line: MarkdownLine): BlockKind {
   return LIST_ITEM.test(line.text) ? 'list' : 'paragraph'
 }
 
+/**
+ * One backward pass. Without it, every blank line of a long blank run would scan the rest of
+ * the run to learn whether its list goes on, which is quadratic in the length of the run.
+ */
+function* indexLines(all: MarkdownLine[]): Generator<void, Lines> {
+  const nextContent = new Int32Array(all.length + 1)
+  nextContent[all.length] = all.length
+  for (let index = all.length - 1; index >= 0; index -= 1) {
+    nextContent[index] = isBlank(all[index]) ? (nextContent[index + 1] ?? all.length) : index
+    if (index % LINES_PER_STEP === 0) yield
+  }
+  return { all, nextContent }
+}
+
 /** A blank line ends a list only when what follows is neither another item nor indented content. */
-function listContinues(lines: MarkdownLine[], index: number): boolean {
-  let next = index
-  while (isBlank(lines[next])) next += 1
-  const line = lines[next]
+function listContinues(lines: Lines, index: number): boolean {
+  const next = lines.nextContent[index] ?? lines.all.length
+  const line = lines.all[next]
   if (!line || isHeading(line)) return false
   if (next === index) return true
   return line.code
@@ -49,8 +74,8 @@ function listContinues(lines: MarkdownLine[], index: number): boolean {
     : LIST_ITEM.test(line.text) || INDENTED.test(line.text)
 }
 
-function continues(kind: BlockKind, lines: MarkdownLine[], index: number): boolean {
-  const line = lines[index]
+function continues(kind: BlockKind, lines: Lines, index: number): boolean {
+  const line = lines.all[index]
   if (!line) return false
   if (kind === 'code') return line.code
   if (kind === 'list') return listContinues(lines, index)
@@ -80,19 +105,20 @@ function indentOf(line: MarkdownLine): number {
 
 /**
  * Line indexes in (from, to) where a list item starts with an indentation in (above, upTo].
- * Fences nested in an item are indented too far for `scanLines` to see them, so they are
+ * Fences nested in an item are indented too far for the line scanner to see them, so they are
  * tracked here: a "- name: x" line inside nested YAML is code, not an item.
  */
-function itemStarts(
+function* itemStarts(
   lines: MarkdownLine[],
   from: number,
   to: number,
   above: number,
   upTo: number,
-): number[] {
+): Generator<void, number[]> {
   const starts: number[] = []
   let fence: string | undefined
   for (let index = from + 1; index < to; index += 1) {
+    if (index % LINES_PER_STEP === 0) yield
     const line = lines[index]
     if (!line || line.code) continue
     const marker = NESTED_FENCE.exec(line.text)?.[1]
@@ -107,29 +133,35 @@ function itemStarts(
   return starts
 }
 
+type Range = [from: number, to: number]
+
 /** An oversized item becomes its own lead lines plus one piece per nested item, recursively. */
-function itemRanges(
+function* itemRanges(
   lines: MarkdownLine[],
-  from: number,
-  to: number,
+  range: Range,
   indent: number,
-): [number, number][] {
-  if (spanChars(lines, from, to) <= LONG_LIST_CHARS) return [[from, to]]
-  const nested = itemStarts(lines, from, to, indent, Number.POSITIVE_INFINITY)
-  if (nested.length === 0) return [[from, to]]
-  const childIndent = Math.min(
-    ...nested.flatMap((index) => {
-      const line = lines[index]
-      return line ? [indentOf(line)] : []
-    }),
-  )
-  const children = itemStarts(lines, from, to, indent, childIndent)
-  return [
-    [from, children[0] ?? to],
-    ...children.flatMap((start, position) =>
-      itemRanges(lines, start, children[position + 1] ?? to, childIndent),
-    ),
-  ]
+  depth: number,
+): Generator<void, Range[]> {
+  const [from, to] = range
+  if (depth >= MAX_LIST_DEPTH || spanChars(lines, from, to) <= LONG_LIST_CHARS) return [range]
+  const nested = yield* itemStarts(lines, from, to, indent, Number.POSITIVE_INFINITY)
+  if (nested.length === 0) return [range]
+  let childIndent = Number.POSITIVE_INFINITY
+  for (const index of nested) {
+    const line = lines[index]
+    if (line) childIndent = Math.min(childIndent, indentOf(line))
+  }
+  const children = nested.filter((index) => {
+    const line = lines[index]
+    return line !== undefined && indentOf(line) <= childIndent
+  })
+  const ranges: Range[] = [[from, children[0] ?? to]]
+  for (const [position, start] of children.entries()) {
+    if (position % LINES_PER_STEP === LINES_PER_STEP - 1) yield
+    const child: Range = [start, children[position + 1] ?? to]
+    ranges.push(...(yield* itemRanges(lines, child, childIndent, depth + 1)))
+  }
+  return ranges
 }
 
 /**
@@ -137,23 +169,27 @@ function itemRanges(
  * block of thousands of characters that no budget can place and no ranking can see into, so it
  * is divided at item boundaries: each item keeps its continuation lines, nested items, and code.
  */
-function listRanges(lines: MarkdownLine[], from: number, to: number): [number, number][] {
+function* listRanges(lines: MarkdownLine[], from: number, to: number): Generator<void, Range[]> {
   const first = lines[from]
   if (!first || spanChars(lines, from, to) <= LONG_LIST_CHARS) return [[from, to]]
   const indent = indentOf(first)
-  const starts = [from, ...itemStarts(lines, from, to, -1, indent)]
-  return starts.flatMap((start, position) =>
-    itemRanges(lines, start, starts[position + 1] ?? to, indent),
-  )
+  const starts = [from, ...(yield* itemStarts(lines, from, to, -1, indent))]
+  const ranges: Range[] = []
+  for (const [position, start] of starts.entries()) {
+    if (position % LINES_PER_STEP === LINES_PER_STEP - 1) yield
+    const item: Range = [start, starts[position + 1] ?? to]
+    ranges.push(...(yield* itemRanges(lines, item, indent, 1)))
+  }
+  return ranges
 }
 
 function toBlock(
   markdown: string,
   lines: MarkdownLine[],
   kind: BlockKind,
-  from: number,
-  to: number,
+  range: Range,
 ): Block | undefined {
+  const [from, to] = range
   const first = lines[from]
   if (!first) return undefined
   const last = lastContentLine(lines, from, to) ?? first
@@ -162,30 +198,51 @@ function toBlock(
   return block
 }
 
+/** Index just past the last line of the block that starts at `index`. */
+function* blockEnd(lines: Lines, kind: BlockKind, index: number): Generator<void, number> {
+  let next = index + 1
+  if (kind === 'heading') return next
+  while (continues(kind, lines, next)) {
+    next += 1
+    if (next % LINES_PER_STEP === 0) yield
+  }
+  return next
+}
+
+function* linkTiles(blocks: Block[], length: number): Generator<void, void> {
+  for (const [position, block] of blocks.entries()) {
+    block.tileEnd = blocks[position + 1]?.start ?? length
+    if (position % LINES_PER_STEP === 0) yield
+  }
+}
+
 /** Fenced code, tables, and short lists stay whole; everything else splits at blank lines. */
-export function splitBlocks(markdown: string): Block[] {
-  const lines = scanLines(markdown)
+export function* splitBlockSteps(markdown: string): Generator<void, Block[]> {
+  const lines = yield* indexLines(yield* scanLineSteps(markdown))
   const blocks: Block[] = []
   let index = 0
-  while (index < lines.length) {
-    const first = lines[index]
+  for (let turn = 1; index < lines.all.length; turn += 1) {
+    if (turn % LINES_PER_STEP === 0) yield
+    const first = lines.all[index]
     if (!first || isBlank(first)) {
-      index += 1
+      index = Math.max(index + 1, lines.nextContent[index] ?? index + 1)
       continue
     }
     const kind = kindOf(first)
-    let next = index + 1
-    if (kind !== 'heading') while (continues(kind, lines, next)) next += 1
-    const ranges: [number, number][] =
-      kind === 'list' ? listRanges(lines, index, next) : [[index, next]]
-    for (const [from, to] of ranges) {
-      const block = toBlock(markdown, lines, kind, from, to)
+    const next = yield* blockEnd(lines, kind, index)
+    const ranges: Range[] =
+      kind === 'list' ? yield* listRanges(lines.all, index, next) : [[index, next]]
+    for (const [position, range] of ranges.entries()) {
+      if (position % LINES_PER_STEP === LINES_PER_STEP - 1) yield
+      const block = toBlock(markdown, lines.all, kind, range)
       if (block) blocks.push(block)
     }
     index = next
   }
-  blocks.forEach((block, position) => {
-    block.tileEnd = blocks[position + 1]?.start ?? markdown.length
-  })
+  yield* linkTiles(blocks, markdown.length)
   return blocks
+}
+
+export function splitBlocks(markdown: string): Block[] {
+  return runToEnd(splitBlockSteps(markdown))
 }

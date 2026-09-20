@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { analyze } from '../../src/fetch/document.ts'
+import { runSliced } from '../../src/fetch/slices.ts'
+import { counting, countTurns, FUSE_MS, growth } from './helpers.ts'
 import {
   createFoldCache,
   findMatches,
+  foldSteps,
   foldText,
   foldTextSliced,
   MAX_FOLD_CHARS,
@@ -239,21 +242,21 @@ describe('fold cache', () => {
 })
 
 describe('hostile input', () => {
-  const MB4 = 4 * 1024 * 1024
-  // Measured on the development machine: 40 to 130 ms each. The old scanner took 1 to 7.6 s.
-  const LIMIT_MS = 600
+  // Shapes that made the first scanner quadratic: it looked ahead from every bracket.
+  const shapes: [string, (chars: number) => string][] = [
+    ['only opening brackets', (chars) => '['.repeat(chars)],
+    ['only "]("', (chars) => ']('.repeat(chars / 2)],
+    ['alternating nesting', (chars) => '[('.repeat(chars / 2)],
+    ['link openers without an end', (chars) => '[a]('.repeat(chars / 4)],
+    ['rules and bullets on every line', (chars) => '---\n- \n'.repeat(chars / 7)],
+  ]
 
-  it.each([
-    ['only opening brackets', '['.repeat(MB4)],
-    ['only "]("', ']('.repeat(MB4 / 2)],
-    ['alternating nesting', '[('.repeat(MB4 / 2)],
-    ['link openers without an end', '[a]('.repeat(MB4 / 4)],
-    ['rules and bullets on every line', '---\n- \n'.repeat(MB4 / 7)],
-  ])('folds 4 MB of %s in linear time', (_name, input) => {
+  it.each(shapes)('folds %s in linear time', (_name, make) => {
     const started = performance.now()
-    const folded = foldText(input)
-    expect(performance.now() - started).toBeLessThan(LIMIT_MS)
-    expect(folded.starts.length).toBe(folded.text.length)
+    const ratio = growth(make, (input) => void foldText(input))
+    expect(performance.now() - started).toBeLessThan(FUSE_MS)
+    // Four times the input: about 4 when linear, about 16 when quadratic.
+    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(8)
   })
 
   it('gives the same result in slices as in one go', async () => {
@@ -265,23 +268,27 @@ describe('hostile input', () => {
     expect(sliced.ends).toEqual(whole.ends)
   })
 
-  it('lets the event loop run while folding, and stops when cancelled', async () => {
-    const input = '[a]('.repeat((4 * MB4) / 4)
-    let turns = 0
-    const timer = setInterval(() => (turns += 1), 1)
-    const fullStarted = performance.now()
-    await foldTextSliced(input, new AbortController().signal)
-    const full = performance.now() - fullStarted
-    clearInterval(timer)
-    expect(turns).toBeGreaterThan(5)
+  it('lets the event loop run while it folds', async () => {
+    const input = '[a]('.repeat(1024 * 1024)
+    const { value, turns } = await countTurns(() =>
+      foldTextSliced(input, new AbortController().signal),
+    )
+    expect(value.text.length).toBe(input.length)
+    expect(turns).toBeGreaterThanOrEqual(10)
+  })
 
+  it('stops early when cancelled: far fewer steps than a complete run', async () => {
+    const input = '[a]('.repeat(1024 * 1024)
+    const complete = counting(foldSteps(input))
+    await runSliced(complete.work, new AbortController().signal)
+    const cancelled = counting(foldSteps(input))
     const abort = new AbortController()
     setImmediate(() => abort.abort())
-    const cancelStarted = performance.now()
-    await expect(foldTextSliced(input, abort.signal)).rejects.toMatchObject({ code: 'cancelled' })
-    const cancelled = performance.now() - cancelStarted
-    expect(cancelled).toBeLessThan(100)
-    expect(cancelled).toBeLessThan(full / 3)
+    await expect(runSliced(cancelled.work, abort.signal)).rejects.toMatchObject({
+      code: 'cancelled',
+    })
+    expect(complete.steps()).toBeGreaterThan(40)
+    expect(cancelled.steps()).toBeLessThan(complete.steps() / 4)
   })
 
   it('stops counting a text that occurs absurdly often', () => {
