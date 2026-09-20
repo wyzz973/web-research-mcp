@@ -201,6 +201,7 @@ export function selectPassages(
   documents: PageDocument[],
   candidates: Candidate[][],
   budget: Budget,
+  widen = true,
 ): PageSelection[] {
   const ledger: Ledger = { room: budget, used: [] }
   const contenders = candidates.filter((list) => list.length > 0).length
@@ -211,9 +212,10 @@ export function selectPassages(
     tokens: Math.floor(fair.tokens * CONTEXT_TARGET),
     chars: Math.floor(fair.chars * CONTEXT_TARGET),
   }
-  documents.forEach((document, page) =>
-    widenPage({ document, page, covered: new Set(), ledger, target }, spans[page] ?? []),
-  )
+  if (widen)
+    documents.forEach((document, page) =>
+      widenPage({ document, page, covered: new Set(), ledger, target }, spans[page] ?? []),
+    )
   return documents.map((document, page) => {
     const chosen = new Set((spans[page] ?? []).map((span) => span.candidate))
     return {

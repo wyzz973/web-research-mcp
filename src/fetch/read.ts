@@ -15,7 +15,7 @@ import {
 import { fitOutline } from './outline.ts'
 import { makePart, readRange } from './range.ts'
 import { findSection, nearestSectionIds } from './section.ts'
-import { selectPassages } from './select.ts'
+import { selectPassages, type PageSelection } from './select.ts'
 
 export interface ReadablePage {
   n: number
@@ -32,11 +32,15 @@ export interface PageRead {
   outline?: OutlineEntry[]
   /** Outline entries that did not fit even after dropping every deeper level. */
   outlineDropped?: number
-  /** Goal mode found nothing relevant on this page. */
+  /** Goal mode: no passage matched the goal terms, so the beginning of the page is shown instead. */
   nothingRelevant?: boolean
+  /** Goal mode: every relevant passage of this page was already shown from another page. */
+  onlyReposts?: boolean
   error?: ToolError
 }
 
+/** How many look-alike passages stand in for a find that matched nothing. */
+const CLOSEST_PASSAGES = 3
 /** Share of `max_tokens` an outline may use before it starts losing levels. */
 const OUTLINE_SHARE = 0.15
 
@@ -234,6 +238,12 @@ export interface GoalOptions {
   shown?: [number, number][]
 }
 
+interface GoalCandidates {
+  lists: Candidate[][]
+  /** Pages on which at least one passage matched the goal, before reposts were removed. */
+  matched: boolean[]
+}
+
 /**
  * Candidates per page, in page order. Pages shown whole contribute all their passages, so that a
  * repost of them on another page is recognized; they take no part in the ranking itself.
@@ -242,10 +252,10 @@ function goalCandidates(
   pages: ReadablePage[],
   whole: Set<ReadablePage>,
   options: GoalOptions,
-): Candidate[][] {
+): GoalCandidates {
   const shown = options.shown ?? []
   const documents = pages.map((page) => page.document)
-  const isWhole = (index: number): boolean => isShownWhole(pages, whole, index)
+  const isWhole = (index: number): boolean => memberAt(pages, whole, index)
   const ranked = rankPassages(documents, options.goal).map((list, index) =>
     isWhole(index) ? [] : list,
   )
@@ -256,15 +266,18 @@ function goalCandidates(
     if (document && isWhole(index)) return wholePagePassages(document, index)
     return list.filter((candidate) => !overlapsShown(candidate, shown))
   })
-  return dropReposts(
-    lists,
-    pages.map((page) => page.n),
-  )
+  return {
+    lists: dropReposts(
+      lists,
+      pages.map((page) => page.n),
+    ),
+    matched: ranked.map((list) => list.length > 0),
+  }
 }
 
-function isShownWhole(pages: ReadablePage[], whole: Set<ReadablePage>, index: number): boolean {
+function memberAt(pages: ReadablePage[], set: Set<ReadablePage>, index: number): boolean {
   const page = pages[index]
-  return page !== undefined && whole.has(page)
+  return page !== undefined && set.has(page)
 }
 
 function readWhole(page: ReadablePage, passages: Candidate[]): PageRead {
@@ -276,37 +289,107 @@ function readWhole(page: ReadablePage, passages: Candidate[]): PageRead {
 }
 
 /**
- * Evidence mode. Pages that fit are returned whole; for the others the best passages are chosen
- * under one shared budget, widened with context when there is room, and listed in document order.
+ * Words are matched literally, so a page about "abort" has no passage for a goal that says
+ * "cancel". Such a page is still worth reading: it gets the default view, its beginning and its
+ * outline, within its fair share of what is left.
+ */
+function readUnmatched(
+  pages: ReadablePage[],
+  unmatched: Set<ReadablePage>,
+  room: Budget,
+  pending: number,
+  maxTokens: number,
+): { reads: Map<ReadablePage, PageRead>; room: Budget } {
+  const reads = new Map<ReadablePage, PageRead>()
+  const fair = share(room, pending)
+  let left = room
+  for (const page of pages) {
+    if (!unmatched.has(page)) continue
+    const read = readLead(page, fair, pages.length === 1 ? maxTokens : fair.tokens)
+    read.nothingRelevant = true
+    reads.set(page, read)
+    left = minus(left, fair)
+  }
+  return { reads, room: left }
+}
+
+function readSelected(
+  page: ReadablePage,
+  selection: PageSelection,
+  options: GoalOptions,
+  matched: boolean,
+): PageRead {
+  const shown = options.shown ?? []
+  const read: PageRead = { mode: 'goal', parts: selection.parts, truncated: true }
+  if (selection.parts.length === 0 && shown.length === 0 && matched) read.onlyReposts = true
+  const delivered: [number, number][] = [
+    ...shown,
+    ...selection.parts.map((part): [number, number] => [part.start, part.end]),
+  ]
+  const cursor = selection.more ? goalCursor(page, options.goal, delivered) : undefined
+  if (cursor) read.cursor = cursor
+  return read
+}
+
+/**
+ * Evidence mode. Pages that fit are returned whole; pages without any matching passage get the
+ * default view; for the others the best passages are chosen under one shared budget, widened
+ * with context when there is room, and listed in document order.
  */
 export function readGoal(pages: ReadablePage[], options: GoalOptions): PageRead[] {
-  const shown = options.shown ?? []
-  const granted =
-    shown.length === 0
-      ? pagesShownWhole(pages, options.budget)
-      : { whole: new Set<ReadablePage>(), room: options.budget }
+  const firstCall = (options.shown ?? []).length === 0
+  const granted = firstCall
+    ? pagesShownWhole(pages, options.budget)
+    : { whole: new Set<ReadablePage>(), room: options.budget }
   const candidates = goalCandidates(pages, granted.whole, options)
+  const unmatched = new Set(
+    pages.filter(
+      (page, index) => firstCall && !granted.whole.has(page) && !candidates.matched[index],
+    ),
+  )
+  const fallback = readUnmatched(
+    pages,
+    unmatched,
+    granted.room,
+    pages.length - granted.whole.size,
+    options.maxTokens,
+  )
   const single = pages.length === 1 ? pages[0] : undefined
   const outlined =
-    single && !granted.whole.has(single)
-      ? reserveOutline(single.document.outline, granted.room, options.maxTokens)
+    single && !granted.whole.has(single) && !unmatched.has(single)
+      ? reserveOutline(single.document.outline, fallback.room, options.maxTokens)
       : undefined
   const selections = selectPassages(
     pages.map((page) => page.document),
-    candidates.map((list, index) => (isShownWhole(pages, granted.whole, index) ? [] : list)),
-    outlined?.room ?? granted.room,
+    candidates.lists.map((list, index) =>
+      memberAt(pages, granted.whole, index) || memberAt(pages, unmatched, index) ? [] : list,
+    ),
+    outlined?.room ?? fallback.room,
   )
   return pages.map((page, index) => {
-    if (granted.whole.has(page)) return readWhole(page, candidates[index] ?? [])
+    if (granted.whole.has(page)) return readWhole(page, candidates.lists[index] ?? [])
+    const unmatchedRead = fallback.reads.get(page)
+    if (unmatchedRead) return unmatchedRead
     const selection = selections[index] ?? { parts: [], more: false }
-    const read: PageRead = { mode: 'goal', parts: selection.parts, truncated: true }
-    if (selection.parts.length === 0 && shown.length === 0) read.nothingRelevant = true
-    const delivered: [number, number][] = [
-      ...shown,
-      ...selection.parts.map((part): [number, number] => [part.start, part.end]),
-    ]
-    const cursor = selection.more ? goalCursor(page, options.goal, delivered) : undefined
-    if (cursor) read.cursor = cursor
+    const read = readSelected(page, selection, options, candidates.matched[index] ?? false)
     return outlined ? attachOutline(read, outlined) : read
   })
+}
+
+/**
+ * find had no match at all. The passages that share the most words with the text are shown in
+ * its place, so the call is not a dead end; they carry no `match`, because they are not one.
+ */
+export function readClosest(pages: ReadablePage[], needle: string, budget: Budget): PageRead[] {
+  const documents = pages.map((page) => page.document)
+  const closest = keepRelevant(rankPassages(documents, needle)).map((list) =>
+    list.toSorted((left, right) => right.score - left.score).slice(0, CLOSEST_PASSAGES),
+  )
+  const selections = selectPassages(documents, closest, budget, false)
+  return pages.map((_, index) => ({
+    mode: 'find',
+    parts: selections[index]?.parts ?? [],
+    truncated: false,
+    findTotal: 0,
+  }))
 }

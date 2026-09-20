@@ -2,6 +2,9 @@ import type { PagePart } from '../contract.ts'
 import { fits, minus, partCost, type Budget } from './budget.ts'
 import { makePart } from './range.ts'
 import type { PageDocument } from './document.ts'
+import { foldText, type Folded } from './visible.ts'
+
+export { foldText, type Folded } from './visible.ts'
 
 export interface Match {
   start: number
@@ -13,52 +16,6 @@ const CONTEXT_CHARS = 200
 const SNAP_CHARS = 30
 /** Merged contexts stop growing here so one dense paragraph cannot eat the whole budget. */
 const MAX_GROUP_CHARS = 1200
-const DOUBLE_QUOTES = /[\u201C\u201D\u201E\u201F\u00AB\u00BB\u300C\u300D\u300E\u300F\uFF02]/u
-const SINGLE_QUOTES = /[\u2018\u2019\u201A\u201B\u2032\uFF07`]/u
-const DASHES = /[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/u
-const ASCII_PUNCTUATION = /[!-/:-@[-`{-~]/u
-
-/** Case, whitespace runs, quote and dash styles, and Markdown emphasis or escapes do not count. */
-function fold(char: string, next: string | undefined): string {
-  if (char === '\\' && next !== undefined && ASCII_PUNCTUATION.test(next)) return ''
-  if (char === '*') return ''
-  if (/\s/u.test(char)) return ' '
-  if (DOUBLE_QUOTES.test(char)) return '"'
-  if (SINGLE_QUOTES.test(char)) return "'"
-  if (DASHES.test(char)) return '-'
-  return char.charCodeAt(0) < 128 ? char.toLowerCase() : char.normalize('NFKC').toLowerCase()
-}
-
-export interface Folded {
-  text: string
-  /** For each folded UTF-16 unit, the source span it came from. */
-  starts: Int32Array
-  ends: Int32Array
-}
-
-/** Walks code points but records UTF-16 offsets, the unit every snapshot offset is expressed in. */
-export function foldText(source: string): Folded {
-  const pieces: string[] = []
-  const starts: number[] = []
-  const ends: number[] = []
-  let offset = 0
-  let lastWasSpace = true
-  for (const char of source) {
-    const folded = fold(char, source[offset + char.length])
-    const skip = folded === '' || (folded === ' ' && lastWasSpace)
-    if (!skip) {
-      pieces.push(folded)
-      for (let unit = 0; unit < folded.length; unit += 1) {
-        starts.push(offset)
-        ends.push(offset + char.length)
-      }
-      lastWasSpace = folded === ' '
-    }
-    offset += char.length
-  }
-  return { text: pieces.join(''), starts: Int32Array.from(starts), ends: Int32Array.from(ends) }
-}
-
 export type FoldCache = (snapshotId: string, markdown: string) => Folded
 
 /** Folding a long document costs tens of milliseconds; snapshots never change, so keep a few. */
@@ -100,7 +57,11 @@ function normalizedMatches(markdown: string, needle: string, folded: Folded): Ma
   }))
 }
 
-/** Verbatim occurrences first; folded occurrences are added where no verbatim one already covers them. */
+/**
+ * Verbatim occurrences of the Markdown first; then occurrences in the visible text, which ignore
+ * links, escapes, emphasis, layout markers, case, and spacing. A visible match runs from its first
+ * to its last matched character, markup in between included.
+ */
 export function findMatches(markdown: string, needle: string, folded?: Folded): Match[] {
   if (needle.trim() === '') return []
   const exact: Match[] = allIndexes(markdown, needle).map((start) => ({

@@ -2,8 +2,15 @@
  * Excerpt selection: the most query-relevant run of consecutive sentences that fits a budget.
  * Text is never rewritten. The only characters we add are "…" where source text was left out and
  * a closing code fence when a cut would otherwise leave one open.
+ *
+ * Two kinds of text are left out on purpose, because they spend tokens without helping anyone
+ * decide whether to open the page:
+ *  - low-information lines (see low-information.ts) score nothing and are trimmed from both ends
+ *    of an excerpt; between two kept sentences they stay, so the text remains contiguous;
+ *  - a prose sentence that already occurs earlier in the same excerpt is shown once.
  */
 import { charsWithinTokens, estimateTokens } from '../tokens.ts'
+import { contentWeight, isLowInformation } from './low-information.ts'
 import type { Term } from './terms.ts'
 
 export interface ExcerptLimit {
@@ -19,19 +26,33 @@ const GAP_CHARS = PASSAGE_GAP.length
 /** Room kept for the "…" markers and a closing fence. */
 const MARKER_TOKENS = 6
 const MARKER_CHARS = 12
+/** A repeat must be a real sentence: long enough that saying it twice is no coincidence. */
+const MIN_SENTENCE_WEIGHT = 16
+const MIN_SENTENCE_WORDS = 4
+/** Chinese and Japanese sentences have no spaces to count words by. */
+const MIN_UNSPACED_WEIGHT = 40
+/** How far past a sentence we look to see what follows it. */
+const LOOKAHEAD_CHARS = 16
 
 const FENCE_LINE = /^\s*```/u
 const SENTENCE_END = /(?:[.!?]+["'”’)\]]*(?=\s)|[。！？；]+[”’」』）]*)\s*|\n+/gu
+const SENTENCE_FINAL = /[.!?。！？]["'”’)\]」』）]*$/u
+const STATEMENT_PUNCTUATION = /[{};=]/u
 
 /** A sentence, a line, or a whole fenced code block: the smallest piece we keep or drop. */
 interface Unit {
+  /** Position among all units of the result, across passages. */
+  index: number
   passage: number
   start: number
   end: number
   tokens: number
   chars: number
-  /** Indexes into the term list. */
+  /** Indexes into the term list. Always empty for a low-information unit. */
   terms: number[]
+  lowInformation: boolean
+  /** Set for prose sentences: the text by which a repeat is recognized. */
+  sentence: string | undefined
   opensPassage: boolean
   closesPassage: boolean
 }
@@ -43,7 +64,11 @@ interface Window {
   cut: boolean
 }
 
-type Span = [start: number, end: number]
+interface Span {
+  start: number
+  end: number
+  fenced: boolean
+}
 
 function fencedBlocks(text: string): Span[] {
   const blocks: Span[] = []
@@ -54,14 +79,14 @@ function fencedBlocks(text: string): Span[] {
     if (FENCE_LINE.test(line)) {
       if (open === undefined) open = offset
       else {
-        blocks.push([open, lineEnd])
+        blocks.push({ start: open, end: lineEnd, fenced: true })
         open = undefined
       }
     }
     offset = lineEnd
   }
   // A fence the source already cut open runs to the end of the passage.
-  if (open !== undefined) blocks.push([open, text.length])
+  if (open !== undefined) blocks.push({ start: open, end: text.length, fenced: true })
   return blocks
 }
 
@@ -70,38 +95,60 @@ function sentenceSpans(text: string, from: number, to: number, spans: Span[]): v
   let last = 0
   for (const match of slice.matchAll(SENTENCE_END)) {
     const end = match.index + match[0].length
-    spans.push([from + last, from + end])
+    spans.push({ start: from + last, end: from + end, fenced: false })
     last = end
   }
-  if (last < slice.length) spans.push([from + last, to])
+  if (last < slice.length) spans.push({ start: from + last, end: to, fenced: false })
 }
 
 function spansOf(text: string): Span[] {
   const spans: Span[] = []
   let cursor = 0
-  for (const [start, end] of fencedBlocks(text)) {
-    sentenceSpans(text, cursor, start, spans)
-    spans.push([start, end])
-    cursor = end
+  for (const block of fencedBlocks(text)) {
+    sentenceSpans(text, cursor, block.start, spans)
+    spans.push(block)
+    cursor = block.end
   }
   sentenceSpans(text, cursor, text.length, spans)
-  return spans.filter(([start, end]) => text.slice(start, end).trim().length > 0)
+  return spans.filter(({ start, end }) => text.slice(start, end).trim().length > 0)
 }
 
-function segment(text: string, passage: number, terms: readonly Term[]): Unit[] {
+/**
+ * The text by which a repeated sentence is recognized, or undefined when the unit is not clearly
+ * a prose sentence. Code repeats itself by nature and must stay intact, so anything that looks
+ * like it is left alone: statement punctuation, fewer than MIN_SENTENCE_WORDS words, or a "." that
+ * is followed by a lower-case letter (`controller. abort(...)` in flattened code).
+ */
+function sentenceOf(body: string, span: Span, following: string): string | undefined {
+  if (span.fenced || /^\s*\p{Ll}/u.test(following)) return undefined
+  const text = body.replace(/\s+/gu, ' ').trim()
+  if (!SENTENCE_FINAL.test(text) || STATEMENT_PUNCTUATION.test(text)) return undefined
+  const words = text.split(' ').filter((word) => contentWeight(word) > 0).length
+  const wordy = words >= MIN_SENTENCE_WORDS || contentWeight(text) >= MIN_UNSPACED_WEIGHT
+  return wordy && contentWeight(text) >= MIN_SENTENCE_WEIGHT ? text : undefined
+}
+
+function segment(text: string, passage: number, terms: readonly Term[]): Omit<Unit, 'index'>[] {
   const spans = spansOf(text)
-  return spans.map(([start, end], index) => {
-    const body = text.slice(start, end)
+  return spans.map((span, position) => {
+    const body = text.slice(span.start, span.end)
+    const lowInformation = isLowInformation(body)
     const lower = body.toLowerCase()
     return {
       passage,
-      start,
-      end,
+      start: span.start,
+      end: span.end,
       tokens: estimateTokens(body),
       chars: body.length,
-      terms: terms.flatMap((term, termIndex) => (term.matches(lower) ? [termIndex] : [])),
-      opensPassage: index === 0,
-      closesPassage: index === spans.length - 1,
+      terms: lowInformation
+        ? []
+        : terms.flatMap((term, termIndex) => (term.matches(lower) ? [termIndex] : [])),
+      lowInformation,
+      sentence: lowInformation
+        ? undefined
+        : sentenceOf(body, span, text.slice(span.end, span.end + LOOKAHEAD_CHARS)),
+      opensPassage: position === 0,
+      closesPassage: position === spans.length - 1,
     }
   })
 }
@@ -111,24 +158,57 @@ function crossesGap(units: readonly Unit[], index: number): boolean {
   return index > 0 && previous !== undefined && previous.passage !== units[index]?.passage
 }
 
-/** Running totals of a sliding window, so every step is O(terms in one unit). */
+/**
+ * Running totals of a sliding window, so every step is O(terms in one unit). A sentence that is
+ * already in the window costs only the "…" that will stand in its place.
+ */
 class Tally {
   tokens = 0
   chars = 0
   matchedUnits = 0
   private readonly terms: readonly Term[]
   private readonly counts: number[]
+  private readonly sentences = new Map<string, number>()
 
   constructor(terms: readonly Term[]) {
     this.terms = terms
     this.counts = terms.map(() => 0)
   }
 
+  /** Whether the window would still fit `limit` with `unit` appended. */
+  fitsWith(unit: Unit, gap: boolean, limit: ExcerptLimit): boolean {
+    const repeat = unit.sentence !== undefined && this.sentences.has(unit.sentence)
+    const extra = gap ? 2 : 1
+    const tokens = repeat ? GAP_TOKENS * extra : unit.tokens + (gap ? GAP_TOKENS : 0)
+    const chars = repeat ? GAP_CHARS * extra : unit.chars + (gap ? GAP_CHARS : 0)
+    return this.tokens + tokens <= limit.tokens && this.chars + chars <= limit.chars
+  }
+
+  /** `direction` 1 appends a unit at the end of the window, -1 removes its first unit. */
   shift(unit: Unit, gap: boolean, direction: 1 | -1): void {
-    this.tokens += direction * (unit.tokens + (gap ? GAP_TOKENS : 0))
-    this.chars += direction * (unit.chars + (gap ? GAP_CHARS : 0))
+    if (gap) this.spend(GAP_TOKENS, GAP_CHARS, direction)
+    if (this.isRepeat(unit, direction)) return this.spend(GAP_TOKENS, GAP_CHARS, direction)
+    this.spend(unit.tokens, unit.chars, direction)
     if (unit.terms.length) this.matchedUnits += direction
     for (const term of unit.terms) this.counts[term] = (this.counts[term] ?? 0) + direction
+  }
+
+  /**
+   * Leaving, the first occurrence hands its place to the next one, which has the same text and
+   * so the same size: the window only loses the "…" that stood for that repeat.
+   */
+  private isRepeat(unit: Unit, direction: 1 | -1): boolean {
+    if (unit.sentence === undefined) return false
+    const before = this.sentences.get(unit.sentence) ?? 0
+    const after = before + direction
+    if (after > 0) this.sentences.set(unit.sentence, after)
+    else this.sentences.delete(unit.sentence)
+    return direction === 1 ? before > 0 : after > 0
+  }
+
+  private spend(tokens: number, chars: number, direction: 1 | -1): void {
+    this.tokens += direction * tokens
+    this.chars += direction * chars
   }
 
   /** Distinct terms dominate; more matching sentences break ties. */
@@ -174,20 +254,19 @@ interface Excerptable {
 /**
  * Every candidate starts at a sentence that matches and runs forward as far as the budget allows,
  * so the budget goes to the match and what follows it, not to whatever happened to precede it.
+ * Returns undefined when there is nothing worth starting from.
  */
-function bestWindow({ texts, units, terms }: Excerptable, limit: ExcerptLimit): Window {
+function bestWindow({ texts, units, terms }: Excerptable, limit: ExcerptLimit): Window | undefined {
   const tally = new Tally(terms)
   const anyMatch = units.some((unit) => unit.terms.length > 0)
-  let best: Window = { from: 0, to: 1, cut: true }
+  let best: Window | undefined
   let bestScore = -1
   let to = 0
   for (let from = 0; from < units.length; from += 1) {
     to = Math.max(to, from)
     for (let next = units[to]; next !== undefined; next = units[to]) {
       const gap = to > from && crossesGap(units, to)
-      const tokens = tally.tokens + next.tokens + (gap ? GAP_TOKENS : 0)
-      const chars = tally.chars + next.chars + (gap ? GAP_CHARS : 0)
-      if (tokens > limit.tokens || chars > limit.chars) break
+      if (!tally.fitsWith(next, gap, limit)) break
       tally.shift(next, gap, 1)
       to += 1
     }
@@ -197,7 +276,7 @@ function bestWindow({ texts, units, terms }: Excerptable, limit: ExcerptLimit): 
     const score = empty
       ? cutScore(cutUnit(texts[first.passage] ?? '', first, limit), terms)
       : tally.score()
-    const eligible = !anyMatch || first.terms.length > 0
+    const eligible = !first.lowInformation && (!anyMatch || first.terms.length > 0)
     // Strictly greater: on a tie the earlier window wins.
     if (eligible && score > bestScore) {
       bestScore = score
@@ -208,7 +287,34 @@ function bestWindow({ texts, units, terms }: Excerptable, limit: ExcerptLimit): 
   return best
 }
 
-function joinParts(parts: readonly string[]): string {
+/** The units of a window that are shown: repeats dropped, low-information ends trimmed. */
+function shownUnits(units: readonly Unit[], window: Window): Unit[] {
+  const seen = new Set<string>()
+  const kept = units.slice(window.from, window.to).filter((unit) => {
+    if (unit.sentence === undefined) return true
+    if (seen.has(unit.sentence)) return false
+    seen.add(unit.sentence)
+    return true
+  })
+  const first = kept.findIndex((unit) => !unit.lowInformation)
+  const last = kept.findLastIndex((unit) => !unit.lowInformation)
+  return first < 0 ? [] : kept.slice(first, last + 1)
+}
+
+/** Maximal runs of shown units that are contiguous in the source. */
+function runsOf(shown: readonly Unit[]): Unit[][] {
+  const runs: Unit[][] = []
+  for (const unit of shown) {
+    const run = runs.at(-1)
+    const previous = run?.at(-1)
+    if (run && previous && previous.passage === unit.passage && previous.index + 1 === unit.index)
+      run.push(unit)
+    else runs.push([unit])
+  }
+  return runs
+}
+
+function joinRuns(parts: readonly string[]): string {
   return parts.reduce((joined, part, index) => {
     if (index === 0) return part
     const previous = parts[index - 1] ?? ''
@@ -217,31 +323,20 @@ function joinParts(parts: readonly string[]): string {
   }, '')
 }
 
+/** One "…" stands wherever source text was left out: before, between, and after the runs. */
 function render(texts: readonly string[], units: readonly Unit[], window: Window): string {
-  const parts: string[] = []
-  let index = window.from
-  while (index < window.to) {
-    const first = units[index]
-    if (first === undefined) break
-    let last = first
-    while (index + 1 < window.to && units[index + 1]?.passage === first.passage) {
-      index += 1
-      last = units[index] ?? last
-    }
-    const body = (texts[first.passage] ?? '').slice(first.start, last.end).trim()
-    // Balanced per passage: a fence the source left open must not swallow the next passage.
-    parts.push(
-      closeOpenFence(`${first.opensPassage ? '' : '… '}${body}${last.closesPassage ? '' : ' …'}`),
-    )
-    index += 1
-  }
-  return joinParts(parts)
-}
-
-/** Size of the whole text as `pickExcerpt` would return it with an unlimited budget. */
-export function measurePassages(passages: readonly string[]): ExcerptLimit {
-  const text = passages.join(PASSAGE_GAP)
-  return { tokens: estimateTokens(text), chars: text.length }
+  const shown = shownUnits(units, window)
+  const first = shown[0]
+  const last = shown.at(-1)
+  if (!first || !last) return ''
+  const parts = runsOf(shown).map((run) => {
+    const from = run[0]
+    const to = run.at(-1)
+    if (!from || !to) return ''
+    // Balanced per run: a fence the source left open must not swallow what follows it.
+    return closeOpenFence((texts[from.passage] ?? '').slice(from.start, to.end).trim())
+  })
+  return `${first.opensPassage ? '' : '… '}${joinRuns(parts)}${last.closesPassage ? '' : ' …'}`
 }
 
 function within(text: string, limit: ExcerptLimit): boolean {
@@ -269,8 +364,9 @@ export function pickExcerpt(
 ): string {
   const texts = passages.filter((passage) => passage.trim().length > 0)
   if (texts.length === 0 || limit.tokens <= 0 || limit.chars <= 0) return ''
-  const units = texts.flatMap((text, index) => segment(text, index, terms))
-  if (units.length === 0) return ''
+  const units = texts
+    .flatMap((text, passage) => segment(text, passage, terms))
+    .map((unit, index) => ({ ...unit, index }))
   const source = { texts, units, terms }
   const whole = render(texts, units, { from: 0, to: units.length, cut: false })
   if (within(whole, limit)) return whole
@@ -279,6 +375,7 @@ export function pickExcerpt(
     chars: Math.max(limit.chars - MARKER_CHARS, 1),
   }
   const window = bestWindow(source, room)
+  if (!window) return ''
   const first = units[window.from]
   if (window.cut && first !== undefined) return cutUnit(texts[first.passage] ?? '', first, room)
   return renderWithin(source, window, limit)

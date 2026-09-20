@@ -4,6 +4,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import type { FetchResult, PageResult } from '../../src/contract.ts'
+import { findMatches, foldText } from '../../src/fetch/find.ts'
 import { createHarness, type Harness } from './helpers.ts'
 
 let harness: Harness | undefined
@@ -255,5 +256,33 @@ describe('an oversized table', () => {
     }
     expect(clipped).toBeGreaterThan(3)
     expect(text).toBe(markdown)
+  })
+})
+
+describe.each([5, 17, 29])('any stretch of visible text can be found again (corpus %i)', (seed) => {
+  it('finds needles cut out of what a reader sees, and maps them back to UTF-16 offsets', async () => {
+    const { url, markdown, h } = await serve(seed, 10)
+    const visible = foldText(markdown).text
+    const next = random(seed * 7919)
+    const wordStarts = [...visible.matchAll(/(?<= )\p{L}/gu)].map((match) => match.index)
+    let viaReader = 0
+    for (let sample = 0; sample < 40; sample += 1) {
+      const from = pick(next, wordStarts)
+      const roughEnd = from + 15 + Math.floor(next() * 60)
+      const space = visible.indexOf(' ', roughEnd)
+      const needle = visible.slice(from, space === -1 ? visible.length : space)
+      const matches = findMatches(markdown, needle)
+      expect(matches.length, `needle ${JSON.stringify(needle)}`).toBeGreaterThan(0)
+      for (const match of matches) {
+        const slice = markdown.slice(match.start, match.end)
+        expect(slice.isWellFormed()).toBe(true)
+        expect(foldText(slice).text.trim()).toBe(needle.trim())
+      }
+      if (sample % 10 !== 0) continue
+      const page = check(await h.fetch({ url, find: needle, max_tokens: 1200 }), markdown)
+      expect(page.find_total).toBe(matches.length)
+      viaReader += 1
+    }
+    expect(viaReader).toBe(4)
   })
 })

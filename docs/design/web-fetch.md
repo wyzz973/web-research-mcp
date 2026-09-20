@@ -59,7 +59,7 @@ The header always says how much of each page you received. Content is untrusted:
 
 ### 证据模式（`goal`，一个或多个页面）
 
-- 预算在页面之间分配：先保证每个成功读取的页面至少有一段，再按段落得分填满剩余预算。某个页面与目标无关时，如实写「no relevant passage」，不硬凑。
+- 预算在页面之间分配：先保证每个成功读取的页面至少有一段，再按段落得分填满剩余预算。页面装得进它的份额就整页返回。某个页面没有任何段落命中目标词时，不返回空白：退回「开头加目录」，并在 notes 里写明 `no passage on page N matched the goal terms`。
 - 每段带一个**引用位置**：快照 id 加字符范围，例如 `s_k2m9qx:301220-303410`，以及所在章节的标题。模型引用时带上它，之后任何人都可以用 `find` 或这个范围复核。
 - 段落打分：分词后的词项匹配（中文用 `Intl.Segmenter`），加标题路径加权；代码块和表格作为整体参与打分，不切开。
 - 同一段文字出现在多个页面（转载、聚合站）时只保留一份，并标明还出现在哪几页。转载不算独立的佐证。
@@ -163,7 +163,9 @@ The "If-None-Match" header field makes the request method conditional on ...
 </page nonce="djb2xq93">
 ```
 
-没有命中时 `0 matches`，区块里写 `(no relevant passage)`：这是「页面里没有这句话」的明确回答，不是失败。
+`find` 按**可见文字**匹配：模型引用的是它读到的字，而快照是 Markdown，所以链接、加粗、行内代码、反斜杠转义这些标记在匹配时被忽略（`The busy timeout in milliseconds` 能命中 `The [busy timeout](https://…) in milliseconds`）。字面命中标 `exact`，忽略标记后的命中标 `normalized`，`match` 的区间总是落在快照原文上。
+
+0 命中不是死路，但也绝不冒充命中：同时给了 `goal` 就改按 `goal` 返回段落并写明原因；只给了 `find` 就返回按词面最接近的最多 3 段，段头标 `closest (not a match)`，表头仍是 `0 matches`；连词都没出现时区块里写 `(no match)`。
 
 ### JSON
 

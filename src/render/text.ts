@@ -211,7 +211,7 @@ function renderPage(page: PageResult, lines: string[]): void {
   lines.push(`<page untrusted="true" nonce="${nonce}">`)
   if (page.title) lines.push(`title: ${oneLine(page.title)}`)
   if (body.lines.length) lines.push(...body.lines)
-  else lines.push('(no relevant passage)')
+  else lines.push(page.mode === 'find' ? '(no match)' : '(no passage shown; see the notes above)')
   lines.push(`</page nonce="${nonce}">`)
   const outline = renderOutline(page)
   if (outline) lines.push(outline)

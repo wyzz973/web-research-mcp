@@ -8,7 +8,12 @@ import { estimateTokens } from '../../src/tokens.ts'
 const terms = buildTerms(['fetch abort timeout'], undefined)
 const sentence = 'AbortSignal.timeout() makes fetch abort after the given time. '
 
-function poolOf(count: number, text = sentence.repeat(30)): SearchHit[] {
+/** Distinct sentences: an excerpt shows a repeated sentence only once. */
+function prose(sentences: number): string {
+  return Array.from({ length: sentences }, (_, index) => `Point ${index + 1}: ${sentence}`).join('')
+}
+
+function poolOf(count: number, text = prose(30)): SearchHit[] {
   return Array.from({ length: count }, (_, index) => ({
     ref: `k7f2:r${index + 1}`,
     rank: index + 1,
@@ -54,8 +59,8 @@ describe('packPage', () => {
 
   it('lets one result use the whole budget, up to the text it has', () => {
     const [only] = page(poolOf(1), { count: 1, maxTokens: 6000 }).results
-    expect(only?.excerpt).toBe(sentence.repeat(30).trim())
-    const long = page(poolOf(1, sentence.repeat(60)), { count: 1, maxTokens: 800 })
+    expect(only?.excerpt).toBe(prose(30).trim())
+    const long = page(poolOf(1, prose(60)), { count: 1, maxTokens: 800 })
     expect(estimateTokens(long.results[0]?.excerpt ?? '')).toBeGreaterThan(550)
     expect(long.tokens).toBeLessThanOrEqual(800)
   })
@@ -113,7 +118,10 @@ describe('packPage', () => {
   })
 
   it('budgets CJK text by its real token weight', () => {
-    const chinese = '使用 AbortController 可以在超时之后取消 fetch 请求。'.repeat(80)
+    const chinese = Array.from(
+      { length: 80 },
+      (_, index) => `第 ${index + 1} 点：使用 AbortController 可以在超时之后取消 fetch 请求。`,
+    ).join('')
     const result = page(poolOf(10, chinese), { maxTokens: 3000 })
     expect(result.results).toHaveLength(10)
     expect(result.tokens).toBeLessThanOrEqual(3000)

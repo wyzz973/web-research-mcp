@@ -242,11 +242,76 @@ describe('find through the reader', () => {
     expect(next.parts[0]?.start).toBeGreaterThanOrEqual(page.parts.at(-1)?.end ?? 0)
   })
 
-  it('answers not found with zero matches on a successful page', async () => {
+  it('shows the closest passages, marked as not a match, when the text is not on the page', async () => {
     const h = await manual()
-    const result = await h.fetch({ url: ARTICLE, find: 'a sentence that is not on the page' })
+    const result = await h.fetch({
+      url: MANUAL,
+      find: 'the billing subsystem never reconciles its ledger',
+    })
+    const page = only(result)
+    expect(result.status).toBe('ok')
+    expect(page).toMatchObject({ mode: 'find', find_total: 0, truncated: false })
+    expect(page.parts.length).toBeGreaterThan(0)
+    expect(page.parts.length).toBeLessThanOrEqual(3)
+    for (const part of page.parts) {
+      expect(part.match).toBeUndefined()
+      expect(part.match_start).toBeUndefined()
+      expect(part.text).toMatch(/billing/iu)
+    }
+    expect(page.next_cursor).toBeUndefined()
+    expect(result.notes).toContain(
+      '0 exact or normalized matches; the closest passages by words are shown - they are NOT a match',
+    )
+    expectVerbatim(result, h.store)
+  })
+
+  it('returns nothing, and says why, when not even a word of the text occurs', async () => {
+    const h = await manual()
+    const result = await h.fetch({ url: ARTICLE, find: 'zymurgy quokka xylophone' })
     expect(result.status).toBe('ok')
     expect(only(result)).toMatchObject({ mode: 'find', find_total: 0, parts: [], truncated: false })
+    expect(result.notes).toContain(
+      '0 exact or normalized matches, and none of the words of the find text occur on the page',
+    )
+  })
+
+  it('reads for the goal instead when find has no match and a goal was given', async () => {
+    const h = await manual()
+    const result = await h.fetch({
+      url: MANUAL,
+      find: 'this "exact" sentence\nis not in the manual',
+      goal: 'inspect the billing subsystem',
+      max_tokens: 2000,
+    })
+    const page = only(result)
+    expect(result.goal).toBe('inspect the billing subsystem')
+    expect(page.mode).toBe('goal')
+    expect(page.find_total).toBeUndefined()
+    expect(page.parts.length).toBeGreaterThan(0)
+    expect(page.parts.every((part) => /billing/iu.test(part.text))).toBe(true)
+    expect(result.notes[0]).toBe(
+      'find had 0 matches for "this \'exact\' sentence is not in the manual"; showing passages for the goal instead',
+    )
+    expectVerbatim(result, h.store)
+  })
+
+  it('keeps the find result when any page has a match', async () => {
+    harness = await createHarness({
+      '/a': { body: manualHtml(12) },
+      '/b': { body: fixture('article.html') },
+    })
+    const result = await harness.fetch({
+      urls: ['https://example.com/a', 'https://example.com/b'],
+      find: 'exponential backoff',
+      goal: 'storage',
+    })
+    expect(result.goal).toBeUndefined()
+    expect(result.pages.map((page) => [page.mode, page.find_total])).toEqual([
+      ['find', 0],
+      ['find', 1],
+    ])
+    expect(result.pages[0]?.parts).toEqual([])
+    expect(result.notes).toEqual([])
   })
 
   it('takes priority over section and goal', async () => {
@@ -329,12 +394,52 @@ describe('goal', () => {
     expect(seen.length).toBeGreaterThan(3)
   })
 
-  it('says so when nothing on the page is relevant', async () => {
+  it('shows the beginning and the outline when no passage of a long page matches the goal words', async () => {
     const h = await manual()
     const result = await h.fetch({ url: MANUAL, goal: 'zymurgy quokka', max_tokens: 1500 })
+    const page = only(result)
     expect(result.status).toBe('ok')
-    expect(only(result)).toMatchObject({ mode: 'goal', parts: [], truncated: true })
-    expect(result.notes).toContain('no relevant passage')
+    expect(page).toMatchObject({ mode: 'lead', truncated: true })
+    expect(page.parts).toHaveLength(1)
+    expect(page.parts[0]?.start).toBe(0)
+    expect(page.shown_chars).toBeGreaterThan(500)
+    expect(page.outline?.length).toBeGreaterThan(0)
+    expect(page.next_cursor).toMatch(/^c_/u)
+    expect(result.notes).toContain(
+      'no passage on page 1 matched the goal terms; showing the beginning and the outline instead',
+    )
+    expect(result.tokens).toBeLessThanOrEqual(1500)
+    expectVerbatim(result, h.store)
+  })
+
+  it('returns a short page whole even when none of the goal words occur in it', async () => {
+    const h = await manual()
+    const result = await h.fetch({ url: ARTICLE, goal: 'zymurgy quokka' })
+    expect(only(result)).toMatchObject({ mode: 'full', truncated: false })
+    expect(result.notes).toEqual([])
+  })
+
+  it('never returns an empty page among several: the unmatched one gets its beginning', async () => {
+    harness = await createHarness({
+      '/hit': { body: manualHtml(30) },
+      '/miss': { body: manualHtml(30).replaceAll('billing', 'invoicing') },
+    })
+    const result = await harness.fetch({
+      urls: ['https://example.com/hit', 'https://other.example.com/miss'],
+      goal: 'billing',
+      max_tokens: 3000,
+    })
+    const [hit, miss] = result.pages
+    expect(hit?.mode).toBe('goal')
+    expect(hit?.parts.length).toBeGreaterThan(0)
+    expect(miss).toMatchObject({ mode: 'lead', truncated: true })
+    expect(miss?.parts[0]?.start).toBe(0)
+    expect(miss?.outline?.length).toBeGreaterThan(0)
+    expect(result.notes).toContain(
+      'no passage on page 2 matched the goal terms; showing the beginning and the outline instead',
+    )
+    expect(result.tokens).toBeLessThanOrEqual(3000)
+    expectVerbatim(result, harness.store)
   })
 
   it('matches Chinese goals against Chinese text', async () => {
@@ -399,6 +504,7 @@ describe('several pages', () => {
     expect(result.pages[0]?.parts.length).toBeGreaterThan(0)
     expect(result.pages[0]?.parts.some((part) => part.also_in?.includes(2))).toBe(true)
     expect(result.pages[1]?.parts).toEqual([])
+    expect(result.notes).toContain('page 2 only repeats passages that are shown from another page')
   })
 
   it('reports each page separately and the call as partial when some pages fail', async () => {

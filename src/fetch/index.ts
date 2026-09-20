@@ -22,7 +22,8 @@ import { createFoldCache } from './find.ts'
 import { createLimiter } from './limiter.ts'
 import { asWebError, createPageLoader, type LoadedSnapshot } from './load.ts'
 import { normalizeFetch } from './normalize.ts'
-import { readFind, readGoal, readLead, readOnward, readSection, type PageRead } from './read.ts'
+import { describeReads, readByMode } from './modes.ts'
+import { readFind, readGoal, readOnward, type PageRead, type ReadablePage } from './read.ts'
 import { inheritedGoal, resolveTargets, type ResolvedTarget } from './targets.ts'
 
 export type { NetworkDependencies } from '../net/safe-http.ts'
@@ -134,52 +135,19 @@ export function createReader(dependencies: ReaderDependencies): Reader {
     return okPage(source, read, saveCursor(read.cursor))
   }
 
-  function readNotes(sources: PageSource[], reads: PageRead[]): string[] {
-    const notes: string[] = []
-    const empty = sources
-      .filter((_, index) => reads[index]?.nothingRelevant)
-      .map((source) => source.n)
-    if (empty.length > 0)
-      notes.push(
-        sources.length === 1
-          ? 'no relevant passage'
-          : `no relevant passage on page ${empty.join(', ')}`,
-      )
-    if (reads.some((read) => read.parts.some((part) => part.clipped)))
-      notes.push(
-        'a block larger than the budget was cut at a line boundary; continue with the cursor',
-      )
-    const dropped = reads.reduce((sum, read) => sum + (read.outlineDropped ?? 0), 0)
-    if (dropped > 0) notes.push(`the outline was shortened by ${dropped} entries to fit the budget`)
-    return notes
-  }
-
-  function readAll(
-    sources: PageSource[],
-    plan: ResolvedFetch,
-    goal: string | undefined,
-    failed: number,
-  ): PageRead[] {
-    const budget = contentBudget(plan.maxTokens, sources.length, failed)
-    const pages = sources.map((source) => ({
+  function readablePages(sources: PageSource[]): ReadablePage[] {
+    return sources.map((source) => ({
       n: source.n,
       snapshot: source.snapshot.id,
       document: source.document,
     }))
-    const first = pages[0]
-    if (!first) return []
-    if (plan.find !== undefined) return readFind(pages, plan.find, 0, budget, fold)
-    if (plan.section !== undefined)
-      return [readSection(first, plan.section, budget, plan.maxTokens)]
-    if (goal !== undefined) return readGoal(pages, { goal, budget, maxTokens: plan.maxTokens })
-    return [readLead(first, budget, plan.maxTokens)]
   }
 
   async function readTargets(plan: ResolvedFetch, signal: AbortSignal): Promise<FetchResult> {
     const targets = resolveTargets(store, plan.targets)
     const usesGoal = plan.find === undefined && plan.section === undefined
-    const goal = usesGoal ? (plan.goal ?? inheritedGoal(targets)) : undefined
-    if (targets.length > 1 && plan.find === undefined && goal === undefined)
+    const wanted = usesGoal ? (plan.goal ?? inheritedGoal(targets)) : undefined
+    if (targets.length > 1 && plan.find === undefined && wanted === undefined)
       return failedResult(
         {
           code: 'invalid_input',
@@ -193,8 +161,19 @@ export function createReader(dependencies: ReaderDependencies): Reader {
     )
     const sources = outcomes.flatMap((outcome) => ('source' in outcome ? [outcome.source] : []))
     const failed = outcomes.length - sources.length
-    const reads = readAll(sources, plan, goal, failed)
-    const notes = readNotes(sources, reads)
+    const budget = contentBudget(plan.maxTokens, sources.length, failed)
+    const {
+      reads,
+      goal,
+      notes: modeNotes,
+    } = readByMode(readablePages(sources), plan, wanted, budget, fold)
+    const notes = [
+      ...modeNotes,
+      ...describeReads(
+        sources.map((source) => source.n),
+        reads,
+      ),
+    ]
     if (budgetTooSmall(plan.maxTokens, sources.length, failed))
       notes.push(
         `max_tokens is too small for ${sources.length} pages; each page got the minimum, so the response is larger than requested`,
@@ -235,7 +214,7 @@ export function createReader(dependencies: ReaderDependencies): Reader {
     const target: ResolvedTarget = { kind: 'snapshot', n: 1, ref: snapshot.id, snapshot }
     const source = toSource(target, storedSnapshot(target))
     const read = continueRead(source, state, plan.maxTokens)
-    const notes = [...readNotes([source], [read]), ...plan.notes]
+    const notes = [...describeReads([source.n], [read]), ...plan.notes]
     if (plan.targets.length > 0 || plan.find !== undefined || plan.section !== undefined)
       notes.push('cursor continues an earlier read; the other arguments were ignored')
     return buildResult(
