@@ -160,6 +160,15 @@ export interface PagePart {
   text: string
   /** Present in find mode. */
   match?: 'exact' | 'normalized'
+  /** Find mode: span of the first match inside this part; `start`/`end` bound the context. */
+  match_start?: number
+  match_end?: number
+  /** Find mode: how many matches this part covers when neighbouring contexts were merged. */
+  match_count?: number
+  /** True when a single block larger than the budget was cut at a line, or the part resumes such a cut. */
+  clipped?: boolean
+  /** Goal mode: other pages (by `n`) that carry this same passage; reposts are not independent evidence. */
+  also_in?: number[]
 }
 
 export interface OutlineEntry {
@@ -235,6 +244,8 @@ export interface StoredSearch {
 
 /** Persistence used by both tools. One SQLite file; safe for several processes at once. */
 export interface Store {
+  /** "wal" normally; "delete" on file systems that cannot support WAL. Reported by `doctor`. */
+  readonly journalMode?: string
   /** Insert under a fresh unique id of the form `${prefix}${random}` and return the id. */
   insertRecord(kind: string, prefix: string, value: unknown, ttlSeconds: number): string
   putRecord(kind: string, id: string, value: unknown, ttlSeconds: number): void

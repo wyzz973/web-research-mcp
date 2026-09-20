@@ -68,6 +68,37 @@ describe('sqlite store', () => {
     store.close()
   })
 
+  it('treats a corrupt row as missing instead of throwing into a tool call', async () => {
+    const location = temporaryDatabase()
+    const store = await createSqliteStore(location)
+    store.putRecord('search', 'good', { ok: true }, 60)
+    store.close()
+    const { DatabaseSync } = await import('node:sqlite')
+    const raw = new DatabaseSync(location)
+    raw.prepare("UPDATE records SET value = '{not json' WHERE id = 'good'").run()
+    raw.close()
+    const reopened = await createSqliteStore(location)
+    expect(reopened.getRecord('search', 'good')).toBeUndefined()
+    reopened.close()
+  })
+
+  it('refuses a database written by a newer schema and reports why', async () => {
+    const location = temporaryDatabase()
+    const store = await createSqliteStore(location)
+    store.close()
+    const { DatabaseSync } = await import('node:sqlite')
+    const raw = new DatabaseSync(location)
+    raw.exec('PRAGMA user_version = 99')
+    raw.close()
+    await expect(createSqliteStore(location)).rejects.toThrow(/newer version/u)
+  })
+
+  it('reports the journal mode it ended up with', async () => {
+    const store = await createSqliteStore(temporaryDatabase())
+    expect(store.journalMode).toBe('wal')
+    store.close()
+  })
+
   it('lets two processes write the same database at once without losing rows', async () => {
     const location = temporaryDatabase()
     const writer = fileURLToPath(new URL('../helpers/store-writer.ts', import.meta.url))
