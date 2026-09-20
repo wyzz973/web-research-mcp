@@ -1,5 +1,0 @@
-# Fragment only: merge into an operator-managed SearXNG configuration.
-search:
-  formats:
-    - html
-    - json

@@ -1,7 +1,0 @@
-{
-  "query": "JavaScript quotes",
-  "sites": ["quotes.toscrape.com"],
-  "evidence_mode": "extract",
-  "fetch_engine": "crawl4ai",
-  "max_evidence_results": 1
-}

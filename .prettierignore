@@ -1,7 +1,5 @@
-node_modules/
-dist/
-coverage/
-data/
-artifacts/
-.cache/
+dist
+node_modules
 pnpm-lock.yaml
+tests/fixtures
+docs

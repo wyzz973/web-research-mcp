@@ -1,94 +1,58 @@
 {
   "name": "web-research-mcp",
-  "version": "0.5.0",
+  "version": "2.0.0-alpha.1",
   "private": true,
-  "description": "Free, keyless web search and evidence retrieval over MCP",
+  "description": "Web search and verbatim page reading for LLM agents: MCP server, CLI, and library",
   "type": "module",
-  "engines": {
-    "node": ">=24.0.0 <25.0.0"
-  },
-  "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/mcp/stdio.js",
-    "typecheck": "tsc --noEmit",
-    "lint": "oxlint --type-aware --deny-warnings src tests",
-    "format:check": "prettier --check src tests scripts config schemas examples deploy ui evals *.json *.ts .github .oxlintrc.json",
-    "format": "prettier --write src tests scripts config schemas examples deploy ui evals *.json *.ts .github .oxlintrc.json",
-    "generate:types": "node scripts/generate-types.mjs",
-    "check:types": "node scripts/generate-types.mjs --check",
-    "check:schemas": "node scripts/check-schemas.mjs",
-    "check:boundaries": "node scripts/check-boundaries.mjs",
-    "check:docs": "node scripts/check-docs.mjs",
-    "test": "vitest run --exclude tests/mcp.spec.ts",
-    "test:mcp": "pnpm build && vitest run tests/mcp.spec.ts",
-    "test:built": "pnpm build && node scripts/package-smoke.mjs",
-    "test:live": "pnpm build && node scripts/live-smoke.mjs",
-    "searxng:setup": "node scripts/searxng-native.mjs setup",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm check:types && pnpm check:schemas && pnpm check:boundaries && pnpm check:docs && pnpm test && pnpm test:mcp",
-    "call": "node scripts/call-tool.mjs",
-    "searxng:native:setup": "node scripts/searxng-native.mjs setup",
-    "searxng:start": "node scripts/searxng-native.mjs start",
-    "searxng:run": "node scripts/searxng-native.mjs run",
-    "searxng:status": "node scripts/searxng-native.mjs status",
-    "searxng:stop": "node scripts/searxng-native.mjs stop",
-    "searxng:docker:setup": "node scripts/searxng-setup.mjs",
-    "test:native": "node scripts/searxng-native-smoke.mjs",
-    "workbench": "pnpm build && node dist/workbench/main.js --config config/local.example.json",
-    "search:doctor": "pnpm build && node scripts/search-doctor.mjs",
-    "eval": "pnpm build && node scripts/evaluate.mjs",
-    "eval:collect": "pnpm build && node scripts/collect-eval.mjs",
-    "crawl4ai:setup": "node scripts/crawl4ai-setup.mjs",
-    "test:crawl4ai": "pnpm build && node scripts/crawl4ai-smoke.mjs"
-  },
   "license": "MIT",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "packageManager": "pnpm@10.12.3",
   "bin": {
-    "web-research-mcp": "dist/mcp/stdio.js",
-    "web-research-workbench": "dist/workbench/main.js"
+    "web-research": "dist/cli/main.js",
+    "web-research-mcp": "dist/mcp/stdio.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "files": [
     "dist",
-    "schemas",
-    "config/defaults.example.json",
     "README.md",
-    "LICENSE",
-    "ui",
-    "evals/reports",
-    "scripts/crawl4ai-worker.py",
-    "scripts/crawl4ai-setup.mjs",
-    "deploy/crawl4ai"
+    "LICENSE"
   ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint --deny-warnings src tests",
+    "format": "prettier --write src tests scripts *.json *.ts .github",
+    "format:check": "prettier --check src tests scripts *.json *.ts .github",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
+    "smoke:live": "pnpm build && node scripts/live-smoke.mjs"
+  },
   "dependencies": {
+    "@joplin/turndown-plugin-gfm": "1.0.68",
     "@modelcontextprotocol/server": "2.0.0",
     "@mozilla/readability": "0.6.0",
-    "@joplin/turndown-plugin-gfm": "1.0.68",
-    "ajv": "8.20.0",
-    "ajv-formats": "3.0.1",
-    "better-sqlite3": "13.0.3",
     "ipaddr.js": "2.5.0",
     "jsdom": "29.1.1",
-    "robots-parser": "3.0.1",
     "tldts": "7.4.12",
     "turndown": "7.2.4",
     "undici": "8.10.2"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.0.0",
-    "@types/better-sqlite3": "9.6.0",
     "@types/jsdom": "30.0.0",
     "@types/node": "24.10.1",
     "@types/turndown": "5.0.6",
-    "json-schema-to-typescript": "16.0.0",
     "oxlint": "1.82.0",
-    "oxlint-tsgolint": "7.0.2001",
     "prettier": "3.9.6",
     "typescript": "6.0.3",
     "vitest": "4.1.8"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3"
-    ]
   },
   "repository": {
     "type": "git",
