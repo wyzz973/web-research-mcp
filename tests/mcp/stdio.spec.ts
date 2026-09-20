@@ -24,7 +24,7 @@ function inherited(names: string[]): Record<string, string> {
 }
 
 /** Starts the real stdio entry with no keys and anonymous sources off, so nothing touches the network. */
-async function connect() {
+async function connect(extra: Record<string, string> = {}) {
   const dataDir = await mkdtemp(path.join(tmpdir(), 'wrm-mcp-'))
   cleanup.push(() => rm(dataDir, { recursive: true, force: true }))
   const transport = new StdioClientTransport({
@@ -34,6 +34,7 @@ async function connect() {
       ...inherited(['PATH', 'Path', 'SystemRoot', 'TEMP', 'TMP', 'USERPROFILE', 'HOME']),
       WEB_RESEARCH_DATA_DIR: dataDir,
       WEB_RESEARCH_ANONYMOUS_SOURCES: '0',
+      ...extra,
     },
     stderr: 'pipe',
   })
@@ -78,6 +79,22 @@ describe('MCP stdio entry', () => {
     })
     expect(result.isError).toBe(true)
     expect(text(result)).toContain('unsafe_url')
+  }, 30_000)
+
+  it('returns the result object as JSON text when asked to, still without structuredContent', async () => {
+    const client = await connect({ WEB_RESEARCH_MCP_OUTPUT: 'json' })
+    const result = await client.callTool({
+      name: 'web_fetch',
+      arguments: { url: 'http://169.254.169.254/latest/meta-data/' },
+    })
+    expect(result.isError).toBe(true)
+    expect(result.structuredContent).toBeUndefined()
+    const parsed = JSON.parse(text(result)) as {
+      status: string
+      pages: { error?: { code: string } }[]
+    }
+    expect(parsed.status).toBe('error')
+    expect(parsed.pages[0]?.error?.code).toBe('unsafe_url')
   }, 30_000)
 
   it('accepts slightly wrong argument shapes instead of rejecting them at the protocol layer', async () => {

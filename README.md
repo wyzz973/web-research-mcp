@@ -70,7 +70,7 @@ Keys and settings are read from the server's environment, so pass them in the cl
 { "command": "web-research-mcp", "env": { "TAVILY_API_KEY": "tvly-..." } }
 ```
 
-The server returns a compact text view by default, because several harnesses pass only one of `content` / `structuredContent` to the model and JSON-escaped page text is hard to read. Set `WEB_RESEARCH_MCP_OUTPUT=json` to receive the result object instead.
+The server returns a compact text view by default, because several harnesses pass only one of `content` / `structuredContent` to the model and JSON-escaped page text is hard to read. Set `WEB_RESEARCH_MCP_OUTPUT=json` to receive the result object instead; it is meant for programs: the content is still sized by `max_tokens`, but JSON escaping makes the serialized object 10–20% larger than the text view, and the hard output ceilings apply to the text view only.
 
 ## Search sources, keys, and cost
 
