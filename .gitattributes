@@ -1,0 +1,2 @@
+# Keep LF everywhere: offsets in fixtures are byte-exact and Prettier checks line endings.
+* text=auto eol=lf
