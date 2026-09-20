@@ -102,7 +102,11 @@ describe('normalizeFetch', () => {
       p6: 1,
     }
     const [note] = normalizeFetch(hostile, config).notes
-    const names = (note ?? '').replace('ignored unknown parameters: ', '').split(', ')
+    expect(note).toMatch(/ and 2 more$/u)
+    const names = (note ?? '')
+      .replace('ignored unknown parameters: ', '')
+      .replace(/ and 2 more$/u, '')
+      .split(', ')
     expect(names).toHaveLength(5)
     for (const name of names) expect(name).toMatch(/^[A-Za-z0-9_]{1,32}$/u)
     expect(note).not.toMatch(/reveal|system|[<>"']/u)

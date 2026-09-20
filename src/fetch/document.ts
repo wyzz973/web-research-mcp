@@ -12,6 +12,8 @@ export interface PageDocument {
   outline: OutlineEntry[]
   /** parents[i] is the outline index of the heading that encloses outline[i], or -1. */
   parents: number[]
+  /** The page has more headings than the outline holds; `outline` covers the first of them. */
+  headingsCapped: boolean
   /** prefix[i] is the estimated size of all tiles before block i. */
   prefix: number[]
   totalTokens: number
@@ -64,11 +66,12 @@ function outlineParents(outline: OutlineEntry[]): number[] {
 export function* analyzeSteps(markdown: string): Generator<void, PageDocument> {
   const blocks = yield* splitBlockSteps(markdown)
   const prefix = yield* tokenPrefix(markdown, blocks)
-  const outline = yield* buildOutlineSteps(markdown, blocks, prefix)
+  const { entries: outline, capped } = yield* buildOutlineSteps(markdown, blocks, prefix)
   return {
     markdown,
     blocks,
     outline,
+    headingsCapped: capped,
     parents: outlineParents(outline),
     prefix,
     totalTokens: prefix.at(-1) ?? 0,

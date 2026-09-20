@@ -133,6 +133,14 @@ export function createReader(dependencies: ReaderDependencies): Reader {
     return okPage(source, read, saveCursor(read.cursor))
   }
 
+  /** Limits that were hit while the page was analyzed, carried to the read so that a note says so. */
+  function flagLimits(sources: PageSource[], reads: PageRead[]): void {
+    sources.forEach((source, index) => {
+      const read = reads[index]
+      if (read && source.document.headingsCapped) read.headingsCapped = true
+    })
+  }
+
   function readablePages(sources: PageSource[]): ReadablePage[] {
     return sources.map((source) => ({
       n: source.n,
@@ -165,6 +173,7 @@ export function createReader(dependencies: ReaderDependencies): Reader {
       goal,
       notes: modeNotes,
     } = await readByMode(readablePages(sources), plan, wanted, budget, { fold, signal })
+    flagLimits(sources, reads)
     const notes = [
       ...modeNotes,
       ...describeReads(
@@ -222,6 +231,7 @@ export function createReader(dependencies: ReaderDependencies): Reader {
     const target: ResolvedTarget = { kind: 'snapshot', n: 1, ref: snapshot.id, snapshot }
     const source = await toSource(target, storedSnapshot(target), signal)
     const read = await continueRead(source, state, plan.maxTokens, signal)
+    flagLimits([source], [read])
     const notes = [...describeReads([source.n], [read]), ...plan.notes]
     if (plan.targets.length > 0 || plan.find !== undefined || plan.section !== undefined)
       notes.push('cursor continues an earlier read; the other arguments were ignored')

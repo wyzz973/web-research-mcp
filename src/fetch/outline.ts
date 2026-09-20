@@ -45,17 +45,23 @@ export const MAX_HEADINGS = 20_000
 /** Blocks looked at between two yields. */
 const BLOCKS_PER_STEP = 4096
 
-function* readHeadings(markdown: string, blocks: Block[]): Generator<void, Heading[]> {
-  const headings: Heading[] = []
+interface Headings {
+  list: Heading[]
+  /** The page has more headings than `MAX_HEADINGS`; the rest are text, not outline entries. */
+  capped: boolean
+}
+
+function* readHeadings(markdown: string, blocks: Block[]): Generator<void, Headings> {
+  const list: Heading[] = []
   for (const [index, block] of blocks.entries()) {
     if (index % BLOCKS_PER_STEP === BLOCKS_PER_STEP - 1) yield
     if (block.kind !== 'heading') continue
-    if (headings.length === MAX_HEADINGS) break
+    if (list.length === MAX_HEADINGS) return { list, capped: true }
     const match = ATX_HEADING.exec(markdown.slice(block.start, block.end))
     const text = plainTitle(match?.[2] ?? '')
-    if (text !== '') headings.push({ block: index, level: block.level ?? 1, text })
+    if (text !== '') list.push({ block: index, level: block.level ?? 1, text })
   }
-  return headings
+  return { list, capped: false }
 }
 
 /** "2.4" is the fourth heading under the second top-level heading, whatever their HTML levels were. */
@@ -109,16 +115,22 @@ function sectionEndBlock(headings: Heading[], index: number, blockCount: number)
  * One entry per heading. A section runs to the next heading of the same or a higher level, and
  * its size is the sum of per-block estimates so a long document is measured once, not per level.
  */
+export interface BuiltOutline {
+  entries: OutlineEntry[]
+  /** True when the page has more headings than the outline holds. */
+  capped: boolean
+}
+
 export function* buildOutlineSteps(
   markdown: string,
   blocks: Block[],
   prefix: number[],
-): Generator<void, OutlineEntry[]> {
-  const headings = yield* readHeadings(markdown, blocks)
+): Generator<void, BuiltOutline> {
+  const { list: headings, capped } = yield* readHeadings(markdown, blocks)
   yield
   const labels = assignIds(headings)
   yield
-  return headings.map((heading, index) => {
+  const entries = headings.map((heading, index) => {
     const endBlock = sectionEndBlock(headings, index, blocks.length)
     return {
       id: labels[index]?.id ?? String(index + 1),
@@ -129,6 +141,7 @@ export function* buildOutlineSteps(
       tokens: (prefix[endBlock] ?? 0) - (prefix[heading.block] ?? 0),
     }
   })
+  return { entries, capped }
 }
 
 function label(entry: OutlineEntry): string {
@@ -141,6 +154,8 @@ export interface FittedOutline {
   chars: number
   /** Entries left out after every deeper level had already been dropped. */
   dropped: number
+  /** Heading levels, deepest first, that were left out entirely. */
+  levelsDropped: number
 }
 
 /** A level is only dropped while something useful is left above it; one title line is not a map. */
@@ -150,11 +165,13 @@ const MIN_USEFUL_ENTRIES = 3
 export function fitOutline(outline: OutlineEntry[], maxTokens: number): FittedOutline {
   let priced = outline.map((entry) => ({ entry, cost: estimateTokens(label(entry)) }))
   const total = (): number => priced.reduce((sum, item) => sum + item.cost, 0)
+  let levelsDropped = 0
   while (total() > maxTokens) {
-    const deepest = Math.max(...priced.map((item) => item.entry.level))
+    const deepest = priced.reduce((level, item) => Math.max(level, item.entry.level), 0)
     const shallower = priced.filter((item) => item.entry.level < deepest)
     if (shallower.length < MIN_USEFUL_ENTRIES) break
     priced = shallower
+    levelsDropped += 1
   }
   const entries: OutlineEntry[] = []
   let tokens = 0
@@ -164,5 +181,5 @@ export function fitOutline(outline: OutlineEntry[], maxTokens: number): FittedOu
     entries.push(item.entry)
   }
   const chars = entries.reduce((sum, entry) => sum + label(entry).length, 0)
-  return { entries, tokens, chars, dropped: priced.length - entries.length }
+  return { entries, tokens, chars, dropped: priced.length - entries.length, levelsDropped }
 }

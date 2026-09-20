@@ -2,6 +2,7 @@
 import type { ResolvedFetch } from '../contract.ts'
 import type { Budget } from './budget.ts'
 import { MAX_FOLD_CHARS, MAX_MATCHES, type FoldCache, type Folded } from './find.ts'
+import { MAX_HEADINGS } from './outline.ts'
 import {
   readClosest,
   readFind,
@@ -135,5 +136,19 @@ export function describeReads(numbers: number[], reads: PageRead[]): string[] {
     )
   const dropped = reads.reduce((sum, read) => sum + (read.outlineDropped ?? 0), 0)
   if (dropped > 0) notes.push(`the outline was shortened by ${dropped} entries to fit the budget`)
+  const levels = reads.reduce((most, read) => Math.max(most, read.outlineLevelsDropped ?? 0), 0)
+  if (levels > 0)
+    notes.push(
+      `the outline leaves out its ${levels} deepest heading level${levels === 1 ? '' : 's'} to fit the budget; read a section to see its subsections`,
+    )
+  const capped = where((read) => read.headingsCapped)
+  if (capped.length > 0)
+    notes.push(
+      `${pageList(capped)} has more than ${MAX_HEADINGS} headings; the outline and the section ids cover only the first ${MAX_HEADINGS}`,
+    )
+  if (reads.some((read) => read.cursorExhausted))
+    notes.push(
+      'more relevant passages remain than one cursor chain can track; continue with find or section',
+    )
   return notes
 }

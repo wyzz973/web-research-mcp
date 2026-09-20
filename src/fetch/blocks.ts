@@ -22,7 +22,11 @@ const INDENTED = /^(?: {2,}|\t)/u
 const NESTED_FENCE = /^\s*(`{3,}|~{3,})/u
 /** Lists and list items longer than this are divided at item boundaries. */
 const LONG_LIST_CHARS = 600
-/** Items are divided this many levels deep; pages that nest deeper are not written by people. */
+/**
+ * Items are divided this many levels deep; pages that nest deeper are not written by people.
+ * Nothing is lost beyond this depth: a deeper item simply stays inside the block of its parent,
+ * so blocks get coarser there, and every character is still covered by exactly one tile.
+ */
 const MAX_LIST_DEPTH = 8
 /** Lines handled between two yields. */
 const LINES_PER_STEP = 2048

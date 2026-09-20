@@ -131,10 +131,12 @@ function noteUnknown(request: FetchRequest, notes: Set<string>): void {
   const names = unknown
     .map((key) => key.replace(/[^A-Za-z0-9_]/gu, '').slice(0, MAX_NAME_CHARS))
     .filter((name) => name !== '')
-  const shown = [...new Set(names)].slice(0, MAX_NAMES_SHOWN)
+  const distinct = [...new Set(names)]
+  const shown = distinct.slice(0, MAX_NAMES_SHOWN)
+  const more = unknown.length - shown.length
   notes.add(
     shown.length > 0
-      ? `ignored unknown parameters: ${shown.join(', ')}`
+      ? `ignored unknown parameters: ${shown.join(', ')}${more > 0 ? ` and ${more} more` : ''}`
       : `ignored ${unknown.length} unknown parameters`,
   )
 }

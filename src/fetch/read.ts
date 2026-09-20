@@ -33,6 +33,12 @@ export interface PageRead {
   outline?: OutlineEntry[]
   /** Outline entries that did not fit even after dropping every deeper level. */
   outlineDropped?: number
+  /** Heading levels, deepest first, that the outline leaves out to fit. */
+  outlineLevelsDropped?: number
+  /** The page has more headings than an outline holds; ids exist for the first of them only. */
+  headingsCapped?: boolean
+  /** Goal mode: relevant passages remain, but this cursor chain cannot track any more of them. */
+  cursorExhausted?: boolean
   /** Goal mode: no passage matched the goal terms, so the beginning of the page is shown instead. */
   nothingRelevant?: boolean
   /** Goal mode: every relevant passage of this page was already shown from another page. */
@@ -77,18 +83,25 @@ interface Outlined {
   room: Budget
   entries: OutlineEntry[]
   dropped: number
+  levelsDropped: number
 }
 
 /** The outline is paid for out of the same budget as the content it helps to navigate. */
 function reserveOutline(entries: OutlineEntry[], budget: Budget, maxTokens: number): Outlined {
   const fitted = fitOutline(entries, Math.floor(maxTokens * OUTLINE_SHARE))
   const room = atLeast(minus(budget, { tokens: fitted.tokens, chars: fitted.chars }), MIN_CONTENT)
-  return { room, entries: fitted.entries, dropped: fitted.dropped }
+  return {
+    room,
+    entries: fitted.entries,
+    dropped: fitted.dropped,
+    levelsDropped: fitted.levelsDropped,
+  }
 }
 
 function attachOutline(read: PageRead, outlined: Outlined): PageRead {
   if (outlined.entries.length > 0) read.outline = outlined.entries
   if (outlined.dropped > 0) read.outlineDropped = outlined.dropped
+  if (outlined.levelsDropped > 0) read.outlineLevelsDropped = outlined.levelsDropped
   return read
 }
 
@@ -375,6 +388,7 @@ function readSelected(
   ]
   const cursor = selection.more ? goalCursor(page, options.goal, delivered) : undefined
   if (cursor) read.cursor = cursor
+  else if (selection.more) read.cursorExhausted = true
   return read
 }
 
