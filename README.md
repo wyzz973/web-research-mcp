@@ -121,6 +121,8 @@ Both methods never throw; failures are part of the returned object.
 | Upstream calls | 13 (one escalation to a second source) |
 | Output size for 10 results | about 3,800 tokens on average |
 
+Concurrency, measured the same day in one process: 8 different searches started together finished in 2.9 s in total, spread over the three sources; repeating them was served entirely from the cache with no upstream call; reading 4 pages from 4 hosts in one `web_fetch` took 4.8 s.
+
 ## Development
 
 ```sh
