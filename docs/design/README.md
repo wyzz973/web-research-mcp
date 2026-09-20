@@ -1,6 +1,6 @@
-# v2 重新设计（草案）
+# v2 设计
 
-状态：**设计草案，尚未实现**。日期：2026-09-20。本目录描述的是从零开始的新设计，旧代码和旧文档在实现切换之前保持原样。
+状态：**M0 已实现，版本 2.0.0-alpha.1**（2026-09-21，分支 `v2`）。本目录描述从零开始的新设计；旧的 SearXNG 实现保留在标签 `legacy-v0.5.0`，不再是本分支的一部分。实现进度与验证方式见文末「实现状态」。
 
 ## 为什么重新设计
 
@@ -47,7 +47,7 @@
 - `web_search` 可以指定返回条数：`max_results` 默认 10，最多 50。默认预算 5,000 token；`web_fetch` 默认 8,000 token。单次上限默认 10,000，可由服务端配置调高。
 - `web_search` 默认用一个来源，结果不可靠时自动补一个并融合；`deep` 才并行多个来源。每个匿名来源每天有自我限额。
 - 设计经过一轮对抗审计（Opus）。采纳的结论：预算同时限制 token 和字符；`ref` 只用全称；游标绝不触发上游；不可信区块的结束标记带一次性 `nonce`；不把查询串长度检查说成防外泄；M0 必须带 `doctor` 命令、server `instructions`、robots.txt 与每主机限速。
-- 在本仓库重建。实现阶段开新分支，旧代码在切换前不删除。
+- 在本仓库的 `v2` 分支重建；旧代码从该分支移除，历史保留在标签 `legacy-v0.5.0`。
 - TypeScript、Node 22 及以上，无原生依赖。
 - 不在内部调用大模型；不绕过验证码、付费墙和登录；不接入国内搜索引擎。
 
@@ -58,3 +58,22 @@
 1. MCP 默认只返回给模型看的文本；`WEB_RESEARCH_MCP_OUTPUT=json` 改为返回结果对象。
 2. 厂商的匿名免 Key 档默认开启，条件是：`doctor` 和 README 明确告知查询发往哪几家公共端点、请求带包名版本的 User-Agent、每个来源每天自我限额、失败不重试。`WEB_RESEARCH_ANONYMOUS_SOURCES=0` 可以关闭。
 3. `web_fetch` 默认允许抓取任意公开 URL；严格模式放到 M1。
+
+## 实现状态
+
+M0 的范围见 [架构与路线](architecture.md) 的里程碑表。下面只写已经做了并且能复核的事。
+
+| 能力 | 状态 | 怎么复核 |
+| --- | --- | --- |
+| 契约、文本视图、不可信内容信封、二维输出上限 | 已实现 | `pnpm test`（`tests/render`、`tests/foundation.spec.ts`） |
+| SQLite 状态库（缓存、结果池、快照、账本、冷却），多进程共用 | 已实现 | `tests/store`，含双进程并发写 |
+| `web_search`：指定条数、三档 `depth`、多查询、融合与去重、游标翻页、缓存、每日限额与预算 | 已实现 | `tests/search`、`tests/sources`（录制的上游响应回放） |
+| 来源适配器：Exa、Parallel、Tavily（匿名档与 Key） | 已实现 | `web-research doctor`；`pnpm smoke:live` |
+| `web_fetch`：证据模式（多页）、目录、章节、`find`、游标、快照复读 | 已实现 | `tests/fetch`、`tests/extract`；`pnpm smoke:live` |
+| 受控网络层：地址校验、连接钉死、逐跳复查、robots.txt、每主机限速 | 已实现 | `tests/net`；审计员的 SSRF 探针全部被拒 |
+| MCP stdio 服务、CLI、库入口、`doctor` | 已实现 | `tests/mcp`、`tests/cli`；`pnpm smoke:pack`（从打包产物安装后再验证） |
+| CI：Linux、macOS、Windows × Node 22、24 | 已配置 | `.github/workflows/ci.yml` |
+
+还没有做的（不要当成已有能力）：官方免 Key API 与标识符直达、网页抓取兜底、PDF、JSON 与 RSS 的结构化读取、`web_fetch` 严格模式、录制工具、56 条查询的完整评测、发布到 npm、远程 HTTP 传输。
+
+对抗审计（Opus）到目前为止进行了四轮：设计、基础与外壳、搜索核心、抓取核心。每轮的必须修项都已修复并补了会失败的回归测试，结论记录在对应的提交说明里。

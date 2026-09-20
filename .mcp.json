@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "web-research": {
+      "command": "node",
+      "args": ["dist/mcp/stdio.js"]
+    }
+  }
+}

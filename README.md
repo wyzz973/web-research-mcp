@@ -96,6 +96,7 @@ Both methods never throw; failures are part of the returned object.
 
 ```sh
 pnpm check        # types, lint, format, tests (no network)
+pnpm smoke:pack   # packs the build, installs the tarball elsewhere, drives the installed entry points
 pnpm smoke:live   # real searches and fetches; spends a few free-tier calls
 ```
 

@@ -218,12 +218,12 @@ export async function createSqliteStore(location: string): Promise<Store> {
 
   return {
     journalMode,
-    insertRecord(kind, prefix, value, ttlSeconds) {
+    insertRecord(kind, prefix, value, ttlSeconds, idLength = 4) {
       const now = Date.now()
       const json = JSON.stringify(value)
       for (let attempt = 0; attempt < 8; attempt += 1) {
         // Ids grow by one character after repeated collisions so allocation always terminates.
-        const id = `${prefix}${randomId(4 + Math.floor(attempt / 2))}`
+        const id = `${prefix}${randomId(idLength + Math.floor(attempt / 2))}`
         try {
           insertRecord.run(kind, id, json, now, now + ttlSeconds * 1000)
           maybeSweep(now)

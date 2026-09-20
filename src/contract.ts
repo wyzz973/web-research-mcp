@@ -95,6 +95,8 @@ export interface SourceStatus {
 export interface SearchUsage {
   provider_calls: number
   est_cost_usd: number
+  /** Keyed sources this search sent a request to. Absent when only free tiers were used. */
+  paid_sources?: string[]
 }
 
 export interface SearchResult {
@@ -166,7 +168,7 @@ export interface PagePart {
   /** Find mode: how many matches this part covers when neighbouring contexts were merged. */
   match_count?: number
   /** True when a single block larger than the budget was cut at a line, or the part resumes such a cut. */
-  clipped?: boolean
+  clipped?: true
   /** Goal mode: other pages (by `n`) that carry this same passage; reposts are not independent evidence. */
   also_in?: number[]
 }
@@ -236,6 +238,11 @@ export interface Snapshot {
 export interface StoredSearch {
   id: string
   created_at: string
+  /**
+   * SHA-256 of the normalized request. Cursors and cache entries carry the same value, so a
+   * record id that was reissued after expiry can never be mistaken for the search they belong to.
+   */
+  query_hash?: string
   queries: string[]
   goal?: string
   hits: SearchHit[]
@@ -247,7 +254,14 @@ export interface Store {
   /** "wal" normally; "delete" on file systems that cannot support WAL. Reported by `doctor`. */
   readonly journalMode?: string
   /** Insert under a fresh unique id of the form `${prefix}${random}` and return the id. */
-  insertRecord(kind: string, prefix: string, value: unknown, ttlSeconds: number): string
+  insertRecord(
+    kind: string,
+    prefix: string,
+    value: unknown,
+    ttlSeconds: number,
+    /** Random characters after the prefix. Ids a model keeps in context should be 8 so an expired id is not reused. */
+    idLength?: number,
+  ): string
   putRecord(kind: string, id: string, value: unknown, ttlSeconds: number): void
   getRecord<T>(kind: string, id: string): { value: T; created_at: number } | undefined
   insertSnapshot(snapshot: Omit<Snapshot, 'id'>, ttlSeconds: number): Snapshot

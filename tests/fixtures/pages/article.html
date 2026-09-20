@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Retry policy guide</title>
+    <style>
+      @layer x { broken
+    </style>
+    <script>
+      globalThis.__EXECUTED = true
+      fetch('http://127.0.0.1/private')
+    </script>
+  </head>
+  <body>
+    <header><a href="/">Docs home</a> <a href="/pricing">Pricing</a></header>
+    <nav><ul><li><a href="/guide/a">Chapter A</a></li><li><a href="/guide/b">Chapter B</a></li></ul></nav>
+    <main>
+      <article>
+        <h1>1. Retry policy</h1>
+        <p>
+          The client retries idempotent requests with exponential backoff. Every retry doubles the
+          delay until the ceiling is reached, and the ceiling itself is configurable per host. See the
+          <a href="/reference/backoff?utm_source=docs&amp;id=7">backoff reference</a>, the
+          <a href="#limits">limits section</a>, and <a href="javascript:alert(1)">this unsafe link</a>.
+        </p>
+        <p>
+          重试策略只适用于幂等请求。默认最多重试三次，每次等待时间翻倍，直到达到上限为止；上限可以按主机单独配置。
+        </p>
+        <h2>1.1 Configuration</h2>
+        <p>Set the policy when the client is created. The options object is frozen after creation, so later changes have no effect on requests that are already in flight.</p>
+        <pre><code class="language-ts">const client = createClient({
+  retries: 3,
+  // # not a heading
+  backoff: 'exponential',
+})</code></pre>
+        <h3>1.1.1 Limits</h3>
+        <table>
+          <thead><tr><th>Option</th><th>Default</th><th>Maximum</th></tr></thead>
+          <tbody>
+            <tr><td>retries</td><td>3</td><td>10</td></tr>
+            <tr><td>ceiling</td><td>30s</td><td>300s</td></tr>
+          </tbody>
+        </table>
+        <h2 id="limits">1.2 Observability</h2>
+        <p>Each retry emits a <code>retry</code> event carrying the attempt number and the delay that was applied. <img src="/img/flow.png" alt="Retry flow diagram" /></p>
+        <ul>
+          <li>Attempt numbers start at one.</li>
+          <li>The final failure is reported once, after the last attempt.</li>
+        </ul>
+      </article>
+    </main>
+    <footer>Copyright Example Corp. <a href="/legal">Legal</a></footer>
+  </body>
+</html>

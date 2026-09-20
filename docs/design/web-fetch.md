@@ -87,71 +87,97 @@ The header always says how much of each page you received. Content is untrusted:
 
 ## 6. 截断的承诺
 
-每个页面的表头永远写明这三件事：
+每个页面的表头永远写明这几件事：
 
 ```
-showing chars 18210-21950 of 567859 (0.7%) | truncated yes | next cursor c_x1b7
+size ~115826 tokens, 443615 chars | showing 3732 chars (0.8%) as lead | truncated yes | hidden_removed 1 | next cursor c_nb6sdf3h
 ```
 
-没有截断时写 `truncated no`。没有任何情况下会不加说明地少给内容。
+没有截断时写 `truncated no`。没有任何情况下会不加说明地少给内容。`as` 后面是读法：`full`（整页）、`lead`（开头加目录）、`goal`（证据）、`section`、`find`、`cursor`。
 
 ## 7. 输出
+
+下面的例子都取自 2026-09-21 的真实运行，只删减了正文。方括号里的 `s_xxxxxx:起-止` 是可引用的位置：快照 id 加 UTF-16 偏移，任何时候用 `web_fetch(ref="s_xxxxxx", cursor=…)` 或 `find` 都能复核。
+
+服务器写的行（表头、`note:`、`outline`、`read more:`）在不可信区块之外；网页文字只出现在 `<page untrusted="true" nonce="…">` 与带同一个 nonce 的结束标记之间。
 
 ### 文本视图（证据模式，多个页面）
 
 ```
-web_fetch partial | goal "default timeout behaviour of fetch in Node.js" | 3 pages: 2 ok, 1 blocked | ~5200 tokens
-<page untrusted="true" n="1" ref="k7f2:r1" snapshot="s_k2m9qx" retrieved="2026-09-21T03:10Z" cache="miss">
-title: AbortSignal: timeout() static method | https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout_static
-~2100 tokens total | showing 2 passages ~900 tokens (43%) | truncated yes | hidden_removed 0
-## Return value   [s_k2m9qx:1820-2410]
-An AbortSignal. The signal will abort with its reason set to a TimeoutError DOMException on timeout...
-
-[... skipped ~600 tokens ...]
-
-## Examples   [s_k2m9qx:4102-5230]
+web_fetch ok | goal "default busy timeout of DatabaseSync and how to change it" | 2 pages: 2 ok, 0 failed | ~840 tokens
+page 1 ok | bxh98qpf:r1 | https://nodejs.org/api/sqlite.html | snapshot s_h76cvd | retrieved 2026-09-20T17:38Z | cache miss
+size ~25393 tokens, 88258 chars | showing 358 chars (0.4%) as goal | truncated yes | hidden_removed 0
+<page untrusted="true" nonce="jw86mcdx">
+title: SQLite | Node.js v26.9.0 Documentation
+[s_h76cvd:6020-6183] | section 1.2 Class: DatabaseSync
 ...
-</page>
-<page untrusted="true" n="2" ref="k7f2:r2" snapshot="s_p8w3tz" retrieved="2026-09-21T03:10Z" cache="hit 2h">
+
+[... skipped 236 chars ...]
+
+[s_h76cvd:6419-6614] | section 1.2.1 new DatabaseSync(path[, options])
 ...
-</page>
-page 3 k7f2:r5 blocked: the site refused automated access (HTTP 403); try another source from web_search
-read more: web_fetch(ref="s_k2m9qx", section="...") | find="..." | cursor="c_x1b7"
+</page nonce="jw86mcdx">
+read more: web_fetch(ref="s_h76cvd", ...) with find="exact text"
+page 2 ok | bxh98qpf:r2 | https://github.com/nodejs/node/issues/57597 | snapshot s_79gthn | retrieved 2026-09-20T17:38Z | cache miss
+...
+```
+
+失败的页面只占一行，不进不可信区块：
+
+```
+page 3 error | k7f2:r5 | https://blocked.example/ | blocked: the site refused automated access (HTTP 403)
 ```
 
 ### 文本视图（单个长页面，带目录）
 
 ```
-web_fetch ok | https://www.rfc-editor.org/rfc/rfc9110.html | retrieved 2026-09-21T03:12Z | cache hit 3h | snapshot s_r9110a
-title: RFC 9110 HTTP Semantics | ~153000 tokens total | showing 3 passages ~2600 tokens (1.7%) | truncated yes | hidden_removed 0
-<page untrusted="true">
-## 13.1.2 If-None-Match   [s_r9110a:301220-303410]
-The "If-None-Match" header field makes the request method conditional on a recipient cache or origin server either not having any current representation...
-</page>
-outline (levels 1-2, ~420 tokens): 1 Introduction ~1600t | 2 Conformance ~1700t | ... | 13 Conditional Requests ~9800t | ...
-read more: section="13.1.2" | find="..." | cursor="c_x1b7"
+web_fetch ok | ~1468 tokens
+note: the outline was shortened by 4 entries to fit the budget
+page 1 ok | https://www.rfc-editor.org/rfc/rfc9110.html | snapshot s_jjv54s | retrieved 2026-09-20T17:41Z | cache miss
+size ~115826 tokens, 443615 chars | showing 3732 chars (0.8%) as lead | truncated yes | hidden_removed 1 | next cursor c_nb6sdf3h
+<page untrusted="true" nonce="j3p5g7zr">
+title: RFC 9110: HTTP Semantics
+[s_jjv54s:0-3732] | section p1 RFC 9110
+# RFC 9110
+...
+</page nonce="j3p5g7zr">
+outline (levels 1-2): p1 RFC 9110 ~39t | ... | 13 Conditional Requests ~6393t | 14 Range Requests ~5010t | 15 Status Codes ~12496t | ...
+read more: web_fetch(ref="s_jjv54s", ...) with section="<id from outline>" | find="exact text" | cursor="c_vc6pq9hn"
 ```
 
 ### 文本视图（`find`）
 
+每段的方括号是上下文的范围，`match` 是引文本身的位置——引用时用后者。
+
 ```
-web_fetch ok | find "If-None-Match" | 32 matches, showing 5 | snapshot s_r9110a retrieved 2026-09-21T03:12Z
-<page untrusted="true">
-1. exact | section 8.8.3 ETag | s_r9110a:210455-210468
-...the entity tag can be used in an If-None-Match header field to...
-</page>
-more matches: cursor="c_m3p0"
+web_fetch ok | ~1143 tokens
+page 1 ok | s_jjv54s | https://www.rfc-editor.org/rfc/rfc9110.html | snapshot s_jjv54s | retrieved 2026-09-20T17:41Z | cache hit 7s
+size ~115826 tokens, 443615 chars | 31 matches, showing 16 in 6 passages | truncated yes | hidden_removed 1 | next cursor c_52pg5g92
+<page untrusted="true" nonce="djb2xq93">
+title: RFC 9110: HTTP Semantics
+1. exact | [s_jjv54s:238746-239182] | match s_jjv54s:238949-238962 (+1 more in this passage) | section 13.1.2 If-None-Match
+...
+#### 13.1.2. If-None-Match
+
+The "If-None-Match" header field makes the request method conditional on ...
+</page nonce="djb2xq93">
 ```
+
+没有命中时 `0 matches`，区块里写 `(no relevant passage)`：这是「页面里没有这句话」的明确回答，不是失败。
 
 ### JSON
 
+字段以 `src/contract.ts` 的 `FetchResult` 为准。CLI 加 `--json`，MCP 设 `WEB_RESEARCH_MCP_OUTPUT=json`，库直接返回这个对象。
+
 ```json
-{"status":"partial","goal":"...","tokens":5200,
+{"status":"partial","goal":"...","tokens":5200,"notes":[],
  "pages":[{"n":1,"status":"ok","ref":"k7f2:r1","url":"...","final_url":"...","snapshot":"s_k2m9qx","sha256":"...",
-   "retrieved":"2026-09-21T03:10:00Z","cache":"miss","title":"...","total_chars":7800,"total_tokens":2100,
-   "parts":[{"section":"Return value","start":1820,"end":2410,"text":"...","also_in":[]}],
-   "truncated":true,"next_cursor":"c_x1b7","hidden_removed":0,"outline":[]},
-  {"n":3,"status":"error","ref":"k7f2:r5","error":{"code":"blocked","hint":"..."}}]}
+   "retrieved":"2026-09-21T03:10:00.000Z","cache":"miss","title":"...","total_chars":7800,"total_tokens":2100,
+   "mode":"goal","shown_chars":1500,
+   "parts":[{"section":"1.2","heading":"Return value","start":1820,"end":2410,"text":"...","also_in":[2]}],
+   "truncated":true,"next_cursor":"c_x1b7k2m9","hidden_removed":0,"outline":[]},
+  {"n":3,"status":"error","ref":"k7f2:r5","url":"...","parts":[],"truncated":false,
+   "error":{"code":"blocked","message":"the site refused automated access (HTTP 403)"}}]}
 ```
 
 ## 8. 内容类型

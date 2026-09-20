@@ -10,7 +10,7 @@ import { charsWithinTokens, estimateTokens } from '../tokens.ts'
 
 const ENVELOPE_TAG = /<(\/?)\s*(results|page)\b/giu
 const PROTOCOL_LINE =
-  /^\s*(web_search |web_fetch |page \d+ |sources:|note:|error |more:|read:|read more:|outline |size ~|\[output clamped)/u
+  /^\s*(web_search |web_fetch |page \d+ |sources:|note:|error |more:|read:|read more:|outline |size ~|\[output clamped|\[\.\.\. skipped |(\d+\. (exact|normalized) (\| )?)?\[(s_[a-z0-9]+:)?\d+-\d+\])/u
 
 interface Neutralized {
   text: string
@@ -46,6 +46,14 @@ function age(seconds: number | undefined): string {
   if (seconds < 90) return ` ${Math.round(seconds)}s`
   if (seconds < 5400) return ` ${Math.round(seconds / 60)}m`
   return ` ${Math.round(seconds / 3600)}h`
+}
+
+/** Minute precision is enough to judge freshness; the JSON view keeps the full timestamp. */
+function minute(timestamp: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/u.exec(
+    timestamp,
+  )
+  return match ? `${match[1]}${match[2]}` : oneLine(timestamp)
 }
 
 function joined(parts: (string | undefined)[]): string {
@@ -109,8 +117,15 @@ export function renderSearch(result: SearchResult): string {
   return lines.join('\n')
 }
 
-function location(page: PageResult, part: PagePart): string {
-  return page.snapshot ? `${page.snapshot}:${part.start}-${part.end}` : `${part.start}-${part.end}`
+function location(page: PageResult, start: number, end: number): string {
+  return page.snapshot ? `${page.snapshot}:${start}-${end}` : `${start}-${end}`
+}
+
+/** Find mode: the quote itself is what gets cited, so its own span is printed, not only the context. */
+function matchNote(page: PageResult, part: PagePart): string | undefined {
+  if (part.match_start === undefined || part.match_end === undefined) return undefined
+  const more = (part.match_count ?? 1) - 1
+  return `match ${location(page, part.match_start, part.match_end)}${more > 0 ? ` (+${more} more in this passage)` : ''}`
 }
 
 function partHeader(page: PageResult, part: PagePart, index: number): string {
@@ -120,9 +135,16 @@ function partHeader(page: PageResult, part: PagePart, index: number): string {
     .join(' ')
   return joined([
     page.mode === 'find' ? `${index + 1}. ${part.match ?? 'exact'}` : undefined,
-    `[${location(page, part)}]`,
+    `[${location(page, part.start, part.end)}]`,
+    page.mode === 'find' ? matchNote(page, part) : undefined,
     where ? `section ${where}` : undefined,
+    part.clipped ? 'clipped at a line, the rest follows at the cursor' : undefined,
+    part.also_in?.length ? `same passage on page ${part.also_in.join(', ')}` : undefined,
   ])
+}
+
+function coveredMatches(page: PageResult): number {
+  return page.parts.reduce((sum, part) => sum + (part.match_count ?? 1), 0)
 }
 
 /** Returns the body lines and how many spots of page text had to be neutralized. */
@@ -168,7 +190,7 @@ function renderPage(page: PageResult, lines: string[]): void {
       page.ref,
       oneLine(address),
       `snapshot ${page.snapshot}`,
-      page.retrieved ? `retrieved ${page.retrieved}` : undefined,
+      page.retrieved ? `retrieved ${minute(page.retrieved)}` : undefined,
       page.cache ? `cache ${page.cache}${age(page.cache_age_s)}` : undefined,
     ]),
   )
@@ -176,7 +198,7 @@ function renderPage(page: PageResult, lines: string[]): void {
     joined([
       `size ~${page.total_tokens ?? 0} tokens, ${total} chars`,
       page.mode === 'find'
-        ? `${page.find_total ?? page.parts.length} matches, showing ${page.parts.length}`
+        ? `${page.find_total ?? coveredMatches(page)} matches, showing ${coveredMatches(page)} in ${page.parts.length} passages`
         : `showing ${shown} chars (${percent}%) as ${page.mode ?? 'full'}`,
       `truncated ${page.truncated ? 'yes' : 'no'}`,
       `hidden_removed ${page.hidden_removed ?? 0}`,

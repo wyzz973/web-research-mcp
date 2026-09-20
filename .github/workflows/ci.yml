@@ -35,3 +35,5 @@ jobs:
       # The built entry points must start on every platform without network access.
       - run: node dist/cli/main.js --version
       - run: node dist/cli/main.js --help
+      # Installs the packed tarball into an empty project and drives the installed entry points.
+      - run: node scripts/pack-smoke.mjs

@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+  <head><title>Storage engine manual</title></head>
+  <body>
+    <div role="navigation"><a href="/manual">Manual</a> / <a href="/manual/storage">Storage</a></div>
+    <div id="toc"><ul><li><a href="#wal">Write-ahead log</a></li><li><a href="#compaction">Compaction</a></li></ul></div>
+    <h1>Storage engine manual</h1>
+    <h2>Table of Contents</h2>
+    <ul>
+      <li><a href="#wal">Write-ahead log</a></li>
+      <li><a href="#compaction">Compaction</a></li>
+    </ul>
+    <h2 id="wal">Write-ahead log <a class="headerlink" href="#wal">¶</a></h2>
+    <p>Every mutation is appended to the write-ahead log before it is applied to the tree. The log is fsynced in groups, which keeps latency low while still bounding the amount of data that a crash can lose.</p>
+    <h2 id="compaction">Compaction <a class="headerlink" href="#compaction">¶</a></h2>
+    <p>Compaction merges sorted runs in the background. It is throttled by the write rate so that foreground latency stays predictable even when the disk is close to saturation.</p>
+    <p>Contents of a run are immutable once written, which makes snapshots cheap and lets readers proceed without taking locks.</p>
+  </body>
+</html>
