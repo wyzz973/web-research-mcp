@@ -3,6 +3,11 @@
  * Everything that originates on the web stays inside a block that only ends at a closing tag
  * carrying the same random nonce, and text that imitates our tags or our header and footer lines
  * is neutralized. The number of neutralized spots is reported, never hidden.
+ *
+ * The rule, checked by tests/render/outside-the-block.spec.ts: outside a block there are only
+ * this server's own words, ids, and numbers. A page address is site text (a redirect chooses it),
+ * a goal and a ref are caller text that is often copied from a page, so none of them is printed
+ * outside.
  */
 import type { FetchResult, PagePart, PageResult, SearchResult, ToolError } from '../contract.ts'
 import { randomId } from '../ids.ts'
@@ -11,7 +16,7 @@ import { charsWithinTokens, estimateTokens } from '../tokens.ts'
 const ENVELOPE_TAG = /<(\/?)\s*(results|page)\b/giu
 /** Every line shape this server writes: headers, footers, result lines, and passage headers. */
 const PROTOCOL_LINE =
-  /^\s*(web_search |web_fetch |page \d+ |sources:|note:|error |more:|read:|read more:|outline |size ~|\[output clamped|\[\.\.\. skipped |\[([a-z0-9]{3,12}:)?r\d{1,3}\]|(\d+\. (exact|normalized|closest \(not a match\)) (\| )?)?\[(s_[a-z0-9]+:)?\d+-\d+\])/u
+  /^\s*(web_search |web_fetch |page \d+ |sources:|note:|error |more:|read:|read more:|outline |size ~|title: |url: |\[output clamped|\[\.\.\. skipped |\[([a-z0-9]{3,12}:)?r\d{1,3}\]|(\d+\. (exact|normalized|closest \(not a match\)) (\| )?)?\[(s_[a-z0-9]+:)?\d+-\d+\])/u
 
 interface Neutralized {
   text: string
@@ -88,6 +93,14 @@ function minute(timestamp: string): string {
   return match ? `${match[1]}${match[2]}` : oneLine(timestamp)
 }
 
+/**
+ * Refs, snapshot ids, and cursors are ours, but a ref is echoed from the caller's input: anything
+ * that does not look like one of our ids is left out rather than printed.
+ */
+function ownId(value: string | undefined): string | undefined {
+  return value !== undefined && /^[a-z0-9_]{1,40}(:r\d{1,4})?$/u.test(value) ? value : undefined
+}
+
 function joined(parts: (string | undefined)[]): string {
   return parts.filter(Boolean).join(' | ')
 }
@@ -98,13 +111,20 @@ function renderHits(result: SearchResult): { lines: string[]; neutralized: numbe
   const lines: string[] = []
   result.results.forEach((hit, index) => {
     if (index > 0) lines.push('')
-    lines.push(
-      joined([
-        `[${hit.ref}] ${field(hit.title, tally) || '(untitled)'} - ${field(hit.site, tally)}`,
-        hit.published ? `published ${field(hit.published, tally)}` : undefined,
-        hit.found_by.length > 1 ? `${hit.found_by.length} sources` : undefined,
-      ]),
+    // Our own fields never share a line with web text, so a title cannot add a field of its own
+    // ("Docs | 9 sources") and titles do not have to be altered to prevent it.
+    const ours = joined([
+      hit.published && /^\d{4}(-\d{2}(-\d{2})?)?$/u.test(hit.published)
+        ? `published ${hit.published}`
+        : undefined,
+      hit.found_by.length > 1 ? `${hit.found_by.length} sources` : undefined,
+    ])
+    lines.push(`[${ownId(hit.ref) ?? '?'}]${ours ? ` ${ours}` : ''}`)
+    const heading = neutralize(
+      `${hit.title.trim() || '(untitled)'} - ${hit.site}`.replace(/\s+/gu, ' '),
     )
+    tally.count += heading.count
+    lines.push(heading.text)
     lines.push(oneLine(hit.url))
     if (!hit.excerpt.trim()) return
     const excerpt = neutralize(hit.excerpt.trim())
@@ -218,7 +238,13 @@ function renderParts(page: PageResult): { lines: string[]; neutralized: number }
   const lines: string[] = []
   const tally: Tally = { count: 0 }
   let previousEnd: number | undefined
-  if (page.title) lines.push(`title: ${field(page.title, tally)}`)
+  lines.push(`url: ${urlField(page.final_url ?? page.url)}`)
+  if (page.title) {
+    // A line of its own: "Page | Site" titles stay as they are, only imitation is neutralized.
+    const title = neutralize(page.title.replace(/\s+/gu, ' ').trim())
+    tally.count += title.count
+    lines.push(`title: ${title.text}`)
+  }
   page.parts.forEach((part, index) => {
     if (previousEnd !== undefined && part.start > previousEnd && page.mode !== 'find')
       lines.push('', `[... skipped ${part.start - previousEnd} chars ...]`, '')
@@ -236,10 +262,16 @@ function renderParts(page: PageResult): { lines: string[]; neutralized: number }
 }
 
 function renderPage(page: PageResult, lines: string[]): void {
-  const address = page.final_url ?? page.url
   if (page.status === 'error' || !page.snapshot) {
     const reason = page.error ? errorLine(page.error) : 'internal: no content'
-    lines.push(joined([`page ${page.n} error`, page.ref, urlField(address), reason]))
+    lines.push(joined([`page ${page.n} error`, ownId(page.ref), reason]))
+    // Which address failed is worth three lines: the caller may have sent several.
+    const address = urlField(page.url)
+    if (address) {
+      const nonce = randomId(8)
+      lines.push(`<page untrusted="true" nonce="${nonce}">`, `url: ${address}`)
+      lines.push(`</page nonce="${nonce}">`)
+    }
     return
   }
   const body = renderParts(page)
@@ -249,9 +281,8 @@ function renderPage(page: PageResult, lines: string[]): void {
   lines.push(
     joined([
       `page ${page.n} ok`,
-      page.ref,
-      urlField(address),
-      `snapshot ${page.snapshot}`,
+      ownId(page.ref),
+      `snapshot ${ownId(page.snapshot) ?? '?'}`,
       page.retrieved ? `retrieved ${minute(page.retrieved)}` : undefined,
       page.cache ? `cache ${page.cache}${age(page.cache_age_s)}` : undefined,
     ]),
@@ -265,18 +296,18 @@ function renderPage(page: PageResult, lines: string[]): void {
       `truncated ${page.truncated ? 'yes' : 'no'}`,
       `hidden_removed ${page.hidden_removed ?? 0}`,
       body.neutralized ? `neutralized ${body.neutralized}` : undefined,
-      page.next_cursor ? `next cursor ${page.next_cursor}` : undefined,
+      ownId(page.next_cursor) ? `next cursor ${page.next_cursor}` : undefined,
     ]),
   )
   const nonce = randomId(8)
   lines.push(`<page untrusted="true" nonce="${nonce}">`, ...body.lines)
   lines.push(`</page nonce="${nonce}">`)
-  if (page.truncated || page.outline?.length)
+  if ((page.truncated || page.outline?.length) && ownId(page.snapshot))
     lines.push(
       `read more: web_fetch(ref="${page.snapshot}", ...) with ${joined([
         page.outline?.length ? `section="<id from outline>"` : undefined,
         `find="exact text"`,
-        page.next_cursor ? `cursor="${page.next_cursor}"` : undefined,
+        ownId(page.next_cursor) ? `cursor="${page.next_cursor}"` : undefined,
       ])}`,
     )
 }
@@ -287,8 +318,8 @@ export function renderFetch(result: FetchResult): string {
   lines.push(
     joined([
       `web_fetch ${result.status}`,
-      // The caller's own words, but they share our line: keep them to one field.
-      result.goal ? `goal "${field(result.goal, { count: 0 })}"` : undefined,
+      // Evidence mode is visible from each page's "as goal"; the goal's words are the caller's.
+      result.goal ? 'goal given' : undefined,
       result.pages.length > 1
         ? `${result.pages.length} pages: ${ok} ok, ${result.pages.length - ok} failed`
         : undefined,

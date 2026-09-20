@@ -97,17 +97,20 @@ size ~115826 tokens, 443615 chars | showing 3732 chars (0.8%) as lead | truncate
 
 ## 7. 输出
 
-下面的例子都取自 2026-09-21 的真实运行，只删减了正文。方括号里的 `s_xxxxxx:起-止` 是可引用的位置：快照 id 加 UTF-16 偏移，任何时候用 `web_fetch(ref="s_xxxxxx", cursor=…)` 或 `find` 都能复核。
+下面的例子取自 2026-09-21 的真实运行，删减了正文，并按之后的格式调整改写过（地址移入区块、表头不再回显 goal 的文字）。方括号里的 `s_xxxxxx:起-止` 是可引用的位置：快照 id 加 UTF-16 偏移，任何时候用 `web_fetch(ref="s_xxxxxx", cursor=…)` 或 `find` 都能复核。
 
-服务器写的行（表头、`note:`、`read more:`）在不可信区块之外；网页文字只出现在 `<page untrusted="true" nonce="…">` 与带同一个 nonce 的结束标记之间。目录（`outline`）也在区块**里面**：目录项是页面自己的标题，属于网页文字（第五轮审计后从区块外移入）。与我们的字段共用一行的网页文字——结果标题、章节名、目录项——里的 `|` 会换成 `∣`，URL 里的换成 `%7C`，因为 ` | ` 是我们的字段分隔符；改动的处数计入表头的 `neutralized`。
+规则只有一条，并由 `tests/render/outside-the-block.spec.ts` 机械检验：**区块之外只有本服务器自己的词、id 和数字**。页面地址属于站点文字（重定向的目标由站点决定），goal 和 ref 属于调用方文字（常常是模型从页面上抄来的），所以地址印在区块里的 `url:` 行，表头只写 `goal given` 而不回显它的文字，格式不对的 ref 不回显。
+
+服务器写的行（表头、`note:`、`read more:`）在不可信区块之外；网页文字只出现在 `<page untrusted="true" nonce="…">` 与带同一个 nonce 的结束标记之间。目录（`outline`）也在区块**里面**：目录项是页面自己的标题，属于网页文字（第五轮审计后从区块外移入）。网页文字尽量独占一行（页面标题、搜索结果的标题行、地址），这些行里的 `|` 原样保留。只有不得不和我们的字段共用一行的网页文字——段头里的章节名、目录项——里的 `|` 才换成 `∣`，因为 ` | ` 是我们的字段分隔符；改动的处数计入表头的 `neutralized`。
 
 ### 文本视图（证据模式，多个页面）
 
 ```
-web_fetch ok | goal "default busy timeout of DatabaseSync and how to change it" | 2 pages: 2 ok, 0 failed | ~840 tokens
-page 1 ok | bxh98qpf:r1 | https://nodejs.org/api/sqlite.html | snapshot s_h76cvd | retrieved 2026-09-20T17:38Z | cache miss
+web_fetch ok | goal given | 2 pages: 2 ok, 0 failed | ~840 tokens
+page 1 ok | bxh98qpf:r1 | snapshot s_h76cvd | retrieved 2026-09-20T17:38Z | cache miss
 size ~25393 tokens, 88258 chars | showing 358 chars (0.4%) as goal | truncated yes | hidden_removed 0
 <page untrusted="true" nonce="jw86mcdx">
+url: https://nodejs.org/api/sqlite.html
 title: SQLite | Node.js v26.9.0 Documentation
 [s_h76cvd:6020-6183] | section 1.2 Class: DatabaseSync
 ...
@@ -118,14 +121,17 @@ title: SQLite | Node.js v26.9.0 Documentation
 ...
 </page nonce="jw86mcdx">
 read more: web_fetch(ref="s_h76cvd", ...) with find="exact text"
-page 2 ok | bxh98qpf:r2 | https://github.com/nodejs/node/issues/57597 | snapshot s_79gthn | retrieved 2026-09-20T17:38Z | cache miss
+page 2 ok | bxh98qpf:r2 | snapshot s_79gthn | retrieved 2026-09-20T17:38Z | cache miss
 ...
 ```
 
-失败的页面只占一行，不进不可信区块：
+失败的页面：原因在我们自己的那一行里，地址在一个只有一行的区块里（地址是调用方给的，常常抄自搜索结果，属于区块内的内容）：
 
 ```
-page 3 error | k7f2:r5 | https://blocked.example/ | blocked: the site refused automated access (HTTP 403)
+page 3 error | k7f2:r5 | blocked: the site refused automated access (HTTP 403)
+<page untrusted="true" nonce="cz77gvxm">
+url: https://blocked.example/
+</page nonce="cz77gvxm">
 ```
 
 ### 文本视图（单个长页面，带目录）
@@ -133,9 +139,10 @@ page 3 error | k7f2:r5 | https://blocked.example/ | blocked: the site refused au
 ```
 web_fetch ok | ~1468 tokens
 note: the outline was shortened by 4 entries to fit the budget
-page 1 ok | https://www.rfc-editor.org/rfc/rfc9110.html | snapshot s_jjv54s | retrieved 2026-09-20T17:41Z | cache miss
+page 1 ok | snapshot s_jjv54s | retrieved 2026-09-20T17:41Z | cache miss
 size ~115826 tokens, 443615 chars | showing 3732 chars (0.8%) as lead | truncated yes | hidden_removed 1 | next cursor c_nb6sdf3h
 <page untrusted="true" nonce="j3p5g7zr">
+url: https://www.rfc-editor.org/rfc/rfc9110.html
 title: RFC 9110: HTTP Semantics
 [s_jjv54s:0-3732] | section p1 RFC 9110
 # RFC 9110
@@ -152,9 +159,10 @@ read more: web_fetch(ref="s_jjv54s", ...) with section="<id from outline>" | fin
 
 ```
 web_fetch ok | ~1143 tokens
-page 1 ok | s_jjv54s | https://www.rfc-editor.org/rfc/rfc9110.html | snapshot s_jjv54s | retrieved 2026-09-20T17:41Z | cache hit 7s
+page 1 ok | s_jjv54s | snapshot s_jjv54s | retrieved 2026-09-20T17:41Z | cache hit 7s
 size ~115826 tokens, 443615 chars | 31 matches, showing 16 in 6 passages | truncated yes | hidden_removed 1 | next cursor c_52pg5g92
 <page untrusted="true" nonce="djb2xq93">
+url: https://www.rfc-editor.org/rfc/rfc9110.html
 title: RFC 9110: HTTP Semantics
 1. exact | [s_jjv54s:238746-239182] | match s_jjv54s:238949-238962 (+1 more in this passage) | section 13.1.2 If-None-Match
 ...
