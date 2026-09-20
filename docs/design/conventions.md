@@ -1,6 +1,6 @@
 # 面向模型的共同约定
 
-状态：设计草案，尚未实现。适用于 [web_search](web-search.md) 和 [web_fetch](web-fetch.md)。
+状态：**M0 已实现**（2.0.0-alpha.1）。本页写的是设计目标，范围比 M0 大，**还没有与代码逐条核对**：文中的某项能力是否已经存在，以 [总览的「实现状态」](README.md#实现状态) 和 `src/contract.ts` 为准，不要仅凭本页判断。适用于 [web_search](web-search.md) 和 [web_fetch](web-fetch.md)。
 
 读者是大模型。每一条约定都要回答同一个问题：模型读到这段输出后，能不能用最少的 token 做出正确的下一步。
 
