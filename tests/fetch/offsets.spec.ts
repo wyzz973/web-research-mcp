@@ -271,7 +271,7 @@ describe.each([5, 17, 29])('any stretch of visible text can be found again (corp
       const roughEnd = from + 15 + Math.floor(next() * 60)
       const space = visible.indexOf(' ', roughEnd)
       const needle = visible.slice(from, space === -1 ? visible.length : space)
-      const matches = findMatches(markdown, needle)
+      const matches = findMatches(markdown, needle, foldText(markdown))
       expect(matches.length, `needle ${JSON.stringify(needle)}`).toBeGreaterThan(0)
       for (const match of matches) {
         const slice = markdown.slice(match.start, match.end)

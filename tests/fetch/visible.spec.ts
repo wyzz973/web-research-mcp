@@ -28,13 +28,17 @@ const PAGE = [
   '[sqlite]: https://sqlite.org/',
 ].join('\n')
 
+function find(markdown: string, needle: string): ReturnType<typeof findMatches> {
+  return findMatches(markdown, needle, foldText(markdown))
+}
+
 function visible(text: string): string {
   return foldText(text).text.trim()
 }
 
 /** The matched span, stripped of markup, must read exactly like the needle. */
 function expectMatch(needle: string, kind: 'exact' | 'normalized' = 'normalized'): string {
-  const matches = findMatches(PAGE, needle)
+  const matches = find(PAGE, needle)
   expect(matches, `matches for ${JSON.stringify(needle)}`).toHaveLength(1)
   const match = matches[0]
   expect(match?.kind).toBe(kind)
@@ -95,9 +99,10 @@ describe('quotes taken from the visible text', () => {
     expect(expectMatch('Quoted advice: call close() when done.')).toBe(
       'Quoted advice: call `close()` when done.',
     )
-    expect(
-      findMatches(PAGE, 'new DatabaseSync(path[, options])').map((match) => match.kind),
-    ).toEqual(['exact', 'normalized'])
+    expect(find(PAGE, 'new DatabaseSync(path[, options])').map((match) => match.kind)).toEqual([
+      'exact',
+      'normalized',
+    ])
   })
 
   it('reads image text, reference links, and autolinks as their visible text', () => {
@@ -113,7 +118,7 @@ describe('quotes taken from the visible text', () => {
   it('reports UTF-16 offsets even after an emoji', () => {
     const slice = expectMatch('for \u{1F600} details.', 'exact')
     expect(slice).toBe('for \u{1F600} details.')
-    const match = findMatches(PAGE, 'details.')[0]
+    const match = find(PAGE, 'details.')[0]
     expect(PAGE.slice(match?.start, match?.end)).toBe('details.')
     expect(match?.start).toBe(PAGE.indexOf('details.'))
   })
@@ -125,17 +130,17 @@ describe('quotes taken from the visible text', () => {
     expect(expectMatch('DB.EXEC("pragma busy_timeout = 1000;")')).toBe(
       'db.exec("PRAGMA busy_timeout = 1000;")',
     )
-    expect(findMatches(PAGE, 'js db.exec')).toEqual([])
+    expect(find(PAGE, 'js db.exec')).toEqual([])
   })
 
   it('does not invent matches', () => {
-    expect(findMatches(PAGE, 'The busy timeout in seconds')).toEqual([])
+    expect(find(PAGE, 'The busy timeout in seconds')).toEqual([])
     // A link title is markup: it is not part of the sentence a reader sees.
-    expect(findMatches(PAGE, 'SQLite docs in milliseconds')).toEqual([])
-    expect(findMatches(PAGE, 'busy_timeout.html in milliseconds')).toEqual([])
+    expect(find(PAGE, 'SQLite docs in milliseconds')).toEqual([])
+    expect(find(PAGE, 'busy_timeout.html in milliseconds')).toEqual([])
     // Pure markup has no visible text, so only its literal occurrences can match.
-    expect(findMatches(PAGE, '**').every((match) => match.kind === 'exact')).toBe(true)
-    expect(findMatches(PAGE, '_ * `')).toEqual([])
+    expect(find(PAGE, '**').every((match) => match.kind === 'exact')).toBe(true)
+    expect(find(PAGE, '_ * `')).toEqual([])
   })
 })
 

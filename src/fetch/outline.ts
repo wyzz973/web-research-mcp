@@ -34,14 +34,21 @@ function ownNumber(title: string): { id: string; rest: string } | undefined {
   return undefined
 }
 
+/**
+ * No real document has this many headings (a 150,000-token RFC has 300). A page that does is
+ * hostile or generated, and an outline object per heading would cost memory for nothing.
+ */
+export const MAX_HEADINGS = 20_000
+
 function readHeadings(markdown: string, blocks: Block[]): Heading[] {
   const headings: Heading[] = []
-  blocks.forEach((block, index) => {
-    if (block.kind !== 'heading') return
+  for (const [index, block] of blocks.entries()) {
+    if (block.kind !== 'heading') continue
+    if (headings.length === MAX_HEADINGS) break
     const match = ATX_HEADING.exec(markdown.slice(block.start, block.end))
     const text = plainTitle(match?.[2] ?? '')
     if (text !== '') headings.push({ block: index, level: block.level ?? 1, text })
-  })
+  }
   return headings
 }
 

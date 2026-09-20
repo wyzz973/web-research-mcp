@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { FetchResult, PageResult } from '../../src/contract.ts'
 import { splitBlocks } from '../../src/fetch/blocks.ts'
 import { analyze } from '../../src/fetch/document.ts'
-import { rankPassages } from '../../src/fetch/goal.ts'
+import { PART_OVERHEAD } from '../../src/fetch/budget.ts'
+import { keepRelevant, rankPassages } from '../../src/fetch/goal.ts'
+import { selectPassages } from '../../src/fetch/select.ts'
+import { estimateTokens } from '../../src/tokens.ts'
 import { createHarness, expectVerbatim, type Harness } from './helpers.ts'
 
 let harness: Harness | undefined
@@ -36,13 +39,20 @@ function optionItem(name: string): string {
   return `-   \`${name}\` <boolean> If \`true\`, the connection applies the ${name} behaviour to every statement it prepares, and the setting cannot be altered once the connection has been opened by the constructor. **Default:** \`false\`.`
 }
 
+/** Like the real reference: every API has its own history table, and the class name recurs. */
 function fillerSection(index: number): string {
   const paragraph = `The statement object number ${index} prepares its SQL once and can then be executed repeatedly with different parameters, which avoids parsing the same text again. `
+  const history = [
+    '| Version | Changes |',
+    '| --- | --- |',
+    `| v22.${index}.0 | Added in: v22.${index}.0 |`,
+  ].join('\n')
   return [
     `## Class: Helper${index}`,
+    history,
     paragraph.repeat(3),
     `### helper${index}.run()`,
-    paragraph.repeat(4),
+    `${paragraph.repeat(3)}It is created from a DatabaseSync connection.`,
   ].join('\n\n')
 }
 
@@ -285,6 +295,36 @@ describe('context around a passage', () => {
     }
     expectVerbatim(result, harness.store)
   })
+})
+
+describe('budget after widening', () => {
+  it.each([400, 700, 1200, 2500])(
+    'never spends more than %i tokens, context included',
+    (tokens) => {
+      const documents = [
+        analyze(apiReference()),
+        analyze(apiReference().replaceAll('timeout', 'deadline')),
+      ]
+      const budget = { tokens, chars: tokens * 4 }
+      const candidates = keepRelevant(rankPassages(documents, 'busy timeout deadline default'))
+      const selections = selectPassages(documents, candidates, budget)
+      const parts = selections.flatMap((selection) => selection.parts)
+      // No single block of this document is longer than 400 characters.
+      const widened = parts.filter((part) => part.text.length > 400)
+      expect(parts.length).toBeGreaterThan(0)
+      if (tokens >= 1200) expect(widened.length).toBeGreaterThan(0)
+      const spentTokens = parts.reduce(
+        (sum, part) => sum + estimateTokens(part.text) + PART_OVERHEAD.tokens,
+        0,
+      )
+      const spentChars = parts.reduce(
+        (sum, part) => sum + part.text.length + PART_OVERHEAD.chars,
+        0,
+      )
+      expect(spentTokens).toBeLessThanOrEqual(budget.tokens)
+      expect(spentChars).toBeLessThanOrEqual(budget.chars)
+    },
+  )
 })
 
 describe('pages that fit their share', () => {

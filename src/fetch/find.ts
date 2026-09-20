@@ -2,9 +2,10 @@ import type { PagePart } from '../contract.ts'
 import { fits, minus, partCost, type Budget } from './budget.ts'
 import { makePart } from './range.ts'
 import type { PageDocument } from './document.ts'
-import { foldText, type Folded } from './visible.ts'
+import { throwIfAborted } from '../errors.ts'
+import { foldText, foldTextSliced, type Folded } from './visible.ts'
 
-export { foldText, type Folded } from './visible.ts'
+export { foldText, foldTextSliced, type Folded } from './visible.ts'
 
 export interface Match {
   start: number
@@ -16,34 +17,85 @@ const CONTEXT_CHARS = 200
 const SNAP_CHARS = 30
 /** Merged contexts stop growing here so one dense paragraph cannot eat the whole budget. */
 const MAX_GROUP_CHARS = 1200
-export type FoldCache = (snapshotId: string, markdown: string) => Folded
+/**
+ * Snapshots above this size are searched literally only. The visible-text map costs about ten
+ * bytes per character while it is cached (20 MB here), and no ordinary page comes close: a
+ * 150,000-token RFC is 0.45 million characters, and converted HTML is capped at 3 MB of source.
+ * Only raw text or Markdown bodies of several megabytes reach this limit.
+ */
+export const MAX_FOLD_CHARS = 2_000_000
+/** Cached maps are dropped, oldest first, beyond this many snapshots or this much source text. */
+const CACHE_ENTRIES = 4
+const CACHE_CHARS = 4_000_000
 
-/** Folding a long document costs tens of milliseconds; snapshots never change, so keep a few. */
-export function createFoldCache(capacity = 4): FoldCache {
-  const cache = new Map<string, Folded>()
-  return (snapshotId, markdown) => {
-    const hit = cache.get(snapshotId)
-    if (hit) {
-      cache.delete(snapshotId)
-      cache.set(snapshotId, hit)
-      return hit
+/** Resolves to undefined when the snapshot is too large for visible-text matching. */
+export type FoldCache = (
+  snapshotId: string,
+  markdown: string,
+  signal: AbortSignal,
+) => Promise<Folded | undefined>
+
+type Fold = (markdown: string, signal: AbortSignal) => Promise<Folded>
+
+/**
+ * Snapshots never change, so each is folded once and kept for the next find. Callers that ask
+ * for the same snapshot at the same time share one computation; if its owner is cancelled, the
+ * others start their own.
+ */
+export function createFoldCache(fold: Fold = foldTextSliced): FoldCache {
+  const ready = new Map<string, { folded: Folded; chars: number }>()
+  const pending = new Map<string, Promise<Folded>>()
+
+  function remember(snapshotId: string, folded: Folded, chars: number): void {
+    ready.set(snapshotId, { folded, chars })
+    let total = [...ready.values()].reduce((sum, entry) => sum + entry.chars, 0)
+    for (const [id, entry] of ready) {
+      if (ready.size <= CACHE_ENTRIES && (total <= CACHE_CHARS || ready.size === 1)) break
+      ready.delete(id)
+      total -= entry.chars
     }
-    const folded = foldText(markdown)
-    cache.set(snapshotId, folded)
-    const oldest = cache.size > capacity ? cache.keys().next().value : undefined
-    if (oldest !== undefined) cache.delete(oldest)
+  }
+
+  function recall(snapshotId: string): Folded | undefined {
+    const hit = ready.get(snapshotId)
+    if (!hit) return undefined
+    ready.delete(snapshotId)
+    ready.set(snapshotId, hit)
+    return hit.folded
+  }
+
+  return async (snapshotId, markdown, signal) => {
+    if (markdown.length > MAX_FOLD_CHARS) return undefined
+    for (;;) {
+      const known = recall(snapshotId)
+      if (known) return known
+      const shared = pending.get(snapshotId)
+      if (!shared) break
+      try {
+        return await shared
+      } catch {
+        // The computation belonged to a caller that was cancelled; carry on with our own.
+        throwIfAborted(signal)
+      }
+    }
+    const task = fold(markdown, signal).finally(() => pending.delete(snapshotId))
+    pending.set(snapshotId, task)
+    const folded = await task
+    remember(snapshotId, folded, markdown.length)
     return folded
   }
 }
 
+/** A text that occurs this often is not a quote; counting stops here and the result says so. */
+export const MAX_MATCHES = 10_000
+
 function allIndexes(haystack: string, needle: string): number[] {
   const found: number[] = []
-  for (
-    let at = haystack.indexOf(needle);
-    at !== -1;
-    at = haystack.indexOf(needle, at + needle.length)
-  )
+  let at = haystack.indexOf(needle)
+  while (at !== -1 && found.length < MAX_MATCHES) {
     found.push(at)
+    at = haystack.indexOf(needle, at + needle.length)
+  }
   return found
 }
 
@@ -57,22 +109,36 @@ function normalizedMatches(markdown: string, needle: string, folded: Folded): Ma
   }))
 }
 
+/** Both lists are sorted and free of overlaps in themselves, so one sweep merges them. */
+function mergeMatches(exact: Match[], loose: Match[]): Match[] {
+  const merged: Match[] = []
+  let next = 0
+  for (const match of loose) {
+    while (next < exact.length && (exact[next]?.end ?? 0) <= match.start) {
+      const hit = exact[next]
+      if (hit) merged.push(hit)
+      next += 1
+    }
+    const covered = (exact[next]?.start ?? Number.POSITIVE_INFINITY) < match.end
+    if (!covered) merged.push(match)
+  }
+  return [...merged, ...exact.slice(next)].slice(0, MAX_MATCHES)
+}
+
 /**
  * Verbatim occurrences of the Markdown first; then occurrences in the visible text, which ignore
  * links, escapes, emphasis, layout markers, case, and spacing. A visible match runs from its first
- * to its last matched character, markup in between included.
+ * to its last matched character, markup in between included. The visible text is never computed
+ * here: without `folded` (a snapshot too large to fold) only verbatim occurrences are reported.
  */
-export function findMatches(markdown: string, needle: string, folded?: Folded): Match[] {
+export function findMatches(markdown: string, needle: string, folded: Folded | undefined): Match[] {
   if (needle.trim() === '') return []
   const exact: Match[] = allIndexes(markdown, needle).map((start) => ({
     start,
     end: start + needle.length,
     kind: 'exact',
   }))
-  const loose = normalizedMatches(markdown, needle, folded ?? foldText(markdown)).filter(
-    (match) => !exact.some((hit) => match.start < hit.end && match.end > hit.start),
-  )
-  return [...exact, ...loose].sort((left, right) => left.start - right.start)
+  return folded ? mergeMatches(exact, normalizedMatches(markdown, needle, folded)) : exact
 }
 
 function isLowSurrogate(code: number): boolean {
@@ -148,7 +214,7 @@ export function readMatches(
   needle: string,
   from: number,
   budget: Budget,
-  folded?: Folded,
+  folded: Folded | undefined,
 ): FindRead {
   const matches = findMatches(document.markdown, needle, folded)
   const parts: PagePart[] = []

@@ -1,13 +1,14 @@
 /** Chooses the way of reading (cursor aside): find, then section, then goal, then the default. */
 import type { ResolvedFetch } from '../contract.ts'
 import type { Budget } from './budget.ts'
-import type { FoldCache } from './find.ts'
+import { MAX_FOLD_CHARS, MAX_MATCHES, type FoldCache, type Folded } from './find.ts'
 import {
   readClosest,
   readFind,
   readGoal,
   readLead,
   readSection,
+  type GoalOptions,
   type PageRead,
   type ReadablePage,
 } from './read.ts'
@@ -21,34 +22,55 @@ export interface ModeOutcome {
 
 const QUOTED_CHARS = 80
 
+/** What reading needs besides the pages: the shared visible-text cache and the caller's signal. */
+export interface ModeContext {
+  fold: FoldCache
+  signal: AbortSignal
+}
+
 /** The caller's own words, shortened; never page text. */
 function quoted(text: string): string {
   const flat = text.replace(/\s+/gu, ' ').replaceAll('"', "'").trim()
   return flat.length > QUOTED_CHARS ? `${flat.slice(0, QUOTED_CHARS - 1)}\u2026` : flat
 }
 
+function goalOptions(
+  goal: string,
+  plan: ResolvedFetch,
+  budget: Budget,
+  context: ModeContext,
+): GoalOptions {
+  return { goal, budget, maxTokens: plan.maxTokens, signal: context.signal }
+}
+
 /**
  * A find without a match must not be a dead end. With a goal, the goal is read instead; without
  * one, the passages sharing the most words with the text are shown, clearly marked as not a match.
  */
-function readFound(
+async function readFound(
   pages: ReadablePage[],
   plan: ResolvedFetch,
   needle: string,
   budget: Budget,
-  fold: FoldCache,
-): ModeOutcome {
-  const found = readFind(pages, needle, 0, budget, fold)
+  context: ModeContext,
+): Promise<ModeOutcome> {
+  const folds: (Folded | undefined)[] = []
+  for (const page of pages)
+    folds.push(await context.fold(page.snapshot, page.document.markdown, context.signal))
+  const found = readFind(pages, needle, 0, budget, folds)
   if (found.some((read) => (read.findTotal ?? 0) > 0))
     return { reads: found, goal: undefined, notes: [] }
   if (plan.goal !== undefined)
     return {
-      reads: readGoal(pages, { goal: plan.goal, budget, maxTokens: plan.maxTokens }),
+      reads: await readGoal(pages, goalOptions(plan.goal, plan, budget, context)),
       goal: plan.goal,
       notes: [`find had 0 matches for "${quoted(needle)}"; showing passages for the goal instead`],
     }
-  const closest = readClosest(pages, needle, budget)
+  const closest = await readClosest(pages, needle, budget, context.signal)
   const any = closest.some((read) => read.parts.length > 0)
+  closest.forEach((read, index) => {
+    if (folds[index] === undefined) read.literalOnly = true
+  })
   return {
     reads: closest,
     goal: undefined,
@@ -60,16 +82,16 @@ function readFound(
   }
 }
 
-export function readByMode(
+export async function readByMode(
   pages: ReadablePage[],
   plan: ResolvedFetch,
   goal: string | undefined,
   budget: Budget,
-  fold: FoldCache,
-): ModeOutcome {
+  context: ModeContext,
+): Promise<ModeOutcome> {
   const first = pages[0]
   if (!first) return { reads: [], goal, notes: [] }
-  if (plan.find !== undefined) return readFound(pages, plan, plan.find, budget, fold)
+  if (plan.find !== undefined) return readFound(pages, plan, plan.find, budget, context)
   if (plan.section !== undefined)
     return {
       reads: [readSection(first, plan.section, budget, plan.maxTokens)],
@@ -77,7 +99,11 @@ export function readByMode(
       notes: [],
     }
   if (goal !== undefined)
-    return { reads: readGoal(pages, { goal, budget, maxTokens: plan.maxTokens }), goal, notes: [] }
+    return {
+      reads: await readGoal(pages, goalOptions(goal, plan, budget, context)),
+      goal,
+      notes: [],
+    }
   return { reads: [readLead(first, budget, plan.maxTokens)], goal: undefined, notes: [] }
 }
 
@@ -101,6 +127,15 @@ export function describeReads(numbers: number[], reads: PageRead[]): string[] {
   const reposts = where((read) => read.onlyReposts)
   if (reposts.length > 0)
     notes.push(`${pageList(reposts)} only repeats passages that are shown from another page`)
+  const literal = where((read) => read.literalOnly)
+  if (literal.length > 0)
+    notes.push(
+      `${pageList(literal)} is larger than ${MAX_FOLD_CHARS} characters, so only exact (literal) matches were looked for; normalized matching was skipped`,
+    )
+  if (reads.some((read) => read.findCapped))
+    notes.push(
+      `counting stopped at ${MAX_MATCHES} matches; search for a longer, more specific text`,
+    )
   if (reads.some((read) => read.parts.some((part) => part.clipped)))
     notes.push(
       'a block larger than the budget was cut at a line boundary; continue with the cursor',

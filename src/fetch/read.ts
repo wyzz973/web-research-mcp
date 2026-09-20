@@ -4,11 +4,11 @@ import { estimateTokens } from '../tokens.ts'
 import { atLeast, fits, minus, MIN_CONTENT, PART_OVERHEAD, share, type Budget } from './budget.ts'
 import { MAX_SHOWN_RANGES, type CursorState } from './cursor.ts'
 import type { PageDocument } from './document.ts'
-import { readMatches, type FoldCache } from './find.ts'
+import { MAX_MATCHES, readMatches, type Folded } from './find.ts'
 import {
   dropReposts,
   keepRelevant,
-  rankPassages,
+  rankPassagesSliced,
   wholePagePassages,
   type Candidate,
 } from './goal.ts'
@@ -36,6 +36,10 @@ export interface PageRead {
   nothingRelevant?: boolean
   /** Goal mode: every relevant passage of this page was already shown from another page. */
   onlyReposts?: boolean
+  /** Find mode: the page is too large for visible-text matching; only literal matches were looked for. */
+  literalOnly?: boolean
+  /** Find mode: counting stopped at the limit. */
+  findCapped?: boolean
   error?: ToolError
 }
 
@@ -167,19 +171,21 @@ function spent(parts: PagePart[]): Budget {
   )
 }
 
-/** Each page gets an equal slice of what is left, so an early page cannot starve a later one. */
+/**
+ * Each page gets an equal slice of what is left, so an early page cannot starve a later one.
+ * `folds[i]` is the visible-text map of page i, or undefined when that page is too large for one.
+ */
 export function readFind(
   pages: ReadablePage[],
   needle: string,
   from: number,
   budget: Budget,
-  fold?: FoldCache,
+  folds: readonly (Folded | undefined)[],
 ): PageRead[] {
   let room = budget
   return pages.map((page, index) => {
-    const folded = fold?.(page.snapshot, page.document.markdown)
     const slice = share(room, pages.length - index)
-    const found = readMatches(page.document, needle, from, slice, folded)
+    const found = readMatches(page.document, needle, from, slice, folds[index])
     room = minus(room, spent(found.parts))
     const read: PageRead = {
       mode: 'find',
@@ -187,6 +193,8 @@ export function readFind(
       truncated: found.consumed < found.total,
       findTotal: found.total,
     }
+    if (folds[index] === undefined) read.literalOnly = true
+    if (found.total >= MAX_MATCHES) read.findCapped = true
     if (read.truncated)
       read.cursor = { kind: 'find', snapshot: page.snapshot, find: needle, from: found.consumed }
     return read
@@ -234,6 +242,7 @@ export interface GoalOptions {
   goal: string
   budget: Budget
   maxTokens: number
+  signal: AbortSignal
   /** Ranges already delivered by earlier calls of the same cursor chain (single page only). */
   shown?: [number, number][]
 }
@@ -248,17 +257,16 @@ interface GoalCandidates {
  * Candidates per page, in page order. Pages shown whole contribute all their passages, so that a
  * repost of them on another page is recognized; they take no part in the ranking itself.
  */
-function goalCandidates(
+async function goalCandidates(
   pages: ReadablePage[],
   whole: Set<ReadablePage>,
   options: GoalOptions,
-): GoalCandidates {
+): Promise<GoalCandidates> {
   const shown = options.shown ?? []
   const documents = pages.map((page) => page.document)
   const isWhole = (index: number): boolean => memberAt(pages, whole, index)
-  const ranked = rankPassages(documents, options.goal).map((list, index) =>
-    isWhole(index) ? [] : list,
-  )
+  const scored = await rankPassagesSliced(documents, options.goal, options.signal)
+  const ranked = scored.map((list, index) => (isWhole(index) ? [] : list))
   // The floor is taken before removing what was already shown, so a cursor chain ends when
   // relevance runs out instead of sliding down to ever weaker passages.
   const lists = keepRelevant(ranked).map((list, index) => {
@@ -336,12 +344,12 @@ function readSelected(
  * default view; for the others the best passages are chosen under one shared budget, widened
  * with context when there is room, and listed in document order.
  */
-export function readGoal(pages: ReadablePage[], options: GoalOptions): PageRead[] {
+export async function readGoal(pages: ReadablePage[], options: GoalOptions): Promise<PageRead[]> {
   const firstCall = (options.shown ?? []).length === 0
   const granted = firstCall
     ? pagesShownWhole(pages, options.budget)
     : { whole: new Set<ReadablePage>(), room: options.budget }
-  const candidates = goalCandidates(pages, granted.whole, options)
+  const candidates = await goalCandidates(pages, granted.whole, options)
   const unmatched = new Set(
     pages.filter(
       (page, index) => firstCall && !granted.whole.has(page) && !candidates.matched[index],
@@ -380,9 +388,15 @@ export function readGoal(pages: ReadablePage[], options: GoalOptions): PageRead[
  * find had no match at all. The passages that share the most words with the text are shown in
  * its place, so the call is not a dead end; they carry no `match`, because they are not one.
  */
-export function readClosest(pages: ReadablePage[], needle: string, budget: Budget): PageRead[] {
+export async function readClosest(
+  pages: ReadablePage[],
+  needle: string,
+  budget: Budget,
+  signal: AbortSignal,
+): Promise<PageRead[]> {
   const documents = pages.map((page) => page.document)
-  const closest = keepRelevant(rankPassages(documents, needle)).map((list) =>
+  const ranked = await rankPassagesSliced(documents, needle, signal)
+  const closest = keepRelevant(ranked).map((list) =>
     list.toSorted((left, right) => right.score - left.score).slice(0, CLOSEST_PASSAGES),
   )
   const selections = selectPassages(documents, closest, budget, false)

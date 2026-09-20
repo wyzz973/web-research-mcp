@@ -1,5 +1,4 @@
 import type { PagePart } from '../contract.ts'
-import { estimateTokens } from '../tokens.ts'
 import { fits, minus, partCost, share, type Budget } from './budget.ts'
 import type { PageDocument } from './document.ts'
 import type { Candidate } from './goal.ts'
@@ -109,13 +108,16 @@ function takeNeighbour(context: Widening, span: Span, index: number, added: numb
         spanStart(document, span),
       )
     : document.markdown.slice(span.end, block.end)
-  const cost = { tokens: estimateTokens(text), chars: text.length }
-  if (added + cost.chars > MAX_CONTEXT_CHARS || !fits(ledger.room, cost)) return 0
+  // Charged like a part of its own. That overstates a little, since the text joins an existing
+  // part, but every cost in this file is then counted the same way and the total never exceeds
+  // the budget.
+  const cost = partCost(text)
+  if (added + text.length > MAX_CONTEXT_CHARS || !fits(ledger.room, cost)) return 0
   if (backwards) span.from = head
   else [span.to, span.end] = [index, block.end]
   for (let shown = Math.min(head, index); shown <= index; shown += 1) covered.add(shown)
   charge(ledger, context.page, cost)
-  return cost.chars
+  return text.length
 }
 
 /** The block after the passage first, then the one before it, and so on while there is room. */

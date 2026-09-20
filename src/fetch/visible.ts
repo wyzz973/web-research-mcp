@@ -3,7 +3,12 @@
  * snapshot offsets. Models quote what they read, not the markup around it: a sentence with a
  * link in the middle, or an identifier that the converter escaped, must still be found.
  * The same projection is applied to the text being searched for, so both sides always agree.
+ *
+ * Page text is hostile input and this runs on the main thread, so the work is strictly linear:
+ * one pass pairs brackets with bounded stacks, a second pass emits text and consults the pairs.
+ * Both passes advance in slices, which lets the caller yield to the event loop and cancel.
  */
+import { runSliced, runToEnd } from './slices.ts'
 
 export interface Folded {
   text: string
@@ -14,152 +19,387 @@ export interface Folded {
 
 const MAX_LINK_TEXT = 1000
 const MAX_DESTINATION = 2000
+/** Characters handled before the driver looks at the clock again. */
+const SLICE_CHARS = 1 << 16
 const DOUBLE_QUOTES = /[\u201C\u201D\u201E\u201F\u00AB\u00BB\u300C\u300D\u300E\u300F\uFF02]/u
 const SINGLE_QUOTES = /[\u2018\u2019\u201A\u201B\u2032\uFF07]/u
 const DASHES = /[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/u
-const ASCII_PUNCTUATION = /[!-/:-@[-`{-~]/u
-const FENCE_LINE = /^[ \t]*(?:`{3,}|~{3,})[^`\n]*$/u
-const RULE_CHARS = /^[ \t:|-]*$/u
-const BLOCK_MARKER = /(?:#{1,6}|[-*+]|\d{1,9}[.)])(?=[ \t]|$)/uy
 const AUTOLINK = /<(?:https?|ftp|mailto):[^\s<>]{1,2000}>/uy
 
-/** Emphasis, strikethrough, and code markers carry no text; escaped or not, both sides drop them. */
-function isMarker(char: string): boolean {
-  return char === '*' || char === '_' || char === '`'
+const TAB = 9
+const NEWLINE = 10
+const SPACE = 32
+const BANG = 33
+const HASH = 35
+const ROUND_OPEN = 40
+const ROUND_CLOSE = 41
+const STAR = 42
+const PLUS = 43
+const MINUS = 45
+const DOT = 46
+const COLON = 58
+const LESS = 60
+const GREATER = 62
+const SQUARE_OPEN = 91
+const BACKSLASH = 92
+const SQUARE_CLOSE = 93
+const UNDERSCORE = 95
+const BACKTICK = 96
+const PIPE = 124
+const TILDE = 126
+
+function isAsciiPunctuation(code: number): boolean {
+  return (
+    (code >= 33 && code <= 47) ||
+    (code >= 58 && code <= 64) ||
+    (code >= 91 && code <= 96) ||
+    (code >= 123 && code <= 126)
+  )
 }
 
-function foldChar(char: string): string {
+/** Emphasis, strikethrough, and code markers carry no text; escaped or not, both sides drop them. */
+function isMarker(code: number): boolean {
+  return code === STAR || code === UNDERSCORE || code === BACKTICK
+}
+
+function isAsciiSpace(code: number): boolean {
+  return code === SPACE || (code >= TAB && code <= 13)
+}
+
+function isDigit(code: number): boolean {
+  return code >= 48 && code <= 57
+}
+
+function foldWide(char: string): string {
+  if (/\s/u.test(char)) return ' '
   if (DOUBLE_QUOTES.test(char)) return '"'
   if (SINGLE_QUOTES.test(char)) return "'"
   if (DASHES.test(char)) return '-'
-  return char.charCodeAt(0) < 128 ? char.toLowerCase() : char.normalize('NFKC').toLowerCase()
+  return char.normalize('NFKC').toLowerCase()
 }
 
-/** Index of the bracket that closes the one at `open`, within one paragraph and a sane distance. */
-function closingBracket(source: string, open: number, pair: '[]' | '()', limit: number): number {
-  let depth = 0
-  const stop = Math.min(source.length, open + limit)
-  for (let index = open; index < stop; index += 1) {
-    const char = source[index]
-    if (char === '\\') index += 1
-    else if (char === '\n' && source[index + 1] === '\n') return -1
-    else if (char === pair[0]) depth += 1
-    else if (char === pair[1] && (depth -= 1) === 0) return index
+/** Kana, CJK ideographs, and Hangul syllables: no case, and unchanged by compatibility folding. */
+function isPlainWide(code: number): boolean {
+  return (
+    (code >= 0x3040 && code <= 0x30ff) ||
+    (code >= 0x4e00 && code <= 0x9fff) ||
+    (code >= 0xac00 && code <= 0xd7af)
+  )
+}
+
+const WIDE_CACHE_LIMIT = 4096
+
+/** Openers further back than the longest construct can never pair, so the oldest are overwritten. */
+class BoundedStack {
+  private readonly slots: Int32Array
+  private head = 0
+  private size = 0
+
+  constructor(capacity: number) {
+    this.slots = new Int32Array(capacity)
   }
-  return -1
+
+  push(value: number): void {
+    const capacity = this.slots.length
+    if (this.size === capacity) {
+      this.head = (this.head + 1) % capacity
+      this.size -= 1
+    }
+    this.slots[(this.head + this.size) % capacity] = value
+    this.size += 1
+  }
+
+  pop(): number {
+    if (this.size === 0) return -1
+    this.size -= 1
+    return this.slots[(this.head + this.size) % this.slots.length] ?? -1
+  }
+
+  clear(): void {
+    this.size = 0
+  }
 }
 
-/** Where the destination that follows a link text ends: `(url "title")`, `[ref]`, or nothing. */
-function destinationEnd(source: string, after: number): number {
-  const opener = source[after]
-  if (opener !== '(' && opener !== '[') return -1
-  const close = closingBracket(source, after, opener === '(' ? '()' : '[]', MAX_DESTINATION)
-  return close === -1 ? -1 : close + 1
+/**
+ * First pass. `partner[i]` is the index of the bracket that closes the "[" or "(" at `i`, or 0.
+ * Pairs never span a blank line and never exceed the length limits, as in any sane document.
+ */
+class Pairing {
+  readonly partner: Int32Array
+  private readonly squares = new BoundedStack(MAX_LINK_TEXT)
+  private readonly rounds = new BoundedStack(MAX_DESTINATION)
+  private readonly source: string
+  private index = 0
+
+  constructor(source: string) {
+    this.source = source
+    this.partner = new Int32Array(source.length)
+  }
+
+  private close(stack: BoundedStack, at: number, limit: number): void {
+    const open = stack.pop()
+    if (open !== -1 && at - open <= limit) this.partner[open] = at
+  }
+
+  /** Returns true when the whole source has been paired. */
+  advance(budget: number): boolean {
+    const { source } = this
+    const stop = Math.min(source.length, this.index + budget)
+    let index = this.index
+    for (; index < stop; index += 1) {
+      const code = source.charCodeAt(index)
+      if (code === BACKSLASH) index += 1
+      else if (code === SQUARE_OPEN) this.squares.push(index)
+      else if (code === ROUND_OPEN) this.rounds.push(index)
+      else if (code === SQUARE_CLOSE) this.close(this.squares, index, MAX_LINK_TEXT)
+      else if (code === ROUND_CLOSE) this.close(this.rounds, index, MAX_DESTINATION)
+      else if (code === NEWLINE && source.charCodeAt(index + 1) === NEWLINE) {
+        this.squares.clear()
+        this.rounds.clear()
+      }
+    }
+    this.index = index
+    return index >= source.length
+  }
 }
 
-class Projection {
-  readonly pieces: string[] = []
-  readonly starts: number[] = []
-  readonly ends: number[] = []
-  /** Index of a link's closing "]" (or an autolink's ">") to the index just past what it hides. */
-  readonly hiddenFrom = new Map<number, number>()
+/** Folded text and its offset map, in typed buffers that grow by doubling. */
+class Output {
+  private units = new Uint16Array(1 << 12)
+  private starts = new Int32Array(1 << 12)
+  private ends = new Int32Array(1 << 12)
+  private length = 0
   private lastWasSpace = true
 
-  emit(text: string, start: number, end: number): void {
-    this.pieces.push(text)
-    for (let unit = 0; unit < text.length; unit += 1) {
-      this.starts.push(start)
-      this.ends.push(end)
-    }
+  private grow(): void {
+    const units = new Uint16Array(this.units.length * 2)
+    const starts = new Int32Array(units.length)
+    const ends = new Int32Array(units.length)
+    units.set(this.units)
+    starts.set(this.starts)
+    ends.set(this.ends)
+    this.units = units
+    this.starts = starts
+    this.ends = ends
+  }
+
+  unit(code: number, start: number, end: number): void {
+    if (this.length === this.units.length) this.grow()
+    this.units[this.length] = code
+    this.starts[this.length] = start
+    this.ends[this.length] = end
+    this.length += 1
     this.lastWasSpace = false
+  }
+
+  text(text: string, start: number, end: number): void {
+    for (let at = 0; at < text.length; at += 1) this.unit(text.charCodeAt(at), start, end)
   }
 
   space(start: number, end: number): void {
     if (this.lastWasSpace) return
-    this.emit(' ', start, end)
+    this.unit(SPACE, start, end)
     this.lastWasSpace = true
+  }
+
+  finish(): Folded {
+    const chunks: string[] = []
+    for (let at = 0; at < this.length; at += 8192)
+      chunks.push(String.fromCharCode(...this.units.subarray(at, Math.min(this.length, at + 8192))))
+    return {
+      text: chunks.join(''),
+      starts: this.starts.slice(0, this.length),
+      ends: this.ends.slice(0, this.length),
+    }
   }
 }
 
-/** A code fence, a table delimiter row, or a rule: nothing on such a line is text. */
-function isLayoutLine(line: string): boolean {
-  return FENCE_LINE.test(line) || (line.includes('---') && RULE_CHARS.test(line))
+/** "```js" or "~~~": three or more fence characters, and no backtick after a backtick fence. */
+function isFenceLine(source: string, first: number, lineEnd: number): boolean {
+  const fence = source.charCodeAt(first)
+  if (fence !== BACKTICK && fence !== TILDE) return false
+  let end = first
+  while (source.charCodeAt(end) === fence) end += 1
+  if (end - first < 3) return false
+  if (fence === TILDE) return true
+  for (let index = end; index < lineEnd; index += 1)
+    if (source.charCodeAt(index) === BACKTICK) return false
+  return true
+}
+
+/** "| --- | :---: |" or "---": only rule characters, with three dashes in a row somewhere. */
+function isRuleLine(source: string, first: number, lineEnd: number): boolean {
+  let dashes = 0
+  let longest = 0
+  for (let index = first; index < lineEnd; index += 1) {
+    const code = source.charCodeAt(index)
+    if (code !== MINUS && code !== PIPE && code !== COLON && code !== SPACE && code !== TAB)
+      return false
+    dashes = code === MINUS ? dashes + 1 : 0
+    longest = Math.max(longest, dashes)
+  }
+  return longest >= 3
+}
+
+/** End of a heading, bullet, or list number at `at`, or `at` itself when there is none. */
+function blockMarkerEnd(source: string, at: number): number {
+  let end = at
+  const code = source.charCodeAt(at)
+  if (code === HASH) while (source.charCodeAt(end) === HASH && end - at < 6) end += 1
+  else if (code === MINUS || code === STAR || code === PLUS) end += 1
+  else if (isDigit(code)) {
+    while (isDigit(source.charCodeAt(end)) && end - at < 9) end += 1
+    const after = source.charCodeAt(end)
+    end = after === DOT || after === ROUND_CLOSE ? end + 1 : at
+  }
+  const next = source.charCodeAt(end)
+  const closed = Number.isNaN(next) || next === SPACE || next === TAB || next === NEWLINE
+  return end > at && closed ? end : at
 }
 
 /** Skips what only lays a line out: indentation, quote marks, a heading, bullet, or number. */
 function lineLayoutEnd(source: string, from: number): number {
-  const newline = source.indexOf('\n', from)
-  const lineEnd = newline === -1 ? source.length : newline
-  if (isLayoutLine(source.slice(from, lineEnd))) return lineEnd
   let index = from
-  while (index < lineEnd && /[ \t>]/u.test(source[index] ?? '')) index += 1
-  BLOCK_MARKER.lastIndex = index
-  return BLOCK_MARKER.test(source) ? BLOCK_MARKER.lastIndex : index
+  for (;;) {
+    const code = source.charCodeAt(index)
+    if (code !== SPACE && code !== TAB && code !== GREATER) break
+    index += 1
+  }
+  if (index >= source.length || source.charCodeAt(index) === NEWLINE) return index
+  const newline = source.indexOf('\n', index)
+  const lineEnd = newline === -1 ? source.length : newline
+  // A code fence, a table delimiter row, or a rule: nothing on such a line is text.
+  if (isFenceLine(source, index, lineEnd) || isRuleLine(source, index, lineEnd)) return lineEnd
+  return blockMarkerEnd(source, index)
 }
 
-/** A "[" or "![" that starts a link or image: hides the opener and remembers what its "]" hides. */
-function openLink(source: string, at: number, projection: Projection): number {
-  const bracket = source[at] === '!' ? at + 1 : at
-  const close = closingBracket(source, bracket, '[]', MAX_LINK_TEXT)
-  if (close === -1) return -1
-  const end = destinationEnd(source, close + 1)
-  if (end === -1 && bracket === at) return -1
-  projection.hiddenFrom.set(close, end === -1 ? close + 1 : end)
-  return bracket + 1
-}
+/** Second pass: emits the visible text, using the pairs to hide link syntax in constant time. */
+class Projection {
+  private readonly output = new Output()
+  private readonly wideCache = new Map<number, string>()
+  private readonly source: string
+  /** Openers map to their closers; this pass stores jump targets at the closers it hides. */
+  private readonly partner: Int32Array
+  private index = 0
+  private lineStart = true
 
-/** Handles the character at `at` and returns the index to continue from. */
-function step(source: string, at: number, projection: Projection): number {
-  const hiddenUntil = projection.hiddenFrom.get(at)
-  if (hiddenUntil !== undefined) return hiddenUntil
-  const char = String.fromCodePoint(source.codePointAt(at) ?? 0)
-  const next = source[at + 1]
-  if (char === '\\' && next !== undefined && ASCII_PUNCTUATION.test(next)) {
-    if (next === '|') projection.space(at, at + 2)
-    else if (!isMarker(next)) projection.emit(foldChar(next), at, at + 2)
-    return at + 2
+  constructor(source: string, partner: Int32Array) {
+    this.source = source
+    this.partner = partner
   }
-  if (char === '[' || (char === '!' && next === '[')) {
-    const inside = openLink(source, at, projection)
-    if (inside !== -1) return inside
+
+  /** Returns true when the whole source has been projected. */
+  advance(budget: number): boolean {
+    const stop = Math.min(this.source.length, this.index + budget)
+    while (this.index < stop) {
+      if (this.lineStart) this.layout()
+      else this.step()
+    }
+    return this.index >= this.source.length
   }
-  if (char === ']' && next === '(') {
-    // The tail of a link whose opener lies outside the text, as in a quote that starts mid-link.
-    const end = destinationEnd(source, at + 1)
-    if (end !== -1) return end
+
+  finish(): Folded {
+    return this.output.finish()
   }
-  if (char === '<') {
+
+  private layout(): void {
+    const content = lineLayoutEnd(this.source, this.index)
+    if (content > this.index) this.output.space(this.index, content)
+    this.index = content
+    this.lineStart = false
+  }
+
+  /** Hides "[" (and "!") when it opens a link or image, and marks what its "]" will hide. */
+  private openLink(at: number): boolean {
+    const bracket = this.source.charCodeAt(at) === BANG ? at + 1 : at
+    const close = this.partner[bracket] ?? 0
+    if (close === 0) return false
+    const after = this.source.charCodeAt(close + 1)
+    const hasDestination = after === ROUND_OPEN || after === SQUARE_OPEN
+    const destination = hasDestination ? (this.partner[close + 1] ?? 0) : 0
+    if (destination === 0 && bracket === at) return false
+    this.partner[close] = destination === 0 ? close + 1 : destination + 1
+    this.index = bracket + 1
+    return true
+  }
+
+  private autolink(at: number): boolean {
     AUTOLINK.lastIndex = at
-    if (AUTOLINK.test(source)) {
-      projection.hiddenFrom.set(AUTOLINK.lastIndex - 1, AUTOLINK.lastIndex)
-      return at + 1
-    }
+    if (!AUTOLINK.test(this.source)) return false
+    this.partner[AUTOLINK.lastIndex - 1] = AUTOLINK.lastIndex
+    this.index = at + 1
+    return true
   }
-  if (isMarker(char) || (char === '~' && (next === '~' || source[at - 1] === '~'))) return at + 1
-  if (char === '|' || /\s/u.test(char)) projection.space(at, at + char.length)
-  else projection.emit(foldChar(char), at, at + char.length)
-  return at + char.length
+
+  private escape(at: number, next: number): void {
+    if (next === PIPE) this.output.space(at, at + 2)
+    else if (!isMarker(next)) this.output.unit(next, at, at + 2)
+    this.index = at + 2
+  }
+
+  /** Alphabets repeat a few dozen characters, so each is folded once and then looked up. */
+  private foldedWide(point: number): string {
+    const known = this.wideCache.get(point)
+    if (known !== undefined) return known
+    const folded = foldWide(String.fromCodePoint(point))
+    if (this.wideCache.size < WIDE_CACHE_LIMIT) this.wideCache.set(point, folded)
+    return folded
+  }
+
+  private wide(at: number): void {
+    const point = this.source.codePointAt(at) ?? 0
+    const end = at + (point > 0xffff ? 2 : 1)
+    this.index = end
+    if (isPlainWide(point)) return this.output.unit(point, at, end)
+    const folded = this.foldedWide(point)
+    if (folded === ' ') this.output.space(at, end)
+    else this.output.text(folded, at, end)
+  }
+
+  private step(): void {
+    const { source, partner } = this
+    const at = this.index
+    const code = source.charCodeAt(at)
+    const next = source.charCodeAt(at + 1)
+    if (code >= 128) return this.wide(at)
+    this.lineStart = code === NEWLINE
+    if ((code === SQUARE_CLOSE || code === GREATER) && (partner[at] ?? 0) > 0) {
+      this.index = partner[at] ?? at + 1
+      return
+    }
+    if (code === BACKSLASH && isAsciiPunctuation(next)) return this.escape(at, next)
+    if (code === SQUARE_OPEN || (code === BANG && next === SQUARE_OPEN)) {
+      if (this.openLink(at)) return
+    }
+    // The tail of a link whose opener lies outside the text, as in a quote that starts mid-link.
+    if (code === SQUARE_CLOSE && next === ROUND_OPEN && (partner[at + 1] ?? 0) > 0) {
+      this.index = (partner[at + 1] ?? at) + 1
+      return
+    }
+    if (code === LESS && this.autolink(at)) return
+    this.index = at + 1
+    if (isMarker(code)) return
+    if (code === TILDE && (next === TILDE || source.charCodeAt(at - 1) === TILDE)) return
+    if (code === PIPE || isAsciiSpace(code)) this.output.space(at, at + 1)
+    else this.output.unit(code >= 65 && code <= 90 ? code + 32 : code, at, at + 1)
+  }
 }
 
-/** Walks code points but records UTF-16 offsets, the unit every snapshot offset is expressed in. */
+/** Both passes, yielding after every slice of characters. */
+function* foldSteps(source: string): Generator<void, Folded> {
+  const pairing = new Pairing(source)
+  while (!pairing.advance(SLICE_CHARS)) yield
+  const projection = new Projection(source, pairing.partner)
+  while (!projection.advance(SLICE_CHARS)) yield
+  return projection.finish()
+}
+
+/** For short texts such as the quote being searched for. Snapshots use `foldTextSliced`. */
 export function foldText(source: string): Folded {
-  const projection = new Projection()
-  let index = 0
-  let lineStart = true
-  while (index < source.length) {
-    if (lineStart) {
-      const content = lineLayoutEnd(source, index)
-      if (content > index) projection.space(index, content)
-      index = content
-      lineStart = false
-      continue
-    }
-    lineStart = source[index] === '\n'
-    index = step(source, index, projection)
-  }
-  return {
-    text: projection.pieces.join(''),
-    starts: Int32Array.from(projection.starts),
-    ends: Int32Array.from(projection.ends),
-  }
+  return runToEnd(foldSteps(source))
+}
+
+/** The same result, but the event loop runs between slices and a cancellation stops the work. */
+export function foldTextSliced(source: string, signal: AbortSignal): Promise<Folded> {
+  return runSliced(foldSteps(source), signal)
 }

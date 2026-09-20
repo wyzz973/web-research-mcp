@@ -1,6 +1,7 @@
 /** Lexical passage ranking for evidence mode. No model is called; scores only order passages. */
 import { partCost, type Budget } from './budget.ts'
 import { headingPath, type PageDocument } from './document.ts'
+import { runSliced, runToEnd } from './slices.ts'
 
 export interface Candidate {
   /** Index of the page in the request, used to keep selection order deterministic. */
@@ -80,7 +81,14 @@ function countTerms(tokens: string[], terms: Set<string>): Map<string, number> {
   return counts
 }
 
-function scanPage(document: PageDocument, page: number, terms: Set<string>): Scored[] {
+/** Blocks tokenized before the driver looks at the clock again. */
+const SLICE_BLOCKS = 64
+
+function* scanPage(
+  document: PageDocument,
+  page: number,
+  terms: Set<string>,
+): Generator<void, Scored[]> {
   const headingCache = new Map<number, Set<string>>()
   const termsOf = (start: number, title: string): Set<string> => {
     const cached = headingCache.get(start)
@@ -90,8 +98,9 @@ function scanPage(document: PageDocument, page: number, terms: Set<string>): Sco
     return found
   }
   const scored: Scored[] = []
-  document.blocks.forEach((block, index) => {
-    if (block.kind === 'heading') return
+  for (const [index, block] of document.blocks.entries()) {
+    if (index % SLICE_BLOCKS === SLICE_BLOCKS - 1) yield
+    if (block.kind === 'heading') continue
     const tokens = tokenize(document.markdown.slice(block.start, block.end))
     const path = headingPath(document, block.start).slice(0, HEADING_WEIGHTS.length)
     scored.push({
@@ -101,7 +110,7 @@ function scanPage(document: PageDocument, page: number, terms: Set<string>): Sco
       counts: countTerms(tokens, terms),
       headingTerms: path.map((entry) => termsOf(entry.start, `${entry.id} ${entry.title}`)),
     })
-  })
+  }
   return scored
 }
 
@@ -182,14 +191,12 @@ function toCandidate(document: PageDocument, item: Scored, score: number): Candi
   }
 }
 
-/**
- * Candidates per page. Term rarity is measured over every page of the request together, so
- * scores are comparable when one budget is shared between pages.
- */
-export function rankPassages(documents: PageDocument[], goal: string): Candidate[][] {
+function* rankSteps(documents: PageDocument[], goal: string): Generator<void, Candidate[][]> {
   const terms = goalTerms(goal)
   const termSet = new Set(terms)
-  const scanned = documents.map((document, page) => scanPage(document, page, termSet))
+  const scanned: Scored[][] = []
+  for (const [page, document] of documents.entries())
+    scanned.push(yield* scanPage(document, page, termSet))
   const everything = scanned.flat()
   const idf = inverseFrequencies(everything, terms)
   const average =
@@ -202,6 +209,23 @@ export function rankPassages(documents: PageDocument[], goal: string): Candidate
       return toCandidate(document, item, score)
     })
   })
+}
+
+/**
+ * Candidates per page. Term rarity is measured over every page of the request together, so
+ * scores are comparable when one budget is shared between pages.
+ */
+export function rankPassages(documents: PageDocument[], goal: string): Candidate[][] {
+  return runToEnd(rankSteps(documents, goal))
+}
+
+/** The same ranking for real snapshots: tokenizing megabytes must not stall the event loop. */
+export function rankPassagesSliced(
+  documents: PageDocument[],
+  goal: string,
+  signal: AbortSignal,
+): Promise<Candidate[][]> {
+  return runSliced(rankSteps(documents, goal), signal)
 }
 
 /** Every passage of a page that is shown whole, so that reposts of it elsewhere are recognized. */

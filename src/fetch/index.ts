@@ -166,7 +166,7 @@ export function createReader(dependencies: ReaderDependencies): Reader {
       reads,
       goal,
       notes: modeNotes,
-    } = readByMode(readablePages(sources), plan, wanted, budget, fold)
+    } = await readByMode(readablePages(sources), plan, wanted, budget, { fold, signal })
     const notes = [
       ...modeNotes,
       ...describeReads(
@@ -189,18 +189,29 @@ export function createReader(dependencies: ReaderDependencies): Reader {
     return { mode: 'full', parts: [], truncated: false }
   }
 
-  function continueRead(source: PageSource, state: CursorState, maxTokens: number): PageRead {
+  async function continueRead(
+    source: PageSource,
+    state: CursorState,
+    maxTokens: number,
+    signal: AbortSignal,
+  ): Promise<PageRead> {
     const page = { n: 1, snapshot: source.snapshot.id, document: source.document }
     const budget = contentBudget(maxTokens, 1, 0)
     if (state.kind === 'read') return readOnward(page, state, budget)
-    if (state.kind === 'find')
-      return readFind([page], state.find, state.from, budget, fold)[0] ?? emptyRead()
-    const options = { goal: state.goal, budget, maxTokens, shown: state.shown }
-    return readGoal([page], options)[0] ?? emptyRead()
+    if (state.kind === 'find') {
+      const folded = await fold(page.snapshot, page.document.markdown, signal)
+      return readFind([page], state.find, state.from, budget, [folded])[0] ?? emptyRead()
+    }
+    const options = { goal: state.goal, budget, maxTokens, shown: state.shown, signal }
+    return (await readGoal([page], options))[0] ?? emptyRead()
   }
 
   /** Cursors only ever read the stored snapshot; they never go back to the site. */
-  function continueCursor(plan: ResolvedFetch, cursor: string): FetchResult {
+  async function continueCursor(
+    plan: ResolvedFetch,
+    cursor: string,
+    signal: AbortSignal,
+  ): Promise<FetchResult> {
     const state = parseCursorState(store.getRecord<unknown>(CURSOR_KIND, cursor.trim())?.value)
     const snapshot = state ? store.getSnapshot(state.snapshot) : undefined
     if (!state || !snapshot)
@@ -213,7 +224,7 @@ export function createReader(dependencies: ReaderDependencies): Reader {
       )
     const target: ResolvedTarget = { kind: 'snapshot', n: 1, ref: snapshot.id, snapshot }
     const source = toSource(target, storedSnapshot(target))
-    const read = continueRead(source, state, plan.maxTokens)
+    const read = await continueRead(source, state, plan.maxTokens, signal)
     const notes = [...describeReads([source.n], [read]), ...plan.notes]
     if (plan.targets.length > 0 || plan.find !== undefined || plan.section !== undefined)
       notes.push('cursor continues an earlier read; the other arguments were ignored')
@@ -227,7 +238,7 @@ export function createReader(dependencies: ReaderDependencies): Reader {
   async function run(request: FetchRequest, signal: AbortSignal): Promise<FetchResult> {
     try {
       const plan = normalizeFetch(request, config)
-      if (plan.cursor !== undefined) return continueCursor(plan, plan.cursor)
+      if (plan.cursor !== undefined) return await continueCursor(plan, plan.cursor, signal)
       return await readTargets(plan, signal)
     } catch (error) {
       return failedResult(toToolError(error))

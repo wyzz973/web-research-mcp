@@ -86,8 +86,15 @@ export function headingPath(document: PageDocument, offset: number): OutlineEntr
   return path
 }
 
-/** Snapshots never change, so their analysis can be reused across calls. Small and bounded. */
-export function createDocumentCache(capacity = 8): (id: string, markdown: string) => PageDocument {
+/** Analyses are dropped, oldest first, beyond this many snapshots or this much source text. */
+const CACHE_ENTRIES = 8
+const CACHE_CHARS = 8_000_000
+
+/**
+ * Snapshots never change, so their analysis can be reused across calls. Bounded by count and by
+ * size: a block list costs memory in proportion to the page, and pages can be megabytes.
+ */
+export function createDocumentCache(): (id: string, markdown: string) => PageDocument {
   const cache = new Map<string, PageDocument>()
   return (id, markdown) => {
     const hit = cache.get(id)
@@ -98,8 +105,12 @@ export function createDocumentCache(capacity = 8): (id: string, markdown: string
     }
     const document = analyze(markdown)
     cache.set(id, document)
-    const oldest = cache.size > capacity ? cache.keys().next().value : undefined
-    if (oldest !== undefined) cache.delete(oldest)
+    let chars = [...cache.values()].reduce((sum, entry) => sum + entry.markdown.length, 0)
+    for (const [oldest, entry] of cache) {
+      if (cache.size <= CACHE_ENTRIES && (chars <= CACHE_CHARS || cache.size === 1)) break
+      cache.delete(oldest)
+      chars -= entry.markdown.length
+    }
     return document
   }
 }
