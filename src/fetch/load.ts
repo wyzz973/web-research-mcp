@@ -18,6 +18,7 @@ import {
   classifyStatus,
   contentKind,
   mediaType,
+  tooDeep,
   unreadable,
   unsupportedType,
 } from './classify.ts'
@@ -111,6 +112,7 @@ export function createPageLoader(dependencies: LoaderDependencies): PageLoader {
     const signals = reply.ok ? reply.value.signals : reply.signals
     const failure = signals && classifyContent(signals, { requested, final: response.url })
     if (failure) throw failure
+    if (!reply.ok && reply.reason === 'too_deep') throw tooDeep()
     if (!reply.ok) throw unreadable()
     return reply.value
   }

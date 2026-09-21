@@ -15,7 +15,7 @@ import {
   restoreHeadingLevels,
   rewriteLinks,
 } from '../../src/extract/clean.ts'
-import { FUSE_MS, growth } from '../fetch/helpers.ts'
+import { FUSE_MS, growthOf } from '../fetch/helpers.ts'
 
 const URL_OF_PAGE = 'https://docs.example.com/guide'
 
@@ -69,18 +69,25 @@ describe('cleaning passes with very many siblings', () => {
   it.each(PASSES)('stay linear for %s', (_name, body, pass) => {
     const started = performance.now()
     // Counts, not characters: a thousand elements are enough to measure, and enough to tell a
-    // pass that touches each of them from one that scans their siblings every time. Ten thousand
-    // parsed documents at once exhaust the heap of a CI runner.
-    const ratio = growth(
-      body,
-      (html) => {
-        const document = parse(html)
-        pass(document)
-        // Without this the windows of every run stay alive at once, and a CI runner, which has a
-        // fraction of the memory of a development machine, dies before the file is through.
-        document.defaultView?.close()
+    // pass that touches each of them from one that scans their siblings every time. Parsing is
+    // not counted, and each window is closed when its measurement is done: ten thousand parsed
+    // documents at once exhaust the heap of a CI runner, and the parser's own cost, which is
+    // larger than the pass's and not quite linear, would otherwise drown the ratio. One size
+    // only: every pass takes 9 ms or more at a thousand elements, so there is nothing to grow
+    // towards, and growing is what filled the heap. Four times the elements measured 2.2 to 4.0
+    // here; scanning the siblings on every change would be about 16.
+    const ratio = growthOf(
+      (count) => {
+        const document = parse(body(count))
+        return () => {
+          pass(document)
+          document.defaultView?.close()
+        }
       },
-      [1000, 2500],
+      // One size only: every pass takes 9 ms or more at a thousand elements, so there is
+      // nothing to grow towards, and growing is what filled the heap of a CI runner. Four times
+      // the elements measured 2.2 to 4.0 here; scanning the siblings on every change is about 16.
+      [1000],
     )
     expect(performance.now() - started).toBeLessThan(FUSE_MS)
     // Four times the elements: about 4 when linear, about 16 when every change scans the siblings.

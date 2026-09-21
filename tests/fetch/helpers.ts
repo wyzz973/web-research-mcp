@@ -241,6 +241,45 @@ export function cpuRatio(small: () => void, large: () => void): number | undefin
 }
 
 /**
+ * Like `cpuRatio`, but only what the setup returns is timed. Where building the input costs more
+ * than the thing under test, and costs it unevenly, its noise lands in the ratio: a parser that
+ * is a little worse than linear can push an honest pass over the limit on one machine and not on
+ * another.
+ */
+export function cpuRatioOf(
+  small: () => () => void,
+  large: () => () => void,
+  runs = 3,
+): number | undefined {
+  let smallMs = Number.POSITIVE_INFINITY
+  let largeMs = Number.POSITIVE_INFINITY
+  for (let attempt = 0; attempt < runs; attempt += 1) {
+    smallMs = Math.min(smallMs, cpuMs(small()))
+    largeMs = Math.min(largeMs, cpuMs(large()))
+  }
+  return smallMs >= MEASURABLE_MS ? largeMs / smallMs : undefined
+}
+
+/**
+ * `growth` for work whose input has to be built first; the building is not counted, and there
+ * are fewer runs than `cpuRatio` takes: here every run builds an input of its own, and holding
+ * several parsed documents at once is what exhausts the memory of a CI runner.
+ */
+export function growthOf(
+  prepare: (size: number) => () => void,
+  sizes: readonly number[],
+): number | undefined {
+  for (const base of sizes) {
+    const ratio = cpuRatioOf(
+      () => prepare(base),
+      () => prepare(4 * base),
+    )
+    if (ratio !== undefined) return ratio
+  }
+  return undefined
+}
+
+/**
  * Cost of a fourfold larger input relative to the smaller one: about 4 when the work is linear,
  * about 16 when it is quadratic. Undefined when even the largest size is too fast to measure.
  *

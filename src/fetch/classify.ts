@@ -161,6 +161,17 @@ export function classifyContent(signals: PageSignals, context: PageContext): Web
   return undefined
 }
 
+/**
+ * Refused before conversion, not after a failure: the nesting is what makes it uncountably slow,
+ * and saying "parse failed" would suggest that trying again or another mode could help.
+ */
+export function tooDeep(): WebError {
+  return new WebError(
+    'too_large',
+    'The page nests its elements too deeply to be converted (more than 100 levels); this is far beyond any ordinary page. Look for a printable or text version, or another source.',
+  )
+}
+
 export function unreadable(): WebError {
   return new WebError(
     'parse_failed',

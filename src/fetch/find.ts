@@ -34,6 +34,7 @@ type Fold = (markdown: string, signal: AbortSignal) => Promise<Folded | undefine
 interface Known {
   folded: Folded | undefined
   chars: number
+  sourceChars: number
 }
 
 /**
@@ -56,9 +57,14 @@ export function createFoldCache(fold: Fold = foldTextSliced): FoldCache {
     }
   }
 
-  function recall(snapshotId: string): Known | undefined {
+  /**
+   * A snapshot id is unique and its text never changes, so the id alone would do — until an id
+   * is swept and issued again while the old entry is still here. The source length is already
+   * kept, so checking it costs nothing (seventh audit round).
+   */
+  function recall(snapshotId: string, sourceChars: number): Known | undefined {
     const hit = ready.get(snapshotId)
-    if (!hit) return undefined
+    if (!hit || hit.sourceChars !== sourceChars) return undefined
     ready.delete(snapshotId)
     ready.set(snapshotId, hit)
     return hit
@@ -67,7 +73,7 @@ export function createFoldCache(fold: Fold = foldTextSliced): FoldCache {
   return async (snapshotId, markdown, signal) => {
     if (markdown.length > MAX_FOLD_CHARS) return undefined
     for (;;) {
-      const known = recall(snapshotId)
+      const known = recall(snapshotId, markdown.length)
       if (known) return known.folded
       const shared = pending.get(snapshotId)
       if (!shared) break
@@ -81,7 +87,11 @@ export function createFoldCache(fold: Fold = foldTextSliced): FoldCache {
     const task = fold(markdown, signal).finally(() => pending.delete(snapshotId))
     pending.set(snapshotId, task)
     const folded = await task
-    remember(snapshotId, { folded, chars: folded ? folded.text.length : 0 })
+    remember(snapshotId, {
+      folded,
+      chars: folded ? folded.text.length : 0,
+      sourceChars: markdown.length,
+    })
     return folded
   }
 }

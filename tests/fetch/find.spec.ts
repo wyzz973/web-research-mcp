@@ -45,6 +45,27 @@ function find(markdown: string, needle: string): ReturnType<typeof findMatches> 
   return findMatches(markdown, needle, mustFold(markdown))
 }
 
+describe('the fold cache', () => {
+  const never = (): AbortSignal => new AbortController().signal
+
+  it('does not answer for a snapshot id that now holds different text', async () => {
+    let folds = 0
+    const cache = createFoldCache(async (markdown) => {
+      folds += 1
+      return foldText(markdown, Number.POSITIVE_INFINITY)
+    })
+    const first = await cache('s_reused', 'alpha alpha', never())
+    expect(first?.text).toBe('alpha alpha')
+    // The id was swept and issued again while this entry was still here.
+    const second = await cache('s_reused', 'beta beta beta', never())
+    expect(second?.text).toBe('beta beta beta')
+    expect(folds).toBe(2)
+    // The text it was last used for is still answered from the cache.
+    expect((await cache('s_reused', 'beta beta beta', never()))?.text).toBe('beta beta beta')
+    expect(folds).toBe(2)
+  })
+})
+
 describe('findMatches', () => {
   it('finds verbatim occurrences and reports them as exact', () => {
     const matches = find(MARKDOWN, 'If-None-Match')
@@ -193,7 +214,7 @@ describe('fold cache', () => {
       cache('s_aaaaaa', 'Alpha  TEXT', never()),
       cache('s_aaaaaa', 'Alpha  TEXT', never()),
     ])
-    const third = await cache('s_aaaaaa', 'ignored because the id is known', never())
+    const third = await cache('s_aaaaaa', 'Alpha  TEXT', never())
     expect(first?.text).toBe('alpha text')
     expect(second).toBe(first)
     expect(third).toBe(first)

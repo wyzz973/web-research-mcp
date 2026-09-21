@@ -29,7 +29,8 @@ export interface Extracted {
 }
 
 export type ExtractReply =
-  { ok: true; value: Extracted } | { ok: false; reason: 'empty' | 'failed'; signals?: PageSignals }
+  | { ok: true; value: Extracted }
+  | { ok: false; reason: 'empty' | 'failed' | 'too_deep'; signals?: PageSignals }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -71,6 +72,7 @@ export function isExtractReply(value: unknown): value is ExtractReply {
   if (!isRecord(value)) return false
   if (value.ok === true) return isExtracted(value.value)
   if (value.ok !== false) return false
-  if (value.reason !== 'empty' && value.reason !== 'failed') return false
+  const reasons = new Set(['empty', 'failed', 'too_deep'])
+  if (typeof value.reason !== 'string' || !reasons.has(value.reason)) return false
   return value.signals === undefined || isSignals(value.signals)
 }
