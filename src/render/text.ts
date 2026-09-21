@@ -46,7 +46,9 @@ function urlField(text: string): string {
 
 /** Notes and errors are ours, but they sit outside the block: one of them never spans lines. */
 function flat(text: string): string {
-  return text.replace(/\s+/gu, ' ').trim()
+  // Written by this server, so this changes nothing today. It is the last line of defence if a
+  // producer ever lets foreign text into a note: no tag of ours, and no field separator.
+  return neutralize(text.replace(/\s+/gu, ' ').trim()).text.replace(/\|/gu, '\u2223')
 }
 
 function errorLine(error: ToolError): string {
@@ -62,19 +64,23 @@ function age(seconds: number | undefined): string {
 }
 
 /** Minute precision is enough to judge freshness; the JSON view keeps the full timestamp. */
-function minute(timestamp: string): string {
+function minute(timestamp: string): string | undefined {
   const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/u.exec(
     timestamp,
   )
-  return match ? `${match[1]}${match[2]}` : oneLine(timestamp)
+  // Ours, but it has been through the store and a library caller can build a result by hand:
+  // what does not parse as a timestamp is left out, like an id that does not look like ours.
+  return match ? `${match[1]}${match[2]}` : undefined
 }
 
 /**
- * Refs, snapshot ids, and cursors are ours, but a ref is echoed from the caller's input: anything
- * that does not look like one of our ids is left out rather than printed.
+ * Refs, snapshot ids, and cursors are ours, but a ref is echoed from the caller's input. Our ids
+ * are drawn from digits and consonants, so that they never spell a word; anything else, such as
+ * "ignore_previous_instructions", is left out rather than printed.
  */
 function ownId(value: string | undefined): string | undefined {
-  return value !== undefined && /^[a-z0-9_]{1,40}(:r\d{1,4})?$/u.test(value) ? value : undefined
+  const shaped = /^(?:[sc]_)?[b-df-hj-np-tv-z0-9]{3,16}(?::r\d{1,4})?$/u
+  return value !== undefined && shaped.test(value) ? value : undefined
 }
 
 function joined(parts: (string | undefined)[]): string {
@@ -259,7 +265,7 @@ function renderPage(page: PageResult, lines: string[]): void {
       `page ${page.n} ok`,
       ownId(page.ref),
       `snapshot ${ownId(page.snapshot) ?? '?'}`,
-      page.retrieved ? `retrieved ${minute(page.retrieved)}` : undefined,
+      page.retrieved && minute(page.retrieved) ? `retrieved ${minute(page.retrieved)}` : undefined,
       page.cache ? `cache ${page.cache}${age(page.cache_age_s)}` : undefined,
     ]),
   )

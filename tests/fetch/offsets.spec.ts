@@ -161,13 +161,13 @@ describe('snapshot text', () => {
   it('is final before any offset exists: no CR, nothing invisible but honest joiners, every removal counted', async () => {
     const source = generate(7, 6)
     const { markdown, h, url } = await serve(7, 6)
-    // A zero width non-joiner between two letters spells a word (Persian does this), so it stays.
-    expect(markdown).not.toMatch(/\r|[\u200B\uFEFF\u00AD\u202E]/u)
-    const removed = [...source.matchAll(/[\u200B\uFEFF\u00AD\u202E]/gu)].length
-    const kept = [...source.matchAll(/zero\u200Cwidth/gu)].length
+    // Between two Latin letters a joiner joins nothing: it would be a free bit for whoever wants
+    // to hide data (sixth audit round), so it goes like the rest. Joiners that spell words in
+    // scripts that use them are covered by tests/extract/html.spec.ts.
+    expect(markdown).not.toMatch(/\r|[\u200B\u200C\uFEFF\u00AD\u202E]/u)
+    const removed = [...source.matchAll(/[\u200B\u200C\uFEFF\u00AD\u202E]/gu)].length
     expect(removed).toBeGreaterThan(10)
-    expect(kept).toBeGreaterThan(2)
-    expect([...markdown.matchAll(/zero\u200Cwidth/gu)]).toHaveLength(kept)
+    expect([...source.matchAll(/zero\u200Cwidth/gu)].length).toBeGreaterThan(2)
     expect((await h.fetch({ url })).pages[0]?.hidden_removed).toBe(removed)
     // Joiners inside emoji sequences are visible text and survive.
     expect(markdown).toContain('\u{1F468}\u200D\u{1F469}\u200D\u{1F467}')
