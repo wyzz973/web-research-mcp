@@ -214,7 +214,8 @@ function cpuMs(run: () => void): number {
   return (spent.user + spent.system) / 1000
 }
 
-const MB = 1024 * 1024
+const KB = 1024
+const MB = 1024 * KB
 const RUNS = 5
 /** Below this the measurement is mostly noise. */
 const MEASURABLE_MS = 5
@@ -241,13 +242,21 @@ export function cpuRatio(small: () => void, large: () => void): number | undefin
 
 /**
  * Cost of a fourfold larger input relative to the smaller one: about 4 when the work is linear,
- * about 16 when it is quadratic. Undefined when even the larger size is too fast to measure.
+ * about 16 when it is quadratic. Undefined when even the largest size is too fast to measure.
+ *
+ * It starts small and grows only while the smaller side is too fast to measure: the ratio tells
+ * linear from quadratic at any size, so the size is chosen for the measurement, not for the
+ * input. A CI runner is several times slower than this machine and has a fraction of its memory,
+ * and a test that needs a gigabyte to prove a point fails there for the wrong reason. `sizes` is
+ * a ladder in whatever unit `make` takes: characters by default, elements where a parser is the
+ * expensive part.
  */
 export function growth(
-  make: (chars: number) => string,
+  make: (size: number) => string,
   run: (input: string) => void,
+  sizes: readonly number[] = [64 * KB, 256 * KB, MB],
 ): number | undefined {
-  for (const base of [MB, 2 * MB]) {
+  for (const base of sizes) {
     const small = make(base)
     const large = make(4 * base)
     const ratio = cpuRatio(

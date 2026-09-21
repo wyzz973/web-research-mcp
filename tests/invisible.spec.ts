@@ -133,6 +133,21 @@ describe('stripInvisible', () => {
     expect(stripInvisible('a\u2065\u206A\u206Fb')).toEqual({ text: 'ab', removed: 3 })
   })
 
+  // Seventh audit round: the list of format characters was written by hand and missed 29 of them,
+  // among them the Arabic number signs and the Egyptian hieroglyph controls. Nobody can keep such
+  // a list complete, and Unicode adds to it, so the property is asserted over the whole class.
+  it('removes every format character there is, between two letters', () => {
+    const survivors: string[] = []
+    for (let point = 0; point <= 0x10ffff; point += 1) {
+      const character = String.fromCodePoint(point)
+      if (!/\p{Cf}/u.test(character)) continue
+      if (character === ZWNJ || character === ZWJ) continue // joiners, checked on their own
+      const { text, removed } = stripInvisible(`a${character}b`)
+      if (text !== 'ab' || removed !== 1) survivors.push(`U+${point.toString(16).toUpperCase()}`)
+    }
+    expect(survivors).toEqual([])
+  })
+
   it('cannot be used to hide a word from comparison', () => {
     expect(withoutInvisible('Abort\u200BCont\u00ADroller')).toBe('AbortController')
     expect(withoutInvisible(`Abort${tags('x')}Controller`)).toBe('AbortController')

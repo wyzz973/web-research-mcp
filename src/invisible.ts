@@ -29,12 +29,18 @@ export interface Visible {
   removed: number
 }
 
-/** Never shown and never needed: controls, format characters, fillers, selectors, tags. */
+/**
+ * Never shown and never needed. The base is the format class itself, not a list of its members:
+ * the seventh audit round smuggled a whole sentence through 29 format characters that a
+ * hand-written list had missed (the Arabic number signs, the Egyptian hieroglyph controls, and
+ * more), and Unicode keeps adding to the class. What is added here by hand is only what the
+ * class does not contain: controls, the fillers that are letters, the unassigned code point in
+ * the middle of the format block, and the variation selectors, which are marks.
+ */
 const ALWAYS =
-  '(?![\\n\\t])\\p{Cc}' +
-  '|[\\u00AD\\u034F\\u061C\\u115F\\u1160\\u17B4\\u17B5\\u180E\\u200B\\u200E\\u200F' +
-  '\\u202A-\\u202E\\u2060-\\u206F\\u3164\\uFE00-\\uFE0D\\uFEFF\\uFFA0\\uFFF9-\\uFFFB]' +
-  '|[\\u{1BCA0}-\\u{1BCA3}\\u{1D173}-\\u{1D17A}\\u{E0000}-\\u{E007F}\\u{E0100}-\\u{E01EF}]'
+  '(?![\\n\\t])\\p{Cc}|\\p{Cf}' +
+  '|[\\u034F\\u115F\\u1160\\u17B4\\u17B5\\u2065\\u3164\\uFE00-\\uFE0D\\uFFA0]' +
+  '|[\\u{E0100}-\\u{E01EF}]'
 /** The subdivision flags in the emoji set: a black flag, the region in tag letters, a cancel tag. */
 const FLAG =
   '\\u{1F3F4}(?:\\u{E0067}\\u{E0062}\\u{E0065}\\u{E006E}\\u{E0067}|\\u{E0067}\\u{E0062}\\u{E0073}\\u{E0063}\\u{E0074}|\\u{E0067}\\u{E0062}\\u{E0077}\\u{E006C}\\u{E0073})\\u{E007F}'
@@ -44,8 +50,10 @@ const MONGOLIAN_SELECTORS = '[\\u180B-\\u180D\\u180F]+'
 
 /** Runs are matched whole, so a page made of nothing else costs one callback, not millions. */
 const INVISIBLE = new RegExp(
-  `(?<flag>${FLAG})|(?<always>(?:${ALWAYS})+)|(?<joiners>${JOINERS})` +
-    `|(?<emoji>${EMOJI_SELECTORS})|(?<mongolian>${MONGOLIAN_SELECTORS})`,
+  // The exceptions come first: joiners are format characters too, and the run that `always`
+  // matches would otherwise swallow them before they are judged in their context.
+  `(?<flag>${FLAG})|(?<joiners>${JOINERS})|(?<emoji>${EMOJI_SELECTORS})` +
+    `|(?<mongolian>${MONGOLIAN_SELECTORS})|(?<always>(?:${ALWAYS})+)`,
   'gu',
 )
 

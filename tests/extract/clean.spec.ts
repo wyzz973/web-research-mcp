@@ -15,7 +15,7 @@ import {
   restoreHeadingLevels,
   rewriteLinks,
 } from '../../src/extract/clean.ts'
-import { cpuRatio, FUSE_MS } from '../fetch/helpers.ts'
+import { FUSE_MS, growth } from '../fetch/helpers.ts'
 
 const URL_OF_PAGE = 'https://docs.example.com/guide'
 
@@ -68,9 +68,19 @@ const PASSES: [string, (count: number) => string, (document: Document) => void][
 describe('cleaning passes with very many siblings', () => {
   it.each(PASSES)('stay linear for %s', (_name, body, pass) => {
     const started = performance.now()
-    const ratio = cpuRatio(
-      () => pass(parse(body(2500))),
-      () => pass(parse(body(10_000))),
+    // Counts, not characters: a thousand elements are enough to measure, and enough to tell a
+    // pass that touches each of them from one that scans their siblings every time. Ten thousand
+    // parsed documents at once exhaust the heap of a CI runner.
+    const ratio = growth(
+      body,
+      (html) => {
+        const document = parse(html)
+        pass(document)
+        // Without this the windows of every run stay alive at once, and a CI runner, which has a
+        // fraction of the memory of a development machine, dies before the file is through.
+        document.defaultView?.close()
+      },
+      [1000, 2500],
     )
     expect(performance.now() - started).toBeLessThan(FUSE_MS)
     // Four times the elements: about 4 when linear, about 16 when every change scans the siblings.
