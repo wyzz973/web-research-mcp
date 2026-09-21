@@ -43,8 +43,14 @@ function* measureTile(markdown: string, from: number, to: number): Generator<voi
 function* tokenPrefix(markdown: string, blocks: Block[]): Generator<void, number[]> {
   const prefix = [0]
   let tileStart = 0
+  let pending = 0
   for (const [index, block] of blocks.entries()) {
-    if (index % BLOCKS_PER_STEP === BLOCKS_PER_STEP - 1) yield
+    // By size as well as by count: a thousand blocks can be a few bytes or several megabytes.
+    pending += block.tileEnd - tileStart
+    if (index % BLOCKS_PER_STEP === BLOCKS_PER_STEP - 1 || pending >= MEASURE_CHARS) {
+      pending = 0
+      yield
+    }
     const tokens = yield* measureTile(markdown, tileStart, block.tileEnd)
     prefix.push((prefix.at(-1) ?? 0) + tokens)
     tileStart = block.tileEnd
@@ -81,6 +87,11 @@ export function* analyzeSteps(markdown: string): Generator<void, PageDocument> {
 /** For tests and small texts. Snapshots are analyzed through the cache, which can pause and cancel. */
 export function analyze(markdown: string): PageDocument {
   return runToEnd(analyzeSteps(markdown))
+}
+
+/** Estimated size of blocks `from` to `to` with the white space after each, as measured once. */
+export function tilesTokens(document: PageDocument, from: number, to: number): number {
+  return (document.prefix[to + 1] ?? document.totalTokens) - (document.prefix[from] ?? 0)
 }
 
 /** Index of the last item whose `start` is at or before the offset, or -1. */

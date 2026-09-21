@@ -124,7 +124,7 @@ export function describeReads(numbers: number[], reads: PageRead[]): string[] {
   const literal = where((read) => read.literalOnly)
   if (literal.length > 0)
     notes.push(
-      `${pageList(literal)} is larger than ${MAX_FOLD_CHARS} characters, so only exact (literal) matches were looked for; normalized matching was skipped`,
+      `${pageList(literal)}: more than ${MAX_FOLD_CHARS} characters, as written or once normalized, so only exact (literal) matches were looked for; normalized matching was skipped`,
     )
   if (reads.some((read) => read.findCapped))
     notes.push(

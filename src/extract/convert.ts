@@ -1,5 +1,6 @@
 import TurndownService from 'turndown'
 import { gfm } from '@joplin/turndown-plugin-gfm'
+import { withoutTrailing } from './markdown.ts'
 
 const LANGUAGE_CLASS =
   /(?:^|\s)(?:language-|lang-|highlight-source-|highlight-text-|brush:\s*)([\w#+.-]+)/iu
@@ -30,7 +31,8 @@ function fenceFor(code: string): string {
 }
 
 function fencedBlock(pre: Element): string {
-  const code = (pre.textContent ?? '').replace(/\r\n?/gu, '\n').replace(/\n+$/u, '')
+  const text = (pre.textContent ?? '').replace(/\r\n?/gu, '\n')
+  const code = withoutTrailing(text, (unit) => unit === 10)
   if (code.trim() === '') return ''
   const fence = fenceFor(code)
   return `\n\n${fence}${codeLanguage(pre)}\n${code}\n${fence}\n\n`

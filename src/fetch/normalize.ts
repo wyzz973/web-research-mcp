@@ -3,6 +3,7 @@ import type { Config } from '../config.ts'
 import type { FetchRequest, FetchTarget, ResolvedFetch } from '../contract.ts'
 import { WebError } from '../errors.ts'
 import { isSnapshotId, parseRef } from '../ids.ts'
+import { stripInvisible } from '../invisible.ts'
 
 const KNOWN = new Set([
   'url',
@@ -48,12 +49,43 @@ function stringList(value: unknown, name: string): string[] {
   return (items as string[]).map((item) => item.trim()).filter((item) => item !== '')
 }
 
-function optionalText(value: unknown, name: string): string | undefined {
+/** Counts what cleaning took out across one request, so that one note can say so. */
+interface Hidden {
+  removed: number
+}
+
+/**
+ * A goal or a quote is usually pasted text. Characters nobody can see would split its words and
+ * make an honest quote miss, so they go first, as they do for web_search: breaks that are only
+ * whitespace become a space, the shared definition removes the rest, and the text is composed.
+ * A quote keeps its line breaks, because it may be matched literally against several lines.
+ */
+function cleanText(text: string, hidden: Hidden, keepLines: boolean): string {
+  const spaced = text.replace(/\r\n/gu, '\n').replace(/[\r\v\f\u0085]+/gu, ' ')
+  const visible = stripInvisible(spaced)
+  hidden.removed += visible.removed
+  const composed = visible.text.normalize('NFC')
+  return (keepLines ? composed : composed.replace(/\s+/gu, ' ')).trim()
+}
+
+function optionalText(
+  value: unknown,
+  name: string,
+  hidden: Hidden,
+  keepLines = false,
+): string | undefined {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string' && typeof value !== 'number')
     throw invalid(`${name} must be a string`)
-  const text = String(value).trim()
+  const text = cleanText(String(value), hidden, keepLines)
   return text === '' ? undefined : text
+}
+
+function hiddenNote(hidden: Hidden): string | undefined {
+  if (hidden.removed === 0) return undefined
+  return hidden.removed === 1
+    ? '1 invisible character was removed from the request.'
+    : `${hidden.removed} invisible characters were removed from the request.`
 }
 
 function isRefLike(value: string): boolean {
@@ -144,22 +176,28 @@ function noteUnknown(request: FetchRequest, notes: Set<string>): void {
 /** Everything that can be decided without the store or the network. */
 export function normalizeFetch(request: FetchRequest, config: Config): ResolvedFetch {
   const notes = new Set<string>()
+  const hidden: Hidden = { removed: 0 }
   noteUnknown(request, notes)
   if (resolveFlag(request.render))
     notes.add('render is not available in this build; the page was read without a browser')
-  const cursor = optionalText(request.cursor, 'cursor')
+  const cursor = optionalText(request.cursor, 'cursor', hidden)
   const targets = collectTargets(request, config.limits.fetchMaxPages, notes)
-  const section = optionalText(request.section, 'section')
+  const section = optionalText(request.section, 'section', hidden)
   if (!cursor && targets.length === 0)
     throw invalid('pass url, urls, ref, or refs to say which page to read')
   if (!cursor && section !== undefined && targets.length > 1)
     throw invalid('section reads one page; pass a single url or ref with it')
+  const goal = optionalText(request.goal, 'goal', hidden)
+  const find = optionalText(request.find, 'find', hidden, true)
+  const maxTokens = resolveMaxTokens(request.max_tokens, config, notes)
+  const removed = hiddenNote(hidden)
+  if (removed) notes.add(removed)
   return {
     targets,
-    goal: optionalText(request.goal, 'goal'),
+    goal,
     section,
-    find: optionalText(request.find, 'find'),
-    maxTokens: resolveMaxTokens(request.max_tokens, config, notes),
+    find,
+    maxTokens,
     cursor,
     fresh: resolveFlag(request.fresh),
     notes: [...notes],

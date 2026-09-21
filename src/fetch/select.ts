@@ -1,6 +1,6 @@
 import type { PagePart } from '../contract.ts'
-import { fits, minus, partCost, plus, share, type Budget } from './budget.ts'
-import type { PageDocument } from './document.ts'
+import { fits, minus, PART_OVERHEAD, partCost, plus, share, type Budget } from './budget.ts'
+import { tilesTokens, type PageDocument } from './document.ts'
 import type { Candidate } from './goal.ts'
 import { clipEnd, makePart } from './range.ts'
 import { runToEnd } from './slices.ts'
@@ -110,11 +110,13 @@ function takeNeighbour(context: Widening, span: Span, index: number, added: numb
         spanStart(document, span),
       )
     : document.markdown.slice(span.end, block.end)
+  // Length first: a neighbour can be megabytes, and pricing reads all of it.
+  if (added + text.length > MAX_CONTEXT_CHARS) return 0
   // Charged like a part of its own. That overstates a little, since the text joins an existing
   // part, but every cost in this file is then counted the same way and the total never exceeds
   // the budget.
   const cost = partCost(text)
-  if (added + text.length > MAX_CONTEXT_CHARS || !fits(ledger.room, cost)) return 0
+  if (!fits(ledger.room, cost)) return 0
   if (backwards) span.from = head
   else [span.to, span.end] = [index, block.end]
   for (let shown = Math.min(head, index); shown <= index; shown += 1) covered.add(shown)
@@ -270,6 +272,25 @@ class Strongest {
   }
 }
 
+/** Above this a passage is priced from the sizes measured during analysis, not read again. */
+const REMEASURE_CHARS = 1 << 16
+
+/**
+ * What showing a passage costs. A passage can be one block of megabytes; it will be cut to the
+ * budget anyway, so its price comes from the tiles measured once, which is never too low: tiles
+ * include the white space after a block.
+ */
+function candidateCost(document: PageDocument | undefined, candidate: Candidate): Budget {
+  if (!document) return partCost('')
+  const chars = candidate.end - candidate.start
+  if (chars <= REMEASURE_CHARS)
+    return partCost(document.markdown.slice(candidate.start, candidate.end))
+  return {
+    tokens: tilesTokens(document, candidate.from, candidate.block) + PART_OVERHEAD.tokens,
+    chars: chars + PART_OVERHEAD.chars,
+  }
+}
+
 /**
  * A page can have a million relevant passages. Sorting and pricing them all would stall the
  * process for nothing, so one linear pass keeps the strongest overall and per page, and only
@@ -291,15 +312,23 @@ function* strongestPriced(
     }
   }
   const strongest = new Set(overall.values())
-  return candidates.map((_, page) => {
+  const priced: Priced[][] = []
+  let pending = 0
+  for (const page of candidates.keys()) {
     const document = documents[page]
     const kept = new Set(perPage[page]?.values() ?? [])
     for (const candidate of strongest) if (candidate.page === page) kept.add(candidate)
-    return [...kept].sort(byScore).map((candidate) => ({
-      ...candidate,
-      cost: partCost(document?.markdown.slice(candidate.start, candidate.end) ?? ''),
-    }))
-  })
+    const list: Priced[] = []
+    for (const candidate of [...kept].sort(byScore)) {
+      list.push({ ...candidate, cost: candidateCost(document, candidate) })
+      pending += Math.min(candidate.end - candidate.start, REMEASURE_CHARS)
+      if (pending < REMEASURE_CHARS) continue
+      pending = 0
+      yield
+    }
+    priced.push(list)
+  }
+  return priced
 }
 
 /**

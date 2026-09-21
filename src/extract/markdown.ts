@@ -13,6 +13,27 @@ export interface MarkdownLine {
 
 const FENCE = /^ {0,3}(`{3,}|~{3,})(.*)$/u
 export const ATX_HEADING = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/u
+/** What decides that a line is a heading. The full pattern reads the whole line, which can be megabytes. */
+const ATX_OPENING = /^ {0,3}(#{1,6})[ \t]/u
+
+/** 1 to 6 for an ATX heading line, undefined for any other line. */
+export function headingLevel(text: string): number | undefined {
+  return ATX_OPENING.exec(text)?.[1]?.length
+}
+
+/**
+ * The text without the given characters at its end. A loop, not /x+$/: that pattern starts over
+ * at every character of a run that is not at the end, which is quadratic in the length of the run.
+ */
+export function withoutTrailing(text: string, isTrailing: (code: number) => boolean): string {
+  let end = text.length
+  while (end > 0 && isTrailing(text.charCodeAt(end - 1))) end -= 1
+  return end === text.length ? text : text.slice(0, end)
+}
+
+function isBlankCode(code: number): boolean {
+  return code === 32 || code === 9
+}
 
 function closesFence(text: string, open: { char: string; size: number }): boolean {
   const match = FENCE.exec(text)
@@ -88,8 +109,10 @@ const ESCAPED_PUNCTUATION = /\\([!-/:-@[-`{-~])/gu
 /** Turndown escapes "1." and similar at line starts; inside a heading that is only noise. */
 function tidyLine(line: MarkdownLine): string {
   if (line.code) return line.text
-  if (ATX_HEADING.test(line.text)) return line.text.replace(ESCAPED_PUNCTUATION, '$1')
-  return line.text.replace(/[ \t]+$/u, (spaces) => (spaces === '  ' ? spaces : ''))
+  if (headingLevel(line.text) !== undefined) return line.text.replace(ESCAPED_PUNCTUATION, '$1')
+  // Exactly two trailing spaces are a hard line break and stay.
+  const trimmed = withoutTrailing(line.text, isBlankCode)
+  return line.text.length - trimmed.length === 2 && line.text.endsWith('  ') ? line.text : trimmed
 }
 
 /** Heading cleanup, trailing-space trim, and blank-run collapse, all outside fenced code. */

@@ -4,8 +4,8 @@
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import type { FetchResult, PageResult } from '../../src/contract.ts'
-import { findMatches, foldText } from '../../src/fetch/find.ts'
-import { createHarness, type Harness } from './helpers.ts'
+import { findMatches } from '../../src/fetch/find.ts'
+import { createHarness, mustFold, type Harness } from './helpers.ts'
 
 let harness: Harness | undefined
 afterEach(() => {
@@ -209,7 +209,7 @@ describe.each([11, 23, 42])('corpus %i', (seed) => {
       expect(page.find_total).toBeGreaterThan(0)
       for (const part of page.parts) {
         const hit = markdown.slice(part.match_start, part.match_end)
-        expect(foldText(hit).text.trim()).toBe(foldText(needle).text.trim())
+        expect(mustFold(hit).text.trim()).toBe(mustFold(needle).text.trim())
       }
     }
     for (const goal of [
@@ -266,7 +266,7 @@ describe('an oversized table', () => {
 describe.each([5, 17, 29])('any stretch of visible text can be found again (corpus %i)', (seed) => {
   it('finds needles cut out of what a reader sees, and maps them back to UTF-16 offsets', async () => {
     const { url, markdown, h } = await serve(seed, 10)
-    const visible = foldText(markdown).text
+    const visible = mustFold(markdown).text
     const next = random(seed * 7919)
     const wordStarts = [...visible.matchAll(/(?<= )\p{L}/gu)].map((match) => match.index)
     let viaReader = 0
@@ -275,12 +275,12 @@ describe.each([5, 17, 29])('any stretch of visible text can be found again (corp
       const roughEnd = from + 15 + Math.floor(next() * 60)
       const space = visible.indexOf(' ', roughEnd)
       const needle = visible.slice(from, space === -1 ? visible.length : space)
-      const matches = findMatches(markdown, needle, foldText(markdown))
+      const matches = findMatches(markdown, needle, mustFold(markdown))
       expect(matches.length, `needle ${JSON.stringify(needle)}`).toBeGreaterThan(0)
       for (const match of matches) {
         const slice = markdown.slice(match.start, match.end)
         expect(slice.isWellFormed()).toBe(true)
-        expect(foldText(slice).text.trim()).toBe(needle.trim())
+        expect(mustFold(slice).text.trim()).toBe(needle.trim())
       }
       if (sample % 10 !== 0) continue
       const page = check(await h.fetch({ url, find: needle, max_tokens: 1200 }), markdown)

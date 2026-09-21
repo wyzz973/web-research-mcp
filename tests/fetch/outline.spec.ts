@@ -189,6 +189,36 @@ describe('outline', () => {
     expect(linked.outline[0]?.title).toBe('Install the CLI tool')
   })
 
+  it('takes link text out of a title like the pattern it replaced, bracket by bracket', () => {
+    const titles = (markdown: string): string[] =>
+      analyze(markdown).outline.map((entry) => entry.title)
+    expect(
+      titles(
+        [
+          '## [a](https://x.example) and [c](d)',
+          '## ![logo](x.png) Name',
+          '## [not a link] (x)',
+          '## [[a](b)',
+          '## [a](b',
+          '## ]( [x](y) )',
+          '## [](empty) text',
+        ].join('\n\ntext\n\n'),
+      ),
+    ).toEqual(['a and c', 'logo Name', '[not a link] (x)', '[a', '[a](b', ']( x )', 'text'])
+  })
+
+  it('shortens a title that is too long to be one, and finds the section by what it shows', () => {
+    const heading = `## ${'very long title '.repeat(40)}`
+    const long = analyze(`${heading}\n\nbody text\n\n## Next\n\nmore`)
+    const title = long.outline[0]?.title ?? ''
+    expect(title).toBe(`${'very long title '.repeat(40).slice(0, 200).trimEnd()}\u2026`)
+    expect(findSection(long.outline, title)?.id).toBe('1')
+    // The page text is untouched: the heading block still holds the whole line.
+    expect(long.markdown.slice(long.outline[0]?.start, long.blocks[0]?.end)).toBe(heading)
+    const pair = analyze(`## ${'a'.repeat(199)}\u{1F600} tail\n\ntext`).outline[0]?.title ?? ''
+    expect(pair.isWellFormed()).toBe(true)
+  })
+
   it('locates the section and heading path of any offset', () => {
     const offset = NUMBERED.indexOf('Deep text.')
     expect(sectionAt(document, offset)?.id).toBe('13.2.1')

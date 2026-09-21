@@ -3,9 +3,9 @@ import { fits, minus, partCost, type Budget } from './budget.ts'
 import { makePart } from './range.ts'
 import type { PageDocument } from './document.ts'
 import { throwIfAborted } from '../errors.ts'
-import { foldText, foldTextSliced, type Folded } from './visible.ts'
+import { foldText, foldTextSliced, MAX_FOLD_CHARS, type Folded } from './visible.ts'
 
-export { foldSteps, foldText, foldTextSliced, type Folded } from './visible.ts'
+export { foldSteps, foldText, foldTextSliced, MAX_FOLD_CHARS, type Folded } from './visible.ts'
 
 export interface Match {
   start: number
@@ -17,14 +17,7 @@ const CONTEXT_CHARS = 200
 const SNAP_CHARS = 30
 /** Merged contexts stop growing here so one dense paragraph cannot eat the whole budget. */
 const MAX_GROUP_CHARS = 1200
-/**
- * Snapshots above this size are searched literally only. The visible-text map costs about ten
- * bytes per character while it is cached (20 MB here), and no ordinary page comes close: a
- * 150,000-token RFC is 0.45 million characters, and converted HTML is capped at 3 MB of source.
- * Only raw text or Markdown bodies of several megabytes reach this limit.
- */
-export const MAX_FOLD_CHARS = 2_000_000
-/** Cached maps are dropped, oldest first, beyond this many snapshots or this much source text. */
+/** Cached maps are dropped, oldest first, beyond this many snapshots or this much visible text. */
 const CACHE_ENTRIES = 4
 const CACHE_CHARS = 4_000_000
 
@@ -35,19 +28,26 @@ export type FoldCache = (
   signal: AbortSignal,
 ) => Promise<Folded | undefined>
 
-type Fold = (markdown: string, signal: AbortSignal) => Promise<Folded>
+type Fold = (markdown: string, signal: AbortSignal) => Promise<Folded | undefined>
+
+/** What is known about one snapshot: its map, or that it is too large to have one. */
+interface Known {
+  folded: Folded | undefined
+  chars: number
+}
 
 /**
- * Snapshots never change, so each is folded once and kept for the next find. Callers that ask
- * for the same snapshot at the same time share one computation; if its owner is cancelled, the
- * others start their own.
+ * Snapshots never change, so each is folded once and the outcome is kept for the next find,
+ * including the outcome that the visible text is too large. Callers that ask for the same
+ * snapshot at the same time share one computation; if its owner is cancelled, the others start
+ * their own.
  */
 export function createFoldCache(fold: Fold = foldTextSliced): FoldCache {
-  const ready = new Map<string, { folded: Folded; chars: number }>()
-  const pending = new Map<string, Promise<Folded>>()
+  const ready = new Map<string, Known>()
+  const pending = new Map<string, Promise<Folded | undefined>>()
 
-  function remember(snapshotId: string, folded: Folded, chars: number): void {
-    ready.set(snapshotId, { folded, chars })
+  function remember(snapshotId: string, known: Known): void {
+    ready.set(snapshotId, known)
     let total = [...ready.values()].reduce((sum, entry) => sum + entry.chars, 0)
     for (const [id, entry] of ready) {
       if (ready.size <= CACHE_ENTRIES && (total <= CACHE_CHARS || ready.size === 1)) break
@@ -56,19 +56,19 @@ export function createFoldCache(fold: Fold = foldTextSliced): FoldCache {
     }
   }
 
-  function recall(snapshotId: string): Folded | undefined {
+  function recall(snapshotId: string): Known | undefined {
     const hit = ready.get(snapshotId)
     if (!hit) return undefined
     ready.delete(snapshotId)
     ready.set(snapshotId, hit)
-    return hit.folded
+    return hit
   }
 
   return async (snapshotId, markdown, signal) => {
     if (markdown.length > MAX_FOLD_CHARS) return undefined
     for (;;) {
       const known = recall(snapshotId)
-      if (known) return known
+      if (known) return known.folded
       const shared = pending.get(snapshotId)
       if (!shared) break
       try {
@@ -81,7 +81,7 @@ export function createFoldCache(fold: Fold = foldTextSliced): FoldCache {
     const task = fold(markdown, signal).finally(() => pending.delete(snapshotId))
     pending.set(snapshotId, task)
     const folded = await task
-    remember(snapshotId, folded, markdown.length)
+    remember(snapshotId, { folded, chars: folded ? folded.text.length : 0 })
     return folded
   }
 }
@@ -89,18 +89,31 @@ export function createFoldCache(fold: Fold = foldTextSliced): FoldCache {
 /** A text that occurs this often is not a quote; counting stops here and the result says so. */
 export const MAX_MATCHES = 10_000
 
+/** A combining mark, or the vowel or final consonant of a Hangul syllable written in parts. */
+const CONTINUES_CHARACTER = /[\p{M}\u1160-\u11FF\uD7B0-\uD7FF]/uy
+
+/**
+ * True when the text goes on inside the character that an occurrence ends in. Letters are
+ * compared in their decomposed form, so that both spellings of an accented letter match; read
+ * naively, "cafe" would then be found in "caf\u00E9" and one Hangul syllable inside another.
+ */
+function endsInsideCharacter(text: string, end: number): boolean {
+  CONTINUES_CHARACTER.lastIndex = end
+  return CONTINUES_CHARACTER.test(text)
+}
+
 function allIndexes(haystack: string, needle: string): number[] {
   const found: number[] = []
   let at = haystack.indexOf(needle)
   while (at !== -1 && found.length < MAX_MATCHES) {
-    found.push(at)
+    if (!endsInsideCharacter(haystack, at + needle.length)) found.push(at)
     at = haystack.indexOf(needle, at + needle.length)
   }
   return found
 }
 
 function normalizedMatches(markdown: string, needle: string, folded: Folded): Match[] {
-  const target = foldText(needle).text.trim()
+  const target = foldText(needle)?.text.trim() ?? ''
   if (target === '') return []
   return allIndexes(folded.text, target).map((at) => ({
     start: folded.starts[at] ?? 0,

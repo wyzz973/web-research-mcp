@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { expect } from 'vitest'
 import { loadConfig, type Config } from '../../src/config.ts'
 import type { FetchResult, Store } from '../../src/contract.ts'
+import { foldText, type Folded } from '../../src/fetch/find.ts'
 import { createReader, type Reader } from '../../src/fetch/index.ts'
 import type { NetworkDependencies } from '../../src/net/safe-http.ts'
 import { createSqliteStore } from '../../src/store/sqlite.ts'
@@ -179,6 +180,13 @@ export async function countTurns<T>(
   } finally {
     running = false
   }
+}
+
+/** The visible-text map of a text that must be small enough to have one. */
+export function mustFold(text: string, limit?: number): Folded {
+  const folded = foldText(text, limit)
+  if (!folded) throw new Error('the text is too large for a visible-text map')
+  return folded
 }
 
 /** Counts the steps taken from a generator, so that "how much work was done" needs no clock. */

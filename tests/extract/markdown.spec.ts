@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ATX_HEADING,
   cleanTitle,
+  headingLevel,
   neutralizeEnvelope,
   scanLines,
   tidyMarkdown,
+  withoutTrailing,
 } from '../../src/extract/markdown.ts'
 import { extractFromText } from '../../src/extract/text.ts'
+import { estimateTokens } from '../../src/tokens.ts'
+import { cpuRatio, FUSE_MS } from '../fetch/helpers.ts'
 
 describe('scanLines', () => {
   it('reports offsets that slice back to each line', () => {
@@ -86,6 +91,61 @@ describe('tidyMarkdown', () => {
   it('collapses blank runs outside code and keeps hard line breaks', () => {
     const markdown = 'a  \nb   \n\n\n\nc\n```\nx\n\n\n\ny\n```\n'
     expect(tidyMarkdown(markdown)).toBe('a  \nb\n\nc\n```\nx\n\n\n\ny\n```')
+  })
+})
+
+describe('trailing blanks', () => {
+  it('go, except the two spaces of a hard line break', () => {
+    expect(tidyMarkdown('a \nb  \nc   \nd\t\ne \t \n')).toBe('a\nb  \nc\nd\ne')
+    expect(withoutTrailing('code\n\n\n', (code) => code === 10)).toBe('code')
+    expect(withoutTrailing('\n\n', (code) => code === 10)).toBe('')
+    expect(withoutTrailing('same', (code) => code === 10)).toBe('same')
+  })
+
+  it('cost less than one pass of the token estimator, wherever the run of blanks stands', () => {
+    // /[ \t]+$/ starts over at every blank of a run that is not at the end of the line: these
+    // hundred lines took four seconds, three hundred times the yardstick.
+    const hostile = `a${' '.repeat(10_000)}x\n`.repeat(100)
+    const started = performance.now()
+    const ratio = cpuRatio(
+      () => void estimateTokens(hostile),
+      () => void tidyMarkdown(hostile),
+    )
+    expect(performance.now() - started).toBeLessThan(FUSE_MS)
+    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(1)
+  })
+})
+
+describe('headingLevel', () => {
+  it('agrees with the full heading pattern on every line, without reading the whole line', () => {
+    const pieces = [
+      '#',
+      '##',
+      '######',
+      '#######',
+      ' ',
+      '   ',
+      '    ',
+      '\t',
+      'a',
+      '# #',
+      ' #',
+      '\\#',
+      '',
+    ]
+    let seed = 7
+    const next = (): number => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed
+    }
+    for (let sample = 0; sample < 3000; sample += 1) {
+      const line = Array.from(
+        { length: 1 + (next() % 5) },
+        () => pieces[next() % pieces.length],
+      ).join('')
+      const full = ATX_HEADING.exec(line)
+      expect(headingLevel(line), JSON.stringify(line)).toBe(full?.[1]?.length)
+    }
   })
 })
 

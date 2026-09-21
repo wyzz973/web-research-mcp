@@ -17,6 +17,16 @@ export interface Folded {
   ends: Int32Array
 }
 
+/**
+ * A map is built for at most this many characters of snapshot and holds at most this many of
+ * visible text, about ten bytes each while it is cached (20 MB). No ordinary page comes close: a
+ * 150,000-token RFC is 0.45 million characters, and converted HTML is capped at 3 MB of source.
+ * The second half is there because folding expands: one Arabic ligature (U+FDFA) stands for 18
+ * characters, so a page made of it would turn 2 million characters into 36 million and the map
+ * into more than a gigabyte. A text over either limit gets no map and is searched literally only.
+ */
+export const MAX_FOLD_CHARS = 2_000_000
+
 const MAX_LINK_TEXT = 1000
 const MAX_DESTINATION = 2000
 /** Characters handled before the driver looks at the clock again. */
@@ -85,16 +95,14 @@ function foldWide(char: string): string {
   if (DOUBLE_QUOTES.test(char)) return '"'
   if (SINGLE_QUOTES.test(char)) return "'"
   if (DASHES.test(char)) return '-'
-  return char.normalize('NFKC').toLowerCase()
+  // Decomposed, not composed: composition needs the neighbours, decomposition does not, and
+  // this way a precomposed letter and the same letter typed as base plus accent fold alike.
+  return char.normalize('NFKD').toLowerCase()
 }
 
-/** Kana, CJK ideographs, and Hangul syllables: no case, and unchanged by compatibility folding. */
+/** CJK ideographs: no case and no decomposition, so they need no folding at all. */
 function isPlainWide(code: number): boolean {
-  return (
-    (code >= 0x3040 && code <= 0x30ff) ||
-    (code >= 0x4e00 && code <= 0x9fff) ||
-    (code >= 0xac00 && code <= 0xd7af)
-  )
+  return code >= 0x4e00 && code <= 0x9fff
 }
 
 const WIDE_CACHE_LIMIT = 4096
@@ -182,6 +190,17 @@ class Output {
   private ends = new Int32Array(1 << 12)
   private length = 0
   private lastWasSpace = true
+  private readonly limit: number
+  /** Set once the text would outgrow the limit; from then on nothing more is taken. */
+  overflowed = false
+
+  constructor(limit: number) {
+    this.limit = limit
+  }
+
+  get size(): number {
+    return this.length
+  }
 
   private grow(): void {
     const units = new Uint16Array(this.units.length * 2)
@@ -196,6 +215,10 @@ class Output {
   }
 
   unit(code: number, start: number, end: number): void {
+    if (this.length >= this.limit) {
+      this.overflowed = true
+      return
+    }
     if (this.length === this.units.length) this.grow()
     this.units[this.length] = code
     this.starts[this.length] = start
@@ -215,7 +238,8 @@ class Output {
   }
 
   /** Builds the string piece by piece: a few million units in one call would be a stall of its own. */
-  *finish(): Generator<void, Folded> {
+  *finish(): Generator<void, Folded | undefined> {
+    if (this.overflowed) return undefined
     const chunks: string[] = []
     for (let at = 0; at < this.length; at += TEXT_CHUNK) {
       chunks.push(
@@ -293,7 +317,7 @@ function lineLayoutEnd(source: string, from: number): number {
 
 /** Second pass: emits the visible text, using the pairs to hide link syntax in constant time. */
 class Projection {
-  private readonly output = new Output()
+  private readonly output: Output
   private readonly wideCache = new Map<number, string>()
   private readonly source: string
   /** Openers map to their closers; this pass stores jump targets at the closers it hides. */
@@ -301,22 +325,27 @@ class Projection {
   private index = 0
   private lineStart = true
 
-  constructor(source: string, partner: Int32Array) {
+  constructor(source: string, partner: Int32Array, limit: number) {
     this.source = source
     this.partner = partner
+    this.output = new Output(limit)
   }
 
-  /** Returns true when the whole source has been projected. */
+  /**
+   * Returns true when the whole source has been projected, or its text has outgrown the limit.
+   * The budget counts what is read and what is written: one character can fold into eighteen.
+   */
   advance(budget: number): boolean {
     const stop = Math.min(this.source.length, this.index + budget)
-    while (this.index < stop) {
+    const full = this.output.size + budget
+    while (this.index < stop && this.output.size < full && !this.output.overflowed) {
       if (this.lineStart) this.layout()
       else this.step()
     }
-    return this.index >= this.source.length
+    return this.index >= this.source.length || this.output.overflowed
   }
 
-  finish(): Generator<void, Folded> {
+  finish(): Generator<void, Folded | undefined> {
     return this.output.finish()
   }
 
@@ -404,21 +433,31 @@ class Projection {
   }
 }
 
-/** Both passes, yielding after every slice of characters. */
-export function* foldSteps(source: string): Generator<void, Folded> {
+/**
+ * Both passes, yielding after every slice of characters. Undefined when the visible text would
+ * be longer than `limit`: the work stops there, and what was gathered is dropped.
+ */
+export function* foldSteps(
+  source: string,
+  limit = MAX_FOLD_CHARS,
+): Generator<void, Folded | undefined> {
   const pairing = new Pairing(source)
   while (!pairing.advance(SLICE_CHARS)) yield
-  const projection = new Projection(source, pairing.partner)
+  const projection = new Projection(source, pairing.partner, limit)
   while (!projection.advance(SLICE_CHARS)) yield
   return yield* projection.finish()
 }
 
 /** For short texts such as the quote being searched for. Snapshots use `foldTextSliced`. */
-export function foldText(source: string): Folded {
-  return runToEnd(foldSteps(source))
+export function foldText(source: string, limit = MAX_FOLD_CHARS): Folded | undefined {
+  return runToEnd(foldSteps(source, limit))
 }
 
 /** The same result, but the event loop runs between slices and a cancellation stops the work. */
-export function foldTextSliced(source: string, signal: AbortSignal): Promise<Folded> {
-  return runSliced(foldSteps(source), signal)
+export function foldTextSliced(
+  source: string,
+  signal: AbortSignal,
+  limit = MAX_FOLD_CHARS,
+): Promise<Folded | undefined> {
+  return runSliced(foldSteps(source, limit), signal)
 }

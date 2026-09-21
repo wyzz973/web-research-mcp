@@ -7,12 +7,16 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { analyze, analyzeSteps, createDocumentCache } from '../../src/fetch/document.ts'
 import { MAX_FOLD_CHARS } from '../../src/fetch/find.ts'
-import { rankPassages, rankSteps } from '../../src/fetch/goal.ts'
+import { dropRepostSteps, rankPassages, rankSteps } from '../../src/fetch/goal.ts'
 import { MAX_HEADINGS } from '../../src/fetch/outline.ts'
-import { runSliced } from '../../src/fetch/slices.ts'
+import { readRange } from '../../src/fetch/range.ts'
+import { selectPassages } from '../../src/fetch/select.ts'
+import { runSliced, runToEnd } from '../../src/fetch/slices.ts'
+import { estimateTokens } from '../../src/tokens.ts'
 import {
   counting,
   countTurns,
+  cpuRatio,
   createHarness,
   expectVerbatim,
   FUSE_MS,
@@ -97,6 +101,124 @@ describe('document analysis', () => {
     })
     expect(complete.steps()).toBeGreaterThan(100)
     expect(cancelled.steps()).toBeLessThan(complete.steps() / 4)
+  })
+})
+
+/**
+ * The shapes above are many small blocks. These are the opposite: few blocks, each very large,
+ * and headings that are long or all alike. Work that pauses after a number of blocks never
+ * pauses here, and anything that looks ahead from every character of a line is quadratic.
+ */
+describe('few, very large blocks', () => {
+  const words = (chars: number): string => 'timeout other '.repeat(Math.floor(chars / 14))
+  /** One pass of the token estimator over the text: the unit the costs below are compared with. */
+  const onePass = (text: string) => (): void => void estimateTokens(text)
+
+  it('pauses by the amount of text, not only by the number of blocks', () => {
+    const input = Array.from({ length: 100 }, () => words(60_000)).join('\n\n')
+    const { work, steps } = counting(analyzeSteps(input))
+    expect(runToEnd(work).blocks).toHaveLength(100)
+    // A pause at least every quarter of a megabyte; by blocks alone there were a handful.
+    expect(steps()).toBeGreaterThanOrEqual(Math.floor(input.length / (256 * 1024)))
+  })
+
+  it('ranks a page that is one paragraph of megabytes in many short steps', () => {
+    const page = analyze(words(2 * MB))
+    const { work, steps } = counting(rankSteps([page], 'busy timeout'))
+    const ranked = runToEnd(work)
+    expect(ranked[0]?.[0]).toMatchObject({ block: 0, start: 0 })
+    expect(steps()).toBeGreaterThanOrEqual(Math.floor(page.markdown.length / (64 * 1024)))
+  })
+
+  it.each([
+    ['is itself the passage', (giant: string) => giant],
+    [
+      'is only the neighbour of the passage',
+      (giant: string) => `busy timeout\n\n${giant.replaceAll('timeout', 'another')}`,
+    ],
+    [
+      'is the heading above the passage',
+      (giant: string) => `# ${giant.replaceAll('timeout', 'another')}\n\nbusy timeout`,
+    ],
+  ])('prices passages without reading a block of megabytes that %s', (_name, make) => {
+    const page = analyze(make(words(4 * MB)))
+    const ranked = rankPassages([page], 'busy timeout')
+    const budget = { tokens: 2000, chars: 8000 }
+    const selection = selectPassages([page], ranked, budget)
+    expect(selection[0]?.parts.length).toBeGreaterThan(0)
+    for (const part of selection[0]?.parts ?? [])
+      expect(part.text).toBe(page.markdown.slice(part.start, part.end))
+    const ratio = cpuRatio(
+      onePass(page.markdown),
+      () => void selectPassages([page], ranked, budget),
+    )
+    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(0.5)
+  })
+
+  it('continues inside a block of megabytes without measuring the rest of it', () => {
+    const page = analyze(words(4 * MB))
+    const budget = { tokens: 2000, chars: 8000 }
+    const part = readRange(page, 70_000, page.markdown.length, budget)
+    expect(part).toMatchObject({ start: 70_000, clipped: true })
+    expect(part?.text).toBe(page.markdown.slice(70_000, part?.end))
+    const ratio = cpuRatio(onePass(page.markdown), () => {
+      readRange(page, 70_000, page.markdown.length, budget)
+    })
+    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(0.5)
+  })
+
+  it('recognizes a long passage that another page repeats, and only that', () => {
+    const long = (middle: string): string => `${words(9_000)}${middle}${words(9_000)}`
+    const pages = [long('first'), long('first'), long('other'), `${long('first')} and more`].map(
+      (body) => analyze(`# Page\n\n${body}`),
+    )
+    const ranked = rankPassages(pages, 'busy timeout')
+    const kept = runToEnd(dropRepostSteps(pages, ranked, [1, 2, 3, 4]))
+    expect(kept.map((list) => list.length)).toEqual([1, 0, 1, 1])
+    expect(kept[0]?.[0]?.alsoIn).toEqual([2])
+  })
+})
+
+describe('headings as hostile input', () => {
+  it('numbers thousands of headings that all claim one section number in linear time', () => {
+    const page = (count: number): string => '## 1.1 Same number\n\ntext\n\n'.repeat(count)
+    const started = performance.now()
+    const ratio = cpuRatio(
+      () => void analyze(page(MAX_HEADINGS / 4)),
+      () => void analyze(page(MAX_HEADINGS)),
+    )
+    expect(performance.now() - started).toBeLessThan(FUSE_MS)
+    // Four times the headings: about 4 when linear, about 16 when every copy starts over at "-2".
+    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(8)
+    const ids = analyze(page(300)).outline.map((entry) => entry.id)
+    expect(ids.slice(0, 3)).toEqual(['1.1', '1.1-2', '1.1-3'])
+    expect(ids.at(-1)).toBe('1.1-300')
+    expect(new Set(ids).size).toBe(300)
+  })
+
+  it.each([
+    ['opening brackets', '['],
+    ['link openers without an end', '[x]('],
+    ['closers before openers', ']([('],
+  ])('cleans titles made of %s as cheaply as titles made of letters', (_name, fill) => {
+    const page = (unit: string): string =>
+      `# ${unit.repeat(8000 / unit.length)}\n\ntext\n\n`.repeat(500)
+    const started = performance.now()
+    const ratio = cpuRatio(
+      () => void analyze(page('a')),
+      () => void analyze(page(fill)),
+    )
+    expect(performance.now() - started).toBeLessThan(FUSE_MS)
+    // The pattern this replaced looked ahead from every bracket: hundreds of times the cost.
+    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(8)
+  })
+
+  it('reads a heading line of megabytes only as far as a title can go', () => {
+    const line = `# ${'word '.repeat(MB)}`
+    const document = analyze(`${line}\n\ntext`)
+    expect(document.outline).toHaveLength(1)
+    expect(document.outline[0]?.title.length).toBeLessThanOrEqual(201)
+    expect(document.blocks[0]).toMatchObject({ kind: 'heading', start: 0, end: line.length })
   })
 })
 
@@ -230,8 +352,27 @@ describe('a snapshot too large for visible-text matching', () => {
 
     const visible = await harness.fetch({ url, find: 'the busy timeout decides' })
     expect(visible.pages[0]).toMatchObject({ mode: 'find', find_total: 0 })
-    expect(visible.notes.join(' ')).toContain(`larger than ${MAX_FOLD_CHARS} characters`)
+    expect(visible.notes.join(' ')).toContain(`more than ${MAX_FOLD_CHARS} characters`)
     expect(visible.notes.join(' ')).toContain('NOT a match')
+  })
+
+  it('treats a page whose visible text outgrows the limit the same way', async () => {
+    // 18 visible characters for each one on the page: 2.2 million for 120,000.
+    const wide = `# Wide\n\n${sentence}\n\n${String.fromCodePoint(0xfdfa).repeat(120_000)}`
+    expect(wide.length).toBeLessThan(MAX_FOLD_CHARS / 10)
+    harness = await createHarness({
+      '/wide.md': { body: wide, headers: { 'content-type': 'text/markdown; charset=utf-8' } },
+    })
+    const url = 'https://example.com/wide.md'
+    const literal = await harness.fetch({ url, find: 'The **busy** timeout' })
+    expect(literal.pages[0]).toMatchObject({ mode: 'find', find_total: 1 })
+    expect(literal.notes.join(' ')).toContain(
+      `page 1: more than ${MAX_FOLD_CHARS} characters, as written or once normalized, so only exact (literal) matches were looked for`,
+    )
+    expectVerbatim(literal, harness.store)
+    const visible = await harness.fetch({ url, find: 'the busy timeout decides' })
+    expect(visible.pages[0]).toMatchObject({ mode: 'find', find_total: 0 })
+    expect(visible.notes.join(' ')).toContain('only exact (literal) matches were looked for')
   })
 
   it('cancels a find on a large page while its text is being folded', async () => {

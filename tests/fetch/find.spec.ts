@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { analyze } from '../../src/fetch/document.ts'
 import { runSliced } from '../../src/fetch/slices.ts'
-import { counting, countTurns, FUSE_MS, growth } from './helpers.ts'
+import { counting, countTurns, FUSE_MS, growth, mustFold } from './helpers.ts'
 import {
   createFoldCache,
   findMatches,
@@ -38,11 +38,11 @@ const MARKDOWN = [
   'Servers send IF-NONE-MATCH handling notes here. \u{1F600} Emoji nearby.',
 ].join('\n')
 
-const FOLDED = foldText(MARKDOWN)
+const FOLDED = mustFold(MARKDOWN)
 
 /** Small documents fold in no time; the reader folds snapshots through its cache instead. */
 function find(markdown: string, needle: string): ReturnType<typeof findMatches> {
-  return findMatches(markdown, needle, foldText(markdown))
+  return findMatches(markdown, needle, mustFold(markdown))
 }
 
 describe('findMatches', () => {
@@ -141,7 +141,7 @@ describe('dense matches', () => {
     `# Log\n\n${Array.from({ length: 300 }, (_, index) => `needle ${index} hay`).join(' ')}`,
   )
   const roomy = { tokens: 50_000, chars: 200_000 }
-  const DENSE_FOLDED = foldText(dense.markdown)
+  const DENSE_FOLDED = mustFold(dense.markdown)
 
   it('splits full groups without overlap and without losing a match', () => {
     const { parts, total, consumed } = readMatches(dense, 'needle', 0, roomy, DENSE_FOLDED)
@@ -233,7 +233,7 @@ describe('fold cache', () => {
 
   it('maps folded positions back to UTF-16 offsets of the source', () => {
     const source = 'x \u{1F600}  \uFB01n \u201Cq\u201D'
-    const folded = foldText(source)
+    const folded = mustFold(source)
     expect(folded.text).toBe('x \u{1F600} fin "q"')
     const at = folded.text.indexOf('fin')
     expect(source.slice(folded.starts[at], folded.ends[at + 2])).toBe('\uFB01n')
@@ -253,7 +253,8 @@ describe('hostile input', () => {
 
   it.each(shapes)('folds %s in linear time', (_name, make) => {
     const started = performance.now()
-    const ratio = growth(make, (input) => void foldText(input))
+    // Without the size limit: the point is how the cost grows, up to 8 MB of input.
+    const ratio = growth(make, (input) => void mustFold(input, Number.POSITIVE_INFINITY))
     expect(performance.now() - started).toBeLessThan(FUSE_MS)
     // Four times the input: about 4 when linear, about 16 when quadratic.
     if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(8)
@@ -262,26 +263,26 @@ describe('hostile input', () => {
   it('gives the same result in slices as in one go', async () => {
     const input = `${'[x](https://e.example/y) **b** \\_c\\_ | d |\n'.repeat(30_000)}tail`
     const sliced = await foldTextSliced(input, new AbortController().signal)
-    const whole = foldText(input)
-    expect(sliced.text).toBe(whole.text)
-    expect(sliced.starts).toEqual(whole.starts)
-    expect(sliced.ends).toEqual(whole.ends)
+    const whole = mustFold(input)
+    expect(sliced?.text).toBe(whole.text)
+    expect(sliced?.starts).toEqual(whole.starts)
+    expect(sliced?.ends).toEqual(whole.ends)
   })
 
   it('lets the event loop run while it folds', async () => {
     const input = '[a]('.repeat(1024 * 1024)
     const { value, turns } = await countTurns(() =>
-      foldTextSliced(input, new AbortController().signal),
+      foldTextSliced(input, new AbortController().signal, Number.POSITIVE_INFINITY),
     )
-    expect(value.text.length).toBe(input.length)
+    expect(value?.text.length).toBe(input.length)
     expect(turns).toBeGreaterThanOrEqual(10)
   })
 
   it('stops early when cancelled: far fewer steps than a complete run', async () => {
     const input = '[a]('.repeat(1024 * 1024)
-    const complete = counting(foldSteps(input))
+    const complete = counting(foldSteps(input, Number.POSITIVE_INFINITY))
     await runSliced(complete.work, new AbortController().signal)
-    const cancelled = counting(foldSteps(input))
+    const cancelled = counting(foldSteps(input, Number.POSITIVE_INFINITY))
     const abort = new AbortController()
     setImmediate(() => abort.abort())
     await expect(runSliced(cancelled.work, abort.signal)).rejects.toMatchObject({
@@ -291,9 +292,53 @@ describe('hostile input', () => {
     expect(cancelled.steps()).toBeLessThan(complete.steps() / 4)
   })
 
+  // One U+FDFA stands for 18 characters once folded; 2 million of them made a map of 36 million
+  // entries and a process of 1.7 GB before the visible text had a limit of its own.
+  const LIGATURE = String.fromCodePoint(0xfdfa)
+
+  it('gives up on a text whose visible form outgrows the limit, exactly at the limit', () => {
+    expect(foldText('abc def', 7)?.text).toBe('abc def')
+    expect(foldText('abc defg', 7)).toBeUndefined()
+    expect(foldText(LIGATURE, 18)?.text).toHaveLength(18)
+    expect(foldText(LIGATURE, 17)).toBeUndefined()
+    expect(foldText(LIGATURE.repeat(MAX_FOLD_CHARS / 18 + 1))).toBeUndefined()
+  })
+
+  it('stops working where the limit is reached instead of reading the rest', async () => {
+    const plain = counting(foldSteps('x'.repeat(MAX_FOLD_CHARS)))
+    const expanding = counting(foldSteps(LIGATURE.repeat(MAX_FOLD_CHARS), 1000))
+    expect(await runSliced(plain.work, new AbortController().signal)).toBeDefined()
+    expect(await runSliced(expanding.work, new AbortController().signal)).toBeUndefined()
+    // The brackets of the whole text are paired first; the second pass ends after 56 characters.
+    expect(expanding.steps()).toBeLessThan(plain.steps() / 2)
+  })
+
+  it('takes no step that writes much more than it reads', async () => {
+    // Every character becomes 18: a step bounded only by what it reads would write a million.
+    const source = LIGATURE.repeat(100_000)
+    const { work, steps } = counting(foldSteps(source))
+    expect((await runSliced(work, new AbortController().signal))?.text).toHaveLength(1_800_000)
+    // Bounded by what it reads, the second pass took 2 steps and the whole run 17.
+    expect(steps()).toBeGreaterThanOrEqual(Math.floor(1_800_000 / (64 * 1024)))
+  })
+
+  it('remembers that a snapshot has no map, so the work is not repeated for every find', async () => {
+    const calls: number[] = []
+    const cache = createFoldCache((markdown, signal) => {
+      calls.push(markdown.length)
+      return foldTextSliced(markdown, signal)
+    })
+    const page = LIGATURE.repeat(MAX_FOLD_CHARS / 18 + 1)
+    const signal = new AbortController().signal
+    expect(await cache('s_wide', page, signal)).toBeUndefined()
+    expect(await cache('s_wide', page, signal)).toBeUndefined()
+    expect(calls).toEqual([page.length])
+    expect(findMatches(page, LIGATURE.repeat(3), undefined).length).toBeGreaterThan(0)
+  })
+
   it('stops counting a text that occurs absurdly often', () => {
     const input = 'ab '.repeat(50_000)
-    expect(findMatches(input, 'ab', foldText(input))).toHaveLength(MAX_MATCHES)
-    expect(findMatches(input, 'AB', foldText(input))).toHaveLength(MAX_MATCHES)
+    expect(findMatches(input, 'ab', mustFold(input))).toHaveLength(MAX_MATCHES)
+    expect(findMatches(input, 'AB', mustFold(input))).toHaveLength(MAX_MATCHES)
   })
 })

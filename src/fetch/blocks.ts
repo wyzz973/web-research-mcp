@@ -1,4 +1,4 @@
-import { ATX_HEADING, scanLineSteps, type MarkdownLine } from '../extract/markdown.ts'
+import { headingLevel, scanLineSteps, type MarkdownLine } from '../extract/markdown.ts'
 import { runToEnd } from './slices.ts'
 
 export type BlockKind = 'heading' | 'code' | 'table' | 'list' | 'paragraph'
@@ -43,7 +43,7 @@ function isBlank(line: MarkdownLine | undefined): boolean {
 }
 
 function isHeading(line: MarkdownLine): boolean {
-  return !line.code && ATX_HEADING.test(line.text)
+  return !line.code && headingLevel(line.text) !== undefined
 }
 
 function kindOf(line: MarkdownLine): BlockKind {
@@ -198,7 +198,7 @@ function toBlock(
   if (!first) return undefined
   const last = lastContentLine(lines, from, to) ?? first
   const block: Block = { kind, start: first.start, end: last.end, tileEnd: markdown.length }
-  if (kind === 'heading') block.level = ATX_HEADING.exec(first.text)?.[1]?.length ?? 1
+  if (kind === 'heading') block.level = headingLevel(first.text) ?? 1
   return block
 }
 

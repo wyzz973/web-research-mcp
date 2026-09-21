@@ -72,14 +72,50 @@ interface Scored {
   headingTerms: Set<string>[]
 }
 
-function countTerms(tokens: string[], terms: Set<string>): Map<string, number> {
-  const counts = new Map<string, number>()
-  for (const token of tokens) if (terms.has(token)) counts.set(token, (counts.get(token) ?? 0) + 1)
-  return counts
+/** Blocks tokenized before the driver looks at the clock again, and characters likewise. */
+const SLICE_BLOCKS = 64
+const PIECE_CHARS = 8192
+/** How far back from the size limit a piece looks for white space to end at. */
+const MAX_WORD_CHARS = 256
+
+function isSpace(code: number): boolean {
+  return code === 32 || (code >= 9 && code <= 13)
 }
 
-/** Blocks tokenized before the driver looks at the clock again. */
-const SLICE_BLOCKS = 64
+/** Where the piece that starts at `from` ends: after white space when there is some nearby. */
+function pieceEnd(text: string, from: number): number {
+  const limit = from + PIECE_CHARS
+  if (limit >= text.length) return text.length
+  for (let at = limit; at > limit - MAX_WORD_CHARS; at -= 1)
+    if (isSpace(text.charCodeAt(at))) return at + 1
+  // A script without spaces, or filler. The cut may split a word, but never a surrogate pair.
+  const code = text.charCodeAt(limit)
+  return code >= 0xdc00 && code <= 0xdfff ? limit + 1 : limit
+}
+
+interface Tally {
+  length: number
+  counts: Map<string, number>
+}
+
+/**
+ * Counts the tokens of one block piece by piece. A page can be one paragraph of megabytes, and
+ * compatibility folding can make each character many, so neither the pause nor the list of
+ * tokens may grow with the block.
+ */
+function* tallyBlock(text: string, terms: Set<string>): Generator<void, Tally> {
+  const tally: Tally = { length: 0, counts: new Map() }
+  for (let at = 0; at < text.length;) {
+    const end = pieceEnd(text, at)
+    for (const token of tokenize(text.slice(at, end))) {
+      tally.length += 1
+      if (terms.has(token)) tally.counts.set(token, (tally.counts.get(token) ?? 0) + 1)
+    }
+    at = end
+    if (at < text.length) yield
+  }
+  return tally
+}
 
 /** What ranking needs from one page: its hits, and the size of the corpus they were found in. */
 interface Scan {
@@ -106,18 +142,23 @@ function* scanPage(
     return found
   }
   const scan: Scan = { hits: [], blocks: 0, length: 0 }
+  let pending = 0
   for (const [index, block] of document.blocks.entries()) {
-    if (index % SLICE_BLOCKS === SLICE_BLOCKS - 1) yield
+    pending += block.end - block.start
+    if (index % SLICE_BLOCKS === SLICE_BLOCKS - 1 || pending >= PIECE_CHARS) {
+      pending = 0
+      yield
+    }
     if (block.kind === 'heading') continue
-    const tokens = tokenize(document.markdown.slice(block.start, block.end))
-    const length = Math.max(1, tokens.length)
+    const tally = yield* tallyBlock(document.markdown.slice(block.start, block.end), terms)
+    const length = Math.max(1, tally.length)
     scan.blocks += 1
     scan.length += length
     const item: Scored = {
       page,
       block: index,
       length,
-      counts: countTerms(tokens, terms),
+      counts: tally.counts,
       headingTerms: headingPath(document, block.start)
         .slice(0, HEADING_WEIGHTS.length)
         .map((entry) => termsOf(entry.start, `${entry.id} ${entry.title}`)),
@@ -302,12 +343,37 @@ export function keepRelevant(candidates: Candidate[][]): Candidate[][] {
   return runToEnd(relevantSteps(candidates))
 }
 
-/** Whitespace-insensitive text of a passage; short passages are too common to call reposts. */
+/** Characters turned into keys between two yields. */
+const KEY_CHARS_PER_STEP = 1 << 16
+/** A passage longer than four of these is recognized by its length and three stretches of it. */
+const KEY_WINDOW_CHARS = 2048
+
+/** Beginning, middle, and end of a long passage, with its length in front. */
+function sampleOf(text: string): string {
+  const middle = Math.floor((text.length - KEY_WINDOW_CHARS) / 2)
+  return [
+    String(text.length),
+    text.slice(0, KEY_WINDOW_CHARS),
+    text.slice(middle, middle + KEY_WINDOW_CHARS),
+    text.slice(-KEY_WINDOW_CHARS),
+  ].join('\n')
+}
+
+/**
+ * Whitespace-insensitive text of a passage; short passages are too common to call reposts. A
+ * block can be megabytes, and a key per passage is kept for the whole call, so a long one is
+ * sampled. Its exact length is part of the key: taking two long passages for one would hide
+ * evidence, while missing a repost only shows it twice. The line break in front marks a sampled
+ * key: no other key contains one.
+ */
 function passageKey(document: PageDocument, candidate: Candidate): string | undefined {
   const block = document.blocks[candidate.block]
   if (!block || block.end - block.start < MIN_DEDUPE_CHARS) return undefined
-  const key = document.markdown.slice(block.start, block.end).replace(/\s+/gu, ' ').trim()
-  return key.length >= MIN_DEDUPE_CHARS ? key : undefined
+  const text = document.markdown.slice(block.start, block.end)
+  const sampled = text.length > 4 * KEY_WINDOW_CHARS
+  const key = (sampled ? sampleOf(text) : text).replace(/\s+/gu, ' ').trim()
+  if (key.length < MIN_DEDUPE_CHARS) return undefined
+  return sampled ? `\n${key}` : key
 }
 
 /** The same passage on a later page is dropped; the first carrier records where else it appeared. */
@@ -321,8 +387,13 @@ export function* dropRepostSteps(
   for (const [page, list] of candidates.entries()) {
     const document = documents[page]
     const unique: Candidate[] = []
+    let pending = 0
     for (const [index, candidate] of list.entries()) {
-      if (index % ITEMS_PER_STEP === ITEMS_PER_STEP - 1) yield
+      pending += Math.min(candidate.end - candidate.start, 4 * KEY_WINDOW_CHARS)
+      if (index % ITEMS_PER_STEP === ITEMS_PER_STEP - 1 || pending >= KEY_CHARS_PER_STEP) {
+        pending = 0
+        yield
+      }
       const key = document ? passageKey(document, candidate) : undefined
       const original = key === undefined ? undefined : firstSeen.get(key)
       if (key !== undefined && !original) firstSeen.set(key, candidate)

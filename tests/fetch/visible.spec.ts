@@ -1,6 +1,7 @@
 /** find must match what a reader sees, because that is what a model quotes. */
 import { describe, expect, it } from 'vitest'
 import { findMatches, foldText } from '../../src/fetch/find.ts'
+import { FUSE_MS, mustFold } from './helpers.ts'
 
 const PAGE = [
   '#### `new DatabaseSync(path[, options])`',
@@ -29,11 +30,11 @@ const PAGE = [
 ].join('\n')
 
 function find(markdown: string, needle: string): ReturnType<typeof findMatches> {
-  return findMatches(markdown, needle, foldText(markdown))
+  return findMatches(markdown, needle, mustFold(markdown))
 }
 
 function visible(text: string): string {
-  return foldText(text).text.trim()
+  return mustFold(text).text.trim()
 }
 
 /** The matched span, stripped of markup, must read exactly like the needle. */
@@ -147,7 +148,7 @@ describe('quotes taken from the visible text', () => {
 describe('foldText', () => {
   it('maps every visible character to the source span it came from', () => {
     const source = 'a \\[b\\] [c](https://x.example/y) **d**'
-    const folded = foldText(source)
+    const folded = mustFold(source)
     expect(folded.text).toBe('a [b] c d')
     const at = (char: string): string => {
       const index = folded.text.indexOf(char)
@@ -161,8 +162,40 @@ describe('foldText', () => {
   it('stays linear on hostile input', () => {
     const hostile = `${'['.repeat(20_000)}${'-'.repeat(200_000)}x\n${'\\'.repeat(50_001)}`
     const started = Date.now()
-    foldText(hostile)
-    expect(Date.now() - started).toBeLessThan(3000)
+    expect(foldText(hostile)).toBeDefined()
+    // Only a fuse; find.spec.ts measures how the cost grows.
+    expect(Date.now() - started).toBeLessThan(FUSE_MS)
+  })
+})
+
+describe('letters that can be written in two ways', () => {
+  const composed = 'caf\u00E9'
+  const decomposed = 'cafe\u0301'
+  const syllable = '\uAC01'
+  const jamo = '\u1100\u1161\u11A8'
+
+  it('finds either spelling with either spelling', () => {
+    for (const written of [composed, decomposed]) {
+      const page = `Un ${written} noir.`
+      for (const asked of [composed, decomposed]) {
+        const matches = find(page, asked)
+        expect(matches, `${asked.length} in ${written.length}`).toHaveLength(1)
+        expect(page.slice(matches[0]?.start, matches[0]?.end)).toBe(written)
+        expect(matches[0]?.kind).toBe(asked === written ? 'exact' : 'normalized')
+      }
+    }
+    for (const written of [syllable, jamo])
+      for (const asked of [syllable, jamo]) expect(find(`a ${written} b`, asked)).toHaveLength(1)
+  })
+
+  it('does not find a letter inside another letter', () => {
+    // Decomposed, "cafe" is the beginning of "caf\u00E9", and one syllable the beginning of another.
+    for (const written of [composed, decomposed])
+      expect(find(`Un ${written} noir.`, 'cafe')).toEqual([])
+    expect(find('Un cafe noir.', composed)).toEqual([])
+    for (const written of [syllable, jamo]) expect(find(`a ${written} b`, '\uAC00')).toEqual([])
+    expect(find('\u304C text', '\u304B')).toEqual([])
+    expect(find('\u304B text', '\u304B')).toHaveLength(1)
   })
 })
 
@@ -172,7 +205,7 @@ describe('characters that only shape the text', () => {
   const page = `I ${persian} a \u2764\uFE0F and a 1\uFE0F\u20E3 key.`
 
   it('finds a word whether or not the quote carries its joiner or its emoji selector', () => {
-    const folded = foldText(page)
+    const folded = mustFold(page)
     const withJoiner = findMatches(page, persian, folded)
     expect(withJoiner).toHaveLength(1)
     expect(withJoiner[0]?.kind).toBe('exact')

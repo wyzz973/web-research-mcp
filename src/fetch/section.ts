@@ -1,8 +1,12 @@
 import type { OutlineEntry } from '../contract.ts'
 
+/** No id or title is longer; what a caller sends beyond this cannot name a section. */
+const MAX_REQUEST_CHARS = 300
+
 function canonical(value: string): string {
   return value
     .trim()
+    .slice(0, MAX_REQUEST_CHARS)
     .replace(/^(?:section|sec\.?|chapter|appendix|annex|§)\s*/iu, '')
     .replace(/[.\s]+$/u, '')
     .toLowerCase()
@@ -14,7 +18,7 @@ export function findSection(outline: OutlineEntry[], requested: string): Outline
   if (wanted === '') return undefined
   const byId = outline.find((entry) => entry.id.toLowerCase() === wanted)
   if (byId) return byId
-  const title = requested.trim().replace(/\s+/gu, ' ').toLowerCase()
+  const title = requested.trim().slice(0, MAX_REQUEST_CHARS).replace(/\s+/gu, ' ').toLowerCase()
   return outline.find(
     (entry) =>
       entry.title.toLowerCase() === title || `${entry.id} ${entry.title}`.toLowerCase() === title,

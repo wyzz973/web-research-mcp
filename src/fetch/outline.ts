@@ -16,12 +16,65 @@ const DOTTED_INTEGER = /^(\d{1,3})[.)](?=\s|$)/u
 const APPENDIX = /^(?:appendix|annex)\s+([A-Z])(?=[.:\s]|$)[.:]?/iu
 const LETTERED_NUMBER = /^([A-Z](?:\.\d+)+)\.?(?=\s|$)/u
 
+/** A heading is read this far; no real one is longer, and a hostile one can be megabytes. */
+const MAX_RAW_TITLE_CHARS = 8192
+/** What the outline shows of a title. Longer ones end in an ellipsis; the page text is untouched. */
+const MAX_TITLE_CHARS = 200
+const SQUARE_OPEN = 91
+const SQUARE_CLOSE = 93
+const ROUND_OPEN = 40
+const ROUND_CLOSE = 41
+const BANG = 33
+
+/** next[i] is the index of the first `code` at or after i, or -1. */
+function nextIndexes(text: string, code: number): Int32Array {
+  const next = new Int32Array(text.length + 1).fill(-1)
+  for (let at = text.length - 1; at >= 0; at -= 1)
+    next[at] = text.charCodeAt(at) === code ? at : (next[at + 1] ?? -1)
+  return next
+}
+
+/**
+ * "[text](destination)" and "![alt](source)" become their text. One pass with precomputed
+ * closers: the obvious regular expression looks ahead from every "[" and is quadratic on a
+ * heading made of brackets.
+ */
+function withoutLinks(raw: string): string {
+  if (!raw.includes('](')) return raw
+  const squares = nextIndexes(raw, SQUARE_CLOSE)
+  const rounds = nextIndexes(raw, ROUND_CLOSE)
+  const pieces: string[] = []
+  let copied = 0
+  let at = 0
+  while (at < raw.length) {
+    const open = raw.charCodeAt(at) === BANG ? at + 1 : at
+    const close = raw.charCodeAt(open) === SQUARE_OPEN ? (squares[open + 1] ?? -1) : -1
+    const linked = close !== -1 && raw.charCodeAt(close + 1) === ROUND_OPEN
+    const end = linked ? (rounds[close + 2] ?? -1) : -1
+    if (end === -1) at += 1
+    else {
+      pieces.push(raw.slice(copied, at), raw.slice(open + 1, close))
+      at = end + 1
+      copied = at
+    }
+  }
+  pieces.push(raw.slice(copied))
+  return pieces.join('')
+}
+
+function shortened(title: string): string {
+  if (title.length <= MAX_TITLE_CHARS) return title
+  const code = title.charCodeAt(MAX_TITLE_CHARS - 1)
+  const end = code >= 0xd800 && code <= 0xdbff ? MAX_TITLE_CHARS - 1 : MAX_TITLE_CHARS
+  return `${title.slice(0, end).trimEnd()}…`
+}
+
 function plainTitle(raw: string): string {
-  return raw
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/gu, '$1')
+  const title = withoutLinks(raw.slice(0, MAX_RAW_TITLE_CHARS))
     .replace(/[*`]|(?<![\w\\])_|_(?!\w)/gu, '')
     .replace(/\s+/gu, ' ')
     .trim()
+  return shortened(title)
 }
 
 /** Returns the heading's own section number and the title without it. */
@@ -42,8 +95,9 @@ function ownNumber(title: string): { id: string; rest: string } | undefined {
  */
 export const MAX_HEADINGS = 20_000
 
-/** Blocks looked at between two yields. */
+/** Blocks looked at between two yields, and characters of heading text likewise. */
 const BLOCKS_PER_STEP = 4096
+const HEADING_CHARS_PER_STEP = 1 << 16
 
 interface Headings {
   list: Heading[]
@@ -53,11 +107,17 @@ interface Headings {
 
 function* readHeadings(markdown: string, blocks: Block[]): Generator<void, Headings> {
   const list: Heading[] = []
+  let pending = 0
   for (const [index, block] of blocks.entries()) {
-    if (index % BLOCKS_PER_STEP === BLOCKS_PER_STEP - 1) yield
+    if (index % BLOCKS_PER_STEP === BLOCKS_PER_STEP - 1 || pending >= HEADING_CHARS_PER_STEP) {
+      pending = 0
+      yield
+    }
     if (block.kind !== 'heading') continue
     if (list.length === MAX_HEADINGS) return { list, capped: true }
-    const match = ATX_HEADING.exec(markdown.slice(block.start, block.end))
+    const line = markdown.slice(block.start, Math.min(block.end, block.start + MAX_RAW_TITLE_CHARS))
+    pending += line.length
+    const match = ATX_HEADING.exec(line)
     const text = plainTitle(match?.[2] ?? '')
     if (text !== '') list.push({ block: index, level: block.level ?? 1, text })
   }
@@ -77,10 +137,25 @@ function ordinalPaths(headings: Heading[]): string[] {
   })
 }
 
-function unique(candidate: string, taken: Set<string>): string {
+/** Ids handed out so far, and for each wanted id the last copy number that was tried. */
+interface Taken {
+  ids: Set<string>
+  copies: Map<string, number>
+}
+
+/**
+ * "1.1", "1.1-2", "1.1-3": the search for a free copy continues where the last one for the same
+ * id stopped. Starting over each time is quadratic, and a page may give 20,000 headings one number.
+ */
+function unique(candidate: string, taken: Taken): string {
   let id = candidate
-  for (let copy = 2; taken.has(id); copy += 1) id = `${candidate}-${copy}`
-  taken.add(id)
+  let copy = taken.copies.get(candidate) ?? 1
+  while (taken.ids.has(id)) {
+    copy += 1
+    id = `${candidate}-${copy}`
+  }
+  taken.copies.set(candidate, copy)
+  taken.ids.add(id)
   return id
 }
 
@@ -90,7 +165,7 @@ function unique(candidate: string, taken: Set<string>): string {
  * for the document's section 1.3.
  */
 function assignIds(headings: Heading[]): { id: string; title: string }[] {
-  const taken = new Set<string>()
+  const taken: Taken = { ids: new Set(), copies: new Map() }
   const numbered = headings.map((heading) => ownNumber(heading.text))
   const prefix = numbered.some((own) => own !== undefined) ? 'p' : ''
   const ids = numbered.map((own) => (own ? unique(own.id, taken) : undefined))

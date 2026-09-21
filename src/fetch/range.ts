@@ -50,8 +50,10 @@ function takeWholeTiles(document: PageDocument, from: number, to: number, budget
   ) {
     const stop = Math.min(document.blocks[index]?.tileEnd ?? to, to)
     if (stop <= end) continue
+    // Size first: the rest of a tile can be megabytes, and measuring it reads all of it.
+    if (stop - end > room.chars) break
     const cost = { tokens: tileTokens(document, index, end, stop), chars: stop - end }
-    if (cost.tokens > room.tokens || cost.chars > room.chars) break
+    if (cost.tokens > room.tokens) break
     room = minus(room, cost)
     end = stop
   }
