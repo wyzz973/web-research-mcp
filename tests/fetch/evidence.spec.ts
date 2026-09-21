@@ -392,3 +392,86 @@ describe('pages that fit their share', () => {
     ).toBe(false)
   })
 })
+
+/**
+ * A long document contains something that looks like a match for almost any goal. Asked what
+ * RFC 9110 says about baking sourdough bread, evidence mode returned two passages of HTTP
+ * specification, each with a citable location, and said nothing about the page being unrelated
+ * (ninth audit round). Neither the score nor the share of the goal's terms that a page contains
+ * tells that case from a real one, so what is required is the term that says what the goal is
+ * about.
+ */
+const SPEC_PAGE = [
+  '# Caching in HTTP',
+  '',
+  '## 3.6 Origin Server',
+  '',
+  'The most familiar form of origin server are large public websites, where a home page is the '.repeat(
+    3,
+  ),
+  '',
+  '## 4.2 Freshness',
+  '',
+  'A response is fresh while its age has not passed its freshness lifetime, which a server may '.repeat(
+    3,
+  ),
+  '',
+  '## 5.1 Conditional requests',
+  '',
+  'A conditional request carries a validator, and the entity tag is the one a server sends. '.repeat(
+    3,
+  ),
+].join('\n')
+
+const RECIPE_PAGE = [
+  '# Sourdough at home',
+  '',
+  '## Feeding the starter',
+  '',
+  'A sourdough starter is flour and water kept warm, and you feed it every day until it rises. '.repeat(
+    3,
+  ),
+  '',
+  '## Baking',
+  '',
+  'Bake the bread in a covered pot so that the crust of the sourdough stays soft while it rises. '.repeat(
+    3,
+  ),
+].join('\n')
+
+describe('a page that is not about the goal', () => {
+  const read = (markdown: string, goal: string) =>
+    keepRelevant(rankPassages([analyze(markdown)], goal))[0] ?? []
+
+  it('offers nothing, rather than whatever words it happens to share', () => {
+    // "home" occurs in the specification, and used to be enough.
+    expect(read(SPEC_PAGE, 'how do I bake sourdough bread at home')).toEqual([])
+    expect(read(RECIPE_PAGE, 'what does an entity tag do in a conditional request')).toEqual([])
+  })
+
+  it('still offers passages when the goal is what the page is about', () => {
+    const spec = read(SPEC_PAGE, 'what does an entity tag do in a conditional request')
+    const recipe = read(RECIPE_PAGE, 'how do I bake sourdough bread at home')
+    expect(spec.length).toBeGreaterThan(0)
+    expect(recipe.length).toBeGreaterThan(0)
+    expect(SPEC_PAGE.slice(spec[0]?.start, spec[0]?.end)).toContain('conditional')
+    expect(RECIPE_PAGE.slice(recipe[0]?.start, recipe[0]?.end)).toContain('sourdough')
+  })
+
+  it('is told apart from the pages that do answer, in one request', () => {
+    const goal = 'how do I bake sourdough bread at home'
+    const ranked = rankPassages([analyze(SPEC_PAGE), analyze(RECIPE_PAGE)], goal)
+    expect(ranked[0]).toEqual([])
+    expect(ranked[1]?.length).toBeGreaterThan(0)
+  })
+
+  it('takes every equally defining term, so that any one of them is enough', () => {
+    // Both are as long as the other; a page about either is about the goal.
+    const onlyOne = [
+      '# Sourdough',
+      '',
+      'A sourdough starter is flour and water, fed daily. '.repeat(6),
+    ].join('\n')
+    expect(read(onlyOne, 'sourdough and chocolate together').length).toBeGreaterThan(0)
+  })
+})

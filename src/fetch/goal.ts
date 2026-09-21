@@ -254,6 +254,37 @@ function toCandidate(document: PageDocument, item: Scored, score: number): Candi
  * scores are comparable when one budget is shared between pages. Costs and duplicate keys are
  * not computed here: most candidates are dropped before anyone needs them.
  */
+/**
+ * The terms of a goal that say what it is about, as opposed to the ones any page might contain.
+ *
+ * Without them a long document answers anything. Asked what RFC 9110 says about baking sourdough
+ * bread, the ranking returned two passages of HTTP specification with citable locations and no
+ * word of warning, because "home" appears in it; asked about AbortSignal.timeout, it returned
+ * twelve passages about 408 and 504 status codes, and matched five of the goal's six terms,
+ * more than the two pages that really answered (ninth audit round). Neither the score nor the
+ * share of terms matched separates those cases: 6.53 against 6.55, and 5 of 6 against 4 of 6.
+ * What separates them is one term. The pages that answer contain "abortsignal"; the RFC does not.
+ *
+ * Length stands for how much a term narrows things down, which is what it is worth here: the
+ * words a language uses most are its shortest, and the name of a thing is usually the longest
+ * word in a question about it. Ties are kept together, and at most three, so that a goal of
+ * several equally specific words is matched by any one of them.
+ */
+export function definingTerms(terms: readonly string[]): Set<string> {
+  const length = (term: string): number => [...term].length
+  const longest = Math.max(0, ...terms.map(length))
+  return new Set(terms.filter((term) => length(term) === longest).slice(0, 3))
+}
+
+function mentions(scan: Scan, wanted: Set<string>): boolean {
+  for (const item of scan.hits) {
+    for (const term of item.counts.keys()) if (wanted.has(term)) return true
+    for (const found of item.headingTerms)
+      for (const term of found) if (wanted.has(term)) return true
+  }
+  return false
+}
+
 export function* rankSteps(
   documents: PageDocument[],
   goal: string,
@@ -266,10 +297,18 @@ export function* rankSteps(
   const idf = yield* inverseFrequencies(scans, terms)
   const blocks = scans.reduce((sum, scan) => sum + scan.blocks, 0)
   const average = scans.reduce((sum, scan) => sum + scan.length, 0) / Math.max(1, blocks)
+  const defining = definingTerms(terms)
   const ranked: Candidate[][] = []
   for (const [page, scan] of scans.entries()) {
     const document = documents[page]
     const list: Candidate[] = []
+    // A page that never says what the goal is about has no passage to offer for it. Leaving it
+    // without candidates is what the readers already treat as "nothing relevant here": the page
+    // is still read, as its beginning and its outline, and the notes say why.
+    if (!mentions(scan, defining)) {
+      ranked.push(list)
+      continue
+    }
     for (const [index, item] of scan.hits.entries()) {
       if (index % ITEMS_PER_STEP === ITEMS_PER_STEP - 1) yield
       if (!document) continue
