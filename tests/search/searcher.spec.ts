@@ -241,7 +241,7 @@ describe('status', () => {
     expect(result.sources.map((source) => source.status)).toEqual(['timeout', 'empty'])
   })
 
-  it('is an error when every source failed, with rate_limited as the leading cause', async () => {
+  it('is an error that gives every source its own reason and its own wait', async () => {
     const sources = [
       fakeSource('exa', new WebError('timeout', 'slow')),
       fakeSource('parallel', new WebError('rate_limited', 'limited', 45)),
@@ -253,10 +253,12 @@ describe('status', () => {
       returned: 0,
       results: [],
       error: {
-        code: 'rate_limited',
+        // They failed for different reasons, so none of those reasons is the search's, and the
+        // wait is the longest: a shorter one promises a retry that cannot succeed.
+        code: 'upstream_error',
         message:
-          'All search sources failed (exa: timeout, parallel: rate_limited, tavily: blocked); retry after 30s.',
-        retry_after_s: 30,
+          'All search sources failed (exa: timeout, retry after 30s; parallel: rate_limited, retry after 300s; tavily: blocked, retry after 300s).',
+        retry_after_s: 300,
       },
     })
     expect(result.id).toBeUndefined()

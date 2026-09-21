@@ -113,7 +113,8 @@ describe('sourceStatus', () => {
 })
 
 describe('representative and allFailedError', () => {
-  const error = (code: ConstructorParameters<typeof WebError>[0]) => new WebError(code, code)
+  const error = (code: ConstructorParameters<typeof WebError>[0], retryAfterSeconds?: number) =>
+    new WebError(code, code, retryAfterSeconds)
 
   it('prefers rate_limited, then the most frequent code, then a fixed order', () => {
     expect(representative([error('timeout'), error('rate_limited'), error('timeout')])?.code).toBe(
@@ -127,17 +128,24 @@ describe('representative and allFailedError', () => {
   })
 
   it('names every source and says when to retry, using only our own words', () => {
-    const failures = [
-      { source: 'exa', error: error('rate_limited') },
-      { source: 'parallel', error: error('timeout') },
+    // Different reasons: no one of them is the answer's, and the wait is the longer of the two,
+    // because the shorter one would promise a retry that cannot succeed (ninth audit round).
+    const mixed = [
+      { source: 'tavily', error: error('budget_exhausted', 79_241) },
+      { source: 'exa', error: error('parse_failed') },
     ]
-    expect(allFailedError(failures, 300)).toEqual({
-      code: 'rate_limited',
+    expect(allFailedError(mixed)).toEqual({
+      code: 'upstream_error',
       message:
-        'All search sources failed (exa: rate_limited, parallel: timeout); retry after 300s.',
-      retry_after_s: 300,
+        'All search sources failed (tavily: budget_exhausted, retry after 79241s; exa: parse_failed).',
+      retry_after_s: 79_241,
     })
-    expect(allFailedError([{ source: 'exa', error: error('blocked') }], undefined)).toEqual({
+    const agreeing = [
+      { source: 'exa', error: error('rate_limited', 30) },
+      { source: 'parallel', error: error('rate_limited', 300) },
+    ]
+    expect(allFailedError(agreeing)).toMatchObject({ code: 'rate_limited', retry_after_s: 300 })
+    expect(allFailedError([{ source: 'exa', error: error('blocked') }])).toEqual({
       code: 'blocked',
       message: 'All search sources failed (exa: blocked).',
     })

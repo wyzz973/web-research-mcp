@@ -402,14 +402,21 @@ function summarize(
   const failures: SourceFailure[] = []
   const sources: SourceStatus[] = []
   const paid: string[] = []
-  const waits: number[] = []
   for (const adapter of waves.flatMap((wave) => wave.adapters)) {
     const own = outcomes.filter((outcome) => outcome.call.adapter === adapter)
     updateCooldown(context, adapter, own)
     sources.push(sourceStatus(adapter.id, own))
     const failure = representative(realErrors(own))
-    if (failure) failures.push({ source: adapter.id, error: failure })
-    if (failure) waits.push(context.cooldowns.get(cooldownKey(adapter))?.retryAfterS ?? 0)
+    if (failure) {
+      // The cooldown outlives the error: a used-up quota comes back tomorrow, whatever the
+      // vendor's own Retry-After said.
+      const waiting = context.cooldowns.get(cooldownKey(adapter))?.retryAfterS
+      failures.push({
+        source: adapter.id,
+        error: failure,
+        ...(waiting === undefined ? {} : { retryAfterS: waiting }),
+      })
+    }
     if (!adapter.free() && own.some((outcome) => outcome.dispatched)) paid.push(adapter.id)
   }
   const answered = sources.some((source) => source.status === 'ok' || source.status === 'empty')
@@ -420,12 +427,7 @@ function summarize(
     costUsd,
     paidSources: paid,
     notes: [...notes, ...heldNotes(cursor.holds()), ...(paid.length ? budgetNote(context) : [])],
-    error: answered
-      ? undefined
-      : allFailedError(
-          failures,
-          waits.some(Boolean) ? Math.min(...waits.filter(Boolean)) : undefined,
-        ),
+    error: answered ? undefined : allFailedError(failures),
   }
 }
 
@@ -465,6 +467,21 @@ export async function runEngine(
     notes.push(`${primary.id} ${weak}, so ${backup.id} was searched as well.`)
   } else if (weak && !signal.aborted) {
     notes.push(`${primary.id} ${weak}, and no other source was available to add.`)
+  }
+  // Still nothing at all. That is not a question of how good an answer is, it is having none, so
+  // the walk goes on down the lineup rather than stopping after one more source: a vendor whose
+  // endpoint begins answering in a format we cannot read takes its own source out of the day,
+  // and the sources behind it are untouched and able (ninth audit round). `fast` is left out:
+  // one source is what it means, and a caller who asked for speed is answered with the failure.
+  while (pool.length === 0 && search.depth !== 'fast' && !signal.aborted) {
+    const left = context.timeouts.standardTotalMs - (performance.now() - began)
+    if (left <= 0) break
+    const next = cursor.next()
+    if (!next) break
+    const hardMs = Math.min(context.timeouts.hardMs, left)
+    waves.push(await runWave(context, search, [next], hardMs, signal))
+    pool = fuseWaves(context, search, waves)
+    if (pool.length > 0) notes.push(`every source before ${next.id} failed, so it was searched.`)
   }
   return summarize(context, waves, pool, cursor, notes)
 }

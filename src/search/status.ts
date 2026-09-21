@@ -9,6 +9,8 @@ import type { CallOutcome } from './execute.ts'
 export interface SourceFailure {
   source: string
   error: WebError
+  /** How long this source is being left alone, which outlives the error that caused it. */
+  retryAfterS?: number
 }
 
 /** rate_limited first: it is the one failure the caller can wait out. */
@@ -105,17 +107,37 @@ export function cacheable(sources: readonly SourceStatus[]): boolean {
 }
 
 /** The error of a search in which no source produced an answer. */
-export function allFailedError(
-  failures: readonly SourceFailure[],
-  retryAfterS: number | undefined,
-): ToolError {
+/**
+ * The error of a search in which no source produced an answer.
+ *
+ * When they failed for different reasons, no one of those reasons is the answer's. Picking one
+ * said, of a vendor that had used up its quota alongside one whose format we could not read,
+ * `budget_exhausted ... retry after 30s`: it read as though this tool had run out of money, and
+ * it promised that waiting half a minute would help, when one of the two would not come back
+ * before tomorrow (ninth audit round). Each source now gives its own reason and its own wait,
+ * the code is neutral unless they agree, and the wait is the longest, since a shorter one is a
+ * promise that the search can succeed sooner than it can.
+ */
+export function allFailedError(failures: readonly SourceFailure[]): ToolError {
+  const codes = new Set(failures.map((failure) => failure.error.code))
   const main = representative(failures.map((failure) => failure.error))
-  const code = main?.code ?? 'upstream_error'
-  const listed = failures.map((failure) => `${failure.source}: ${failure.error.code}`).join(', ')
-  const retry = retryAfterS === undefined ? '' : `; retry after ${retryAfterS}s`
+  const code = codes.size === 1 ? (main?.code ?? 'upstream_error') : 'upstream_error'
+  const waitFor = (failure: SourceFailure): number | undefined =>
+    failure.retryAfterS ?? failure.error.retryAfterSeconds
+  const waits = failures.flatMap((failure) => {
+    const wait = waitFor(failure)
+    return wait === undefined ? [] : [wait]
+  })
+  const retryAfterS = waits.length > 0 ? Math.max(...waits) : undefined
+  const listed = failures
+    .map((failure) => {
+      const wait = waitFor(failure)
+      return `${failure.source}: ${failure.error.code}${wait === undefined ? '' : `, retry after ${wait}s`}`
+    })
+    .join('; ')
   return {
     code,
-    message: `All search sources failed (${listed})${retry}.`,
+    message: `All search sources failed (${listed}).`,
     ...(retryAfterS === undefined ? {} : { retry_after_s: retryAfterS }),
   }
 }

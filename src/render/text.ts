@@ -83,6 +83,16 @@ function ownId(value: string | undefined): string | undefined {
   return value !== undefined && shaped.test(value) ? value : undefined
 }
 
+/** Enough of a source's own account of a failure to act on, on a line shared with others. */
+function firstSentence(text: string): string {
+  // Same substitute for the separator as everywhere else, and whatever brackets the sentence
+  // has it keeps, so that they stay in pairs inside the ones this line puts around it.
+  const flat = neutralize(text).text.replace(/\|/gu, '\u2223').replace(/\s+/gu, ' ').trim()
+  const end = flat.search(/[.;]\s|[.;]$/u)
+  const sentence = end === -1 ? flat : flat.slice(0, end)
+  return sentence.length > 90 ? `${sentence.slice(0, 89)}\u2026` : sentence
+}
+
 function joined(parts: (string | undefined)[]): string {
   return parts.filter(Boolean).join(' | ')
 }
@@ -148,6 +158,10 @@ export function renderSearch(result: SearchResult): string {
             source.id,
             source.status,
             source.retry_after_s === undefined ? undefined : `retry ${source.retry_after_s}s`,
+            // Why, not only that. The model was told "exa error" and had to guess whether that
+            // meant the vendor, the network, or us (ninth audit round). The detail is ours: the
+            // adapters write it from their own words, and it is one bounded line.
+            source.detail ? `(${firstSentence(source.detail)})` : undefined,
           ]
             .filter(Boolean)
             .join(' '),

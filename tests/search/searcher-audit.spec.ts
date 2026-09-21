@@ -592,7 +592,10 @@ describe('points the design review named as high risk', () => {
       fakeSource('parallel', new WebError('upstream_error', 'HTTP 502')),
     ]).search({ query: 'fetch abort' }, never)
     expect(result.status).toBe('error')
-    expect(result.error?.code).toBe('timeout')
+    // Two reasons, neither of them the search's own; both are named in the message.
+    expect(result.error?.code).toBe('upstream_error')
+    expect(result.error?.message).toContain('exa: timeout')
+    expect(result.error?.message).toContain('parallel: upstream_error')
     expect(result.sources.map((source) => source.status)).toEqual(['timeout', 'error'])
     expect(result.results).toEqual([])
   })
