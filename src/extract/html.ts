@@ -171,9 +171,43 @@ const VOID_TAGS = new Set([
   'track',
   'wbr',
 ])
+/**
+ * Elements whose end tag HTML lets a page leave out. Counting their openings would make an
+ * ordinary page look deeply nested: 400 rows of `<tr><td>` written without end tags, which is
+ * 10 KB and four levels of tree, were refused as too deep (eighth audit round). Their containers
+ * (`table`, `ul`, `select`) do have to be closed, so a document that really is nested is still
+ * counted through them.
+ */
+const OPTIONAL_END_TAGS = new Set([
+  'body',
+  'caption',
+  'colgroup',
+  'dd',
+  'dt',
+  'head',
+  'html',
+  'li',
+  'optgroup',
+  'option',
+  'p',
+  'rp',
+  'rt',
+  'tbody',
+  'td',
+  'tfoot',
+  'th',
+  'thead',
+  'tr',
+])
+/** Their content is text, whatever it looks like, so nothing inside them is markup. */
+const RAW_TEXT_TAGS = new Set(['script', 'style', 'textarea', 'title'])
 const LESS_THAN = 0x3c
 const GREATER_THAN = 0x3e
 const SLASH = 0x2f
+const BANG = 0x21
+const QUESTION = 0x3f
+const QUOTE = 0x22
+const APOSTROPHE = 0x27
 
 function tagNameAt(html: Uint8Array, start: number): string {
   let end = start
@@ -186,29 +220,91 @@ function tagNameAt(html: Uint8Array, start: number): string {
   return String.fromCharCode(...html.subarray(start, end)).toLowerCase()
 }
 
+/** Index just past the `>` that ends this tag. A quoted attribute value may contain `>`. */
+function endOfTag(html: Uint8Array, from: number): number {
+  let quote = 0
+  for (let at = from; at < html.length; at += 1) {
+    const byte = html[at] as number
+    if (quote !== 0) {
+      if (byte === quote) quote = 0
+      continue
+    }
+    if (byte === QUOTE || byte === APOSTROPHE) quote = byte
+    else if (byte === GREATER_THAN) return at + 1
+  }
+  return html.length
+}
+
+function indexOfSequence(html: Uint8Array, sequence: string, from: number): number {
+  const first = sequence.charCodeAt(0)
+  for (let at = from; at <= html.length - sequence.length; at += 1) {
+    if (html[at] !== first) continue
+    let matched = true
+    for (let index = 1; index < sequence.length; index += 1)
+      if (html[at + index] !== sequence.charCodeAt(index)) {
+        matched = false
+        break
+      }
+    if (matched) return at
+  }
+  return -1
+}
+
 /**
  * How deeply the source nests, read from the bytes before a parser sees them. The parser itself
  * recurses, so a document nested tens of thousands deep costs a worker its whole deadline before
- * the measured tree exists (seventh audit round); 400 KB of `div` took more than 30 seconds. This
- * is an estimate, since a parser closes and inserts tags of its own, which is why the limit it
+ * the measured tree exists (seventh audit round); 400 KB of `div` took more than 30 seconds.
+ *
+ * Only what a page must close is counted, and only where markup is markup: a `</a>` inside a
+ * comment, inside an attribute value, or inside a script used to cancel out a real opening tag,
+ * which put every one of those documents back through the parser (eighth audit round). This is
+ * still an estimate, since a parser inserts and closes tags of its own, which is why the limit it
  * is held to is far above any real page rather than the one the tree is held to.
  */
 function sourceNestedDeeperThan(html: Uint8Array, limit: number): boolean {
   let depth = 0
-  for (let at = 0; at < html.length; at += 1) {
-    if (html[at] !== LESS_THAN) continue
+  let at = 0
+  while (at < html.length) {
+    if (html[at] !== LESS_THAN) {
+      at += 1
+      continue
+    }
     const next = html[at + 1] as number | undefined
     if (next === undefined) return false
+    if (next === BANG) {
+      if (html[at + 2] === 0x2d && html[at + 3] === 0x2d) {
+        const close = indexOfSequence(html, '-->', at + 4)
+        at = close === -1 ? html.length : close + 3
+      } else at = endOfTag(html, at + 2)
+      continue
+    }
+    if (next === QUESTION) {
+      at = endOfTag(html, at + 2)
+      continue
+    }
     if (next === SLASH) {
-      if (depth > 0) depth -= 1
+      const name = tagNameAt(html, at + 2)
+      at = endOfTag(html, at + 2)
+      if (name !== '' && !VOID_TAGS.has(name) && !OPTIONAL_END_TAGS.has(name) && depth > 0)
+        depth -= 1
       continue
     }
     const name = tagNameAt(html, at + 1)
-    if (name === '' || VOID_TAGS.has(name)) continue
-    // `<foo/>` closes itself; scanning to the end of the tag is bounded by the tag's own length.
-    let end = at + 1
-    while (end < html.length && html[end] !== GREATER_THAN) end += 1
-    if (html[end - 1] === SLASH) continue
+    if (name === '') {
+      at += 1
+      continue
+    }
+    const after = endOfTag(html, at + 1 + name.length)
+    at = after
+    if (RAW_TEXT_TAGS.has(name)) {
+      // Past the end tag, not up to it: stopping on `</script` would count it as closing
+      // something, and a page of `<div><script>a </b</script>` would cancel itself out.
+      const close = indexOfSequence(html, `</${name}`, after)
+      at = close === -1 ? html.length : endOfTag(html, close + 2 + name.length)
+      continue
+    }
+    if (VOID_TAGS.has(name) || OPTIONAL_END_TAGS.has(name)) continue
+    if (html[after - 2] === SLASH) continue
     depth += 1
     if (depth > limit) return true
   }

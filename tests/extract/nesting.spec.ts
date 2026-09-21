@@ -78,6 +78,43 @@ describe('deeply nested documents', () => {
     if (reply.ok) expect(reply.value.markdown).toContain('Ordinary sentence')
   })
 
+  // Eighth audit round: reading depth from the source was both too eager and too easy to fool.
+  it('reads an ordinary page whose end tags are left out, as HTML allows', () => {
+    const rows = Array.from(
+      { length: 400 },
+      (_unused, index) => `<tr><td>Row ${index}<td>${filler.slice(0, 40)}`,
+    ).join('')
+    const items = Array.from({ length: 1200 }, (_unused, index) => `<p>Paragraph ${index}.`).join(
+      '',
+    )
+    for (const shape of [`<table>${rows}</table>`, `<article>${items}</article>`]) {
+      const reply = read(
+        new TextEncoder().encode(
+          `<!doctype html><meta charset="utf-8"><title>T</title><body>${shape}</body>`,
+        ),
+      )
+      expect(reply.ok, shape.slice(0, 20)).toBe(true)
+    }
+  })
+
+  it.each([
+    ['a comment', '<div><!--</a>-->'],
+    ['an attribute value', '<div title="</a>">'],
+    ['script text', '<div><script>if (a </b) {}<\u002fscript>'],
+  ])('is not fooled by a closing tag inside %s', (_name, unit) => {
+    // At this size the tree guard cannot save us: the parser spends the whole deadline before
+    // there is a tree, which is the reason the source is read at all.
+    const started = process.cpuUsage()
+    const reply = read(
+      new TextEncoder().encode(
+        `<!doctype html><meta charset="utf-8"><title>T</title><body>${unit.repeat(40_000)}${filler}</body>`,
+      ),
+    )
+    const spent = process.cpuUsage(started)
+    expect(reply).toEqual({ ok: false, reason: 'too_deep' })
+    expect((spent.user + spent.system) / 1000).toBeLessThan(3000)
+  })
+
   it('does not count a tag that closes itself', () => {
     const selfClosing = '<div/>'.repeat(1100)
     const html = new TextEncoder().encode(
