@@ -402,22 +402,32 @@ describe('a robots.txt too large to evaluate completely', () => {
         'User-agent: *',
         ...Array.from({ length: rules }, (_, index) => `Disallow: /area-${index}/*/private$`),
       ].join('\n')
-    const small = file(10_000)
-    const large = file(40_000)
+    const small = file(5000)
+    const large = file(20_000)
     // Many addresses per run, so that the smaller file is slow enough to be measured at all:
     // the clock has to be well clear of its own granularity, which is about 16 ms on Windows.
     const paths = Array.from(
       { length: 120 },
       (_, index) => `/${'segment/'.repeat(30)}page-${index}?id=1`,
     )
-    const evaluate = (text: string): void => {
+    // Parsing is not what this measures, and it was being done on every run of both sizes: a
+    // Windows runner spent the whole 20 s budget on it. Rules are read once and only read from
+    // afterwards, so evaluation is all that is left in the measurement.
+    const parsed = (text: string): RobotsRule[] => {
       const policy = parseRobots(text, AGENT)
       expect(policy.incomplete).toBe(false)
       for (const path of paths) expect(isAllowed(policy.rules, path)).toBe(true)
+      return policy.rules
     }
+    const few = parsed(small)
+    const many = parsed(large)
     const ratio = cpuRatio(
-      () => evaluate(small),
-      () => evaluate(large),
+      () => {
+        for (const path of paths) isAllowed(few, path)
+      },
+      () => {
+        for (const path of paths) isAllowed(many, path)
+      },
     )
     // Four times the rules: about 4 when linear, about 16 when quadratic.
     expect(ratio).toBeDefined()
