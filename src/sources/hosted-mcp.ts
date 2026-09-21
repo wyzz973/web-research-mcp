@@ -67,6 +67,54 @@ function unwrap(response: JsonRecord, source: string): string {
   return text
 }
 
+/**
+ * The names of the tools an endpoint offers. It is the cheapest question that still needs the
+ * whole path to work: the transport, the JSON-RPC framing, and our reading of the answer. A bare
+ * GET proves only that a host is up, and these endpoints refuse one by design, so doctor used to
+ * report an endpoint as healthy on the evening it began answering searches in a format this
+ * version cannot read (ninth audit round). Costs no search.
+ */
+export async function listHostedTools(
+  http: ApiHttp,
+  source: string,
+  url: string,
+  signal: AbortSignal,
+): Promise<string[]> {
+  let streamed: JsonRecord | undefined
+  const response = await http(
+    {
+      url,
+      method: 'POST',
+      headers: { accept: 'application/json, text/event-stream' },
+      json: { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} },
+      streamComplete(eventBlock) {
+        streamed = asRpcResponse(eventData(eventBlock))
+        return streamed !== undefined
+      },
+    },
+    signal,
+  )
+  const message =
+    streamed ??
+    (response.contentType === 'text/event-stream'
+      ? rpcResponseFromStream(response.body)
+      : asRpcResponse(response.body))
+  if (!message) throw new WebError('parse_failed', `${source} returned no JSON-RPC response.`)
+  if (isRecord(message.error))
+    throw vendorFailure(
+      typeof message.error.message === 'string' ? message.error.message : '',
+      source,
+    )
+  const tools =
+    isRecord(message.result) && Array.isArray(message.result.tools)
+      ? message.result.tools
+      : undefined
+  if (!tools) throw new WebError('parse_failed', `${source} answered without a list of tools.`)
+  return tools.flatMap((tool) =>
+    isRecord(tool) && typeof tool.name === 'string' ? [tool.name] : [],
+  )
+}
+
 /** Returns the text content of the tool result. */
 export async function callHostedTool(
   http: ApiHttp,

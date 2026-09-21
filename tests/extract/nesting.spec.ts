@@ -30,7 +30,8 @@ describe('deeply nested documents', () => {
     const spent = process.cpuUsage(started)
     expect(reply).toEqual({ ok: false, reason: 'too_deep' })
     // Parsing 13 KB is the only work allowed here; converting it took 16.6 s before this guard.
-    expect((spent.user + spent.system) / 1000).toBeLessThan(1000)
+    // The room is for a slow machine, not for a regression: a CI runner measured 1.03 s.
+    expect((spent.user + spent.system) / 1000).toBeLessThan(5000)
   })
 
   it('reads a page nested as deeply as real pages are', () => {

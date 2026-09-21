@@ -15,7 +15,10 @@ import {
   restoreHeadingLevels,
   rewriteLinks,
 } from '../../src/extract/clean.ts'
-import { FUSE_MS, growthOf, MAX_GROWTH } from '../fetch/helpers.ts'
+import { MAX_GROWTH } from '../fetch/helpers.ts'
+
+/** Below this a measurement is mostly noise, whatever the clock. */
+const MEASURABLE_MS = 2
 
 const URL_OF_PAGE = 'https://docs.example.com/guide'
 
@@ -67,35 +70,28 @@ const PASSES: [string, (count: number) => string, (document: Document) => void][
 
 describe('cleaning passes with very many siblings', () => {
   it.each(PASSES)('stay linear for %s', (_name, body, pass) => {
-    const started = performance.now()
-    // Counts, not characters: a thousand elements are enough to measure, and enough to tell a
-    // pass that touches each of them from one that scans their siblings every time. Parsing is
-    // not counted, and each window is closed when its measurement is done: ten thousand parsed
-    // documents at once exhaust the heap of a CI runner, and the parser's own cost, which is
-    // larger than the pass's and not quite linear, would otherwise drown the ratio. One size
-    // only: every pass takes 9 ms or more at a thousand elements, so there is nothing to grow
-    // towards, and growing is what filled the heap. Four times the elements measured 2.2 to 4.0
-    // here; scanning the siblings on every change would be about 16.
-    const ratio = growthOf(
-      (count) => {
+    // Wall clock here, not the process's CPU time, and the smallest of several runs. CPU time
+    // on Windows moves in steps of about 16 ms, and one of these passes takes 10: a runner read
+    // 13.5 for work that measures 3.5 here. A high-resolution clock has no such step, and taking
+    // the smallest of several runs is what keeps a busy machine out of the measurement. Sizes
+    // stay small because parsed documents, not time, are what exhausts a runner's heap.
+    const cost = (count: number): number => {
+      let best = Number.POSITIVE_INFINITY
+      for (let attempt = 0; attempt < 4; attempt += 1) {
         const document = parse(body(count))
-        return () => {
-          pass(document)
-          document.defaultView?.close()
-        }
-      },
-      // One size only: every pass takes 9 ms or more at a thousand elements, so there is
-      // nothing to grow towards, and growing is what filled the heap of a CI runner. Four times
-      // the elements measured 2.2 to 4.0 here; scanning the siblings on every change is about 16.
-      [1000],
-    )
-    expect(performance.now() - started).toBeLessThan(FUSE_MS)
-    // Four times the elements: about 4 when linear, about 16 when every change scans the siblings.
-    // Generous, because the smallest of these passes takes about 10 ms at this size and the
-    // granularity of CPU time on Windows is close to that: a Windows runner measured 8.3 for a
-    // pass that is 2.2 to 4.0 here. What this has to catch is a return to scanning the siblings
-    // on every change, which was 50 to 900 times slower, not a factor of two.
-    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(MAX_GROWTH)
+        const started = performance.now()
+        pass(document)
+        best = Math.min(best, performance.now() - started)
+        document.defaultView?.close()
+      }
+      return best
+    }
+    const small = cost(1000)
+    const ratio = cost(4000) / small
+    expect(small, 'too fast to measure').toBeGreaterThan(MEASURABLE_MS)
+    // Four times the elements: about 4 when linear. Scanning the siblings on every change was
+    // 50 to 900 times slower, so the room here is for the clock, not for a regression.
+    expect(ratio).toBeLessThanOrEqual(MAX_GROWTH)
   })
 
   it.each(PASSES)(

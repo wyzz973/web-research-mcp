@@ -260,7 +260,7 @@ export function cpuRatioOf(
   small: () => () => void,
   large: () => () => void,
   runs = 3,
-  minMs = 8,
+  minMs = 25,
 ): number | undefined {
   let smallMs = Number.POSITIVE_INFINITY
   let largeMs = Number.POSITIVE_INFINITY

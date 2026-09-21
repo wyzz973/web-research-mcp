@@ -4,6 +4,9 @@
  */
 import { EnvHttpProxyAgent, fetch as undiciFetch, type Dispatcher } from 'undici'
 import { databasePath, loadConfig, type Config } from '../config.ts'
+import { WebError } from '../errors.ts'
+import { createApiHttp } from '../net/api-http.ts'
+import { listHostedTools } from '../sources/hosted-mcp.ts'
 import { createCooldowns } from '../search/cooldown.ts'
 import { createSqliteStore } from '../store/sqlite.ts'
 import { VERSION } from '../version.ts'
@@ -14,11 +17,15 @@ interface Check {
   detail: string
 }
 
-/** Hosts contacted when no key is configured. The probe only checks that each one answers. */
-const ANONYMOUS_ENDPOINTS: Record<string, string> = {
-  exa: 'https://mcp.exa.ai/mcp',
-  parallel: 'https://search.parallel.ai/mcp',
-  tavily: 'https://api.tavily.com/',
+/**
+ * Hosts contacted when no key is configured. The two that speak MCP are asked which tools they
+ * offer, which needs the transport, the framing and our reading of the answer to all work and
+ * costs no search; the third is only checked for being up, since its API has nothing as cheap.
+ */
+const ANONYMOUS_ENDPOINTS: Record<string, { url: string; mcp: boolean }> = {
+  exa: { url: 'https://mcp.exa.ai/mcp', mcp: true },
+  parallel: { url: 'https://search.parallel.ai/mcp', mcp: true },
+  tavily: { url: 'https://api.tavily.com/', mcp: false },
 }
 
 /** Same proxy variables as the search client, so a proxied network is not reported as unreachable. */
@@ -69,6 +76,29 @@ async function storeCheck(config: Config): Promise<{ check: Check; usage: Check[
   }
 }
 
+async function speaksMcp(id: string, url: string, userAgent: string): Promise<Check> {
+  const started = performance.now()
+  const host = new URL(url).host
+  const client = createApiHttp({ userAgent, timeoutMs: 8000 })
+  try {
+    const tools = await listHostedTools(client.request, id, url, new AbortController().signal)
+    const ms = Math.round(performance.now() - started)
+    return {
+      name: `reach.${id}`,
+      ok: tools.length > 0,
+      detail:
+        tools.length > 0
+          ? `${host} offers ${tools.length} tool(s) in ${ms} ms`
+          : `${host} answered, but offers no tools`,
+    }
+  } catch (error) {
+    const reason = error instanceof WebError ? `${error.code}: ${error.message}` : 'unreachable'
+    return { name: `reach.${id}`, ok: false, detail: `${host}: ${reason}` }
+  } finally {
+    await client.close()
+  }
+}
+
 async function reachable(id: string, url: string, userAgent: string): Promise<Check> {
   const started = performance.now()
   const host = new URL(url).host
@@ -83,11 +113,18 @@ async function reachable(id: string, url: string, userAgent: string): Promise<Ch
     })
     await response.body?.cancel()
     const ms = Math.round(performance.now() - started)
-    // Any HTTP answer proves the host is reachable; these endpoints reject a bare GET by design.
+    // An answer of any kind proves the host is reachable, and these endpoints refuse a bare GET
+    // by design, so this cannot confirm that searching works. It must not claim that it does:
+    // the evening Exa began answering in a format this version cannot read, its endpoint replied
+    // 405 to this probe and doctor reported everything in order, which is the one thing doctor
+    // exists not to do (ninth audit round).
+    const expected = response.status >= 200 && response.status < 500
     return {
       name: `reach.${id}`,
-      ok: true,
-      detail: `${host} answered HTTP ${response.status} in ${ms} ms`,
+      ok: expected,
+      detail: expected
+        ? `${host} answered HTTP ${response.status} in ${ms} ms (reachable; a search is what proves it works)`
+        : `${host} answered HTTP ${response.status} in ${ms} ms, which is a failure of its own`,
     }
   } catch (error) {
     const cause =
@@ -121,8 +158,10 @@ export async function runDoctor(options: { json: boolean }): Promise<number> {
   const sources = sourceChecks(config)
   const probes = config.sources.anonymous
     ? await Promise.all(
-        Object.entries(ANONYMOUS_ENDPOINTS).map(([id, url]) =>
-          reachable(id, url, config.userAgent),
+        Object.entries(ANONYMOUS_ENDPOINTS).map(([id, endpoint]) =>
+          endpoint.mcp
+            ? speaksMcp(id, endpoint.url, config.userAgent)
+            : reachable(id, endpoint.url, config.userAgent),
         ),
       )
     : []
