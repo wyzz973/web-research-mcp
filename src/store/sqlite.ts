@@ -155,6 +155,19 @@ function toSnapshot(row: unknown): Snapshot | undefined {
  * One SQLite file holds every piece of shared state, so several agent processes on one machine
  * see the same cache, snapshots, and usage ledger without a daemon.
  */
+/**
+ * A reservation is the gate for money and for a vendor's goodwill, so it refuses what is not a
+ * whole number of calls or not an amount. A negative price would raise the budget it is checked
+ * against, and NaN makes every comparison false in ways that are hard to see from outside.
+ */
+function isCount(value: number): boolean {
+  return Number.isSafeInteger(value) && value > 0
+}
+
+function isAmount(value: number): boolean {
+  return Number.isFinite(value) && value >= 0
+}
+
 export async function createSqliteStore(location: string): Promise<Store> {
   const { DatabaseSync } = await loadSqlite()
   if (location !== ':memory:') mkdirSync(path.dirname(location), { recursive: true })
@@ -306,9 +319,11 @@ export async function createSqliteStore(location: string): Promise<Store> {
       upsertUsage.run(today(), source, calls, costUsd)
     },
     reserveUsage(source, calls, cap) {
+      if (!isCount(calls) || !isAmount(cap)) return false
       return Number(reserveUsage.run(today(), source, calls, cap).changes) > 0
     },
     reservePaid(source, calls, estimatedCostUsd, budgetUsd) {
+      if (!isCount(calls) || !isAmount(estimatedCostUsd) || !isAmount(budgetUsd)) return false
       const result = reservePaid.run(today(), source, calls, estimatedCostUsd, budgetUsd)
       return Number(result.changes) > 0
     },

@@ -133,6 +133,25 @@ describe('sqlite store', () => {
     store.close()
   })
 
+  it('refuses a reservation that is not a count or not a price, instead of booking it', async () => {
+    const store = await createSqliteStore(':memory:')
+    // A negative price would raise the budget; NaN compares false everywhere; a fraction of a call
+    // or none at all is not a call. None of these may touch the ledger.
+    for (const calls of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])
+      expect(store.reserveUsage('exa', calls, 10)).toBe(false)
+    for (const cap of [Number.NaN, -1]) expect(store.reserveUsage('exa', 1, cap)).toBe(false)
+    for (const cost of [-5, Number.NaN, Number.POSITIVE_INFINITY])
+      expect(store.reservePaid('exa', 1, cost, 1)).toBe(false)
+    expect(store.reservePaid('exa', 0, 0.1, 1)).toBe(false)
+    expect(store.reservePaid('exa', 1, 0.1, Number.NaN)).toBe(false)
+    expect(store.usageToday()).toEqual({ calls: 0, cost_usd: 0 })
+    // The ordinary cases still work, a free paid call included.
+    expect(store.reserveUsage('exa', 2, 10)).toBe(true)
+    expect(store.reservePaid('tavily', 1, 0, 1)).toBe(true)
+    expect(store.usageToday().calls).toBe(3)
+    store.close()
+  })
+
   it('holds the cap when several processes race for the last calls', async () => {
     const location = temporaryDatabase()
     ;(await createSqliteStore(location)).close()
