@@ -67,7 +67,9 @@ describe('deeply nested documents', () => {
   it('does not count elements that hold nothing as nesting', () => {
     // A page with thousands of line breaks or images is ordinary; reading depth from the source
     // must not take their opening tags for levels.
-    const voids = '<br><img src="i.png"><hr><input value="x">'.repeat(2000)
+    // Just over the source limit of 1,000 opening tags, which is all this has to prove: the
+    // conversion itself is slow per element, and a CI machine is several times slower again.
+    const voids = '<br><img src="i.png"><hr><input value="x">'.repeat(300)
     const html = new TextEncoder().encode(
       `<!doctype html><meta charset="utf-8"><title>T</title><body><article>${filler}${voids}${filler}</article></body>`,
     )
@@ -77,7 +79,7 @@ describe('deeply nested documents', () => {
   })
 
   it('does not count a tag that closes itself', () => {
-    const selfClosing = '<div/>'.repeat(3000)
+    const selfClosing = '<div/>'.repeat(1100)
     const html = new TextEncoder().encode(
       `<!doctype html><meta charset="utf-8"><title>T</title><body><article>${filler}${selfClosing}</article></body>`,
     )

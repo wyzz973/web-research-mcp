@@ -91,7 +91,11 @@ describe('cleaning passes with very many siblings', () => {
     )
     expect(performance.now() - started).toBeLessThan(FUSE_MS)
     // Four times the elements: about 4 when linear, about 16 when every change scans the siblings.
-    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(8)
+    // Generous, because the smallest of these passes takes about 10 ms at this size and the
+    // granularity of CPU time on Windows is close to that: a Windows runner measured 8.3 for a
+    // pass that is 2.2 to 4.0 here. What this has to catch is a return to scanning the siblings
+    // on every change, which was 50 to 900 times slower, not a factor of two.
+    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(12)
   })
 
   it.each(PASSES)(
