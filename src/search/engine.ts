@@ -77,6 +77,8 @@ const CAP_REACHED =
   'the daily cap for anonymous sources is reached; set EXA_API_KEY, TAVILY_API_KEY or PARALLEL_API_KEY, or raise WEB_RESEARCH_ANONYMOUS_DAILY_CAP'
 const BUDGET_SPENT =
   'the daily budget for paid sources is spent and no free source is available; raise WEB_RESEARCH_DAILY_BUDGET_USD or enable anonymous sources (WEB_RESEARCH_ANONYMOUS_SOURCES=1)'
+const PRICE_UNUSABLE =
+  'a paid search source names no usable price per call, so it cannot be held to the daily budget and was not used; its unitCostUsd() must return a number of at least 0'
 const LEDGER_UNAVAILABLE =
   'the usage ledger could not be written, so paid sources were not used; check that the state directory is writable, or enable anonymous sources (WEB_RESEARCH_ANONYMOUS_SOURCES=1)'
 
@@ -96,6 +98,33 @@ function queriesPerCall(adapter: SourceAdapter, search: ResolvedSearch): number 
   if (typeof size !== 'number' || Number.isNaN(size) || size < 1) return 1
   // Infinity is a fair way to say "all of them".
   return Math.max(1, Math.min(Math.floor(size), search.queries.length))
+}
+
+/** Reads an optional numeric trait; undefined when it is absent, not a number, or throws. */
+function numberFrom(read: () => unknown): number | undefined {
+  try {
+    const value = read()
+    return typeof value === 'number' && !Number.isNaN(value) ? value : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The estimated price of one call. Leaving `unitCostUsd` out means "costs nothing", as documented.
+ * A price that is there but is not one (a number where a function belongs, NaN, below zero)
+ * yields undefined: the source cannot be held to the budget, and a negative price would enlarge it.
+ */
+function unitPrice(adapter: SourceAdapter): number | undefined {
+  if (adapter.unitCostUsd === undefined) return 0
+  const price = numberFrom(() => adapter.unitCostUsd?.())
+  return price !== undefined && Number.isFinite(price) && price >= 0 ? price : undefined
+}
+
+/** The most results one call can return; `fallback` when the adapter does not say. */
+function resultsPerCall(adapter: SourceAdapter, fallback: number): number {
+  const most = numberFrom(() => adapter.maxResultsPerCall?.())
+  return most !== undefined && most >= 1 ? most : fallback
 }
 
 /** What admission books. It has to be the number of calls `callsFor` builds. */
@@ -154,8 +183,10 @@ function admission(context: EngineContext, search: ResolvedSearch): Admit {
         return undefined
       }
     }
+    const price = unitPrice(adapter)
+    if (price === undefined) return { kind: 'price' }
     try {
-      const estimate = calls * (adapter.unitCostUsd?.() ?? 0)
+      const estimate = calls * price
       const booked = store.reservePaid(adapter.id, calls, estimate, config.limits.dailyBudgetUsd)
       return booked ? undefined : { kind: 'budget' }
     } catch {
@@ -200,6 +231,8 @@ function unavailable(held: Held): ToolError {
     return { code: 'budget_exhausted', message: BUDGET_SPENT }
   if (holds.some((hold) => hold.kind === 'ledger'))
     return { code: 'internal', message: LEDGER_UNAVAILABLE }
+  if (holds.some((hold) => hold.kind === 'price'))
+    return { code: 'internal', message: PRICE_UNUSABLE }
   return { code: 'no_source_available', message: NO_SOURCE }
 }
 
@@ -220,7 +253,7 @@ function settle(context: EngineContext, outcomes: readonly CallOutcome[]): numbe
   let cost = 0
   for (const outcome of outcomes) {
     const { adapter } = outcome.call
-    const estimate = adapter.free() ? 0 : (adapter.unitCostUsd?.() ?? 0)
+    const estimate = adapter.free() ? 0 : (unitPrice(adapter) ?? 0)
     const billed = outcome.dispatched && (!outcome.error || !UNBILLED.has(outcome.error.code))
     if (!outcome.dispatched) adjustUsage(context, adapter.id, -1, -estimate)
     else if (!billed && estimate > 0) adjustUsage(context, adapter.id, 0, -estimate)
@@ -259,8 +292,7 @@ function weakness(
   if (pool.length === 0) return 'returned nothing'
   // "Few" is judged against what the source could have returned, not against a wish it cannot meet.
   const possible = wave.adapters.reduce(
-    (sum, adapter) =>
-      sum + (adapter.maxResultsPerCall?.() ?? search.maxResults) * callCount(adapter, search),
+    (sum, adapter) => sum + resultsPerCall(adapter, search.maxResults) * callCount(adapter, search),
     0,
   )
   if (pool.length < Math.min(search.maxResults, possible) / 2) return 'returned few results'
@@ -324,7 +356,11 @@ function heldNotes(held: Held): string[] {
   const overBudget = named('budget')
   const overCap = named('cap')
   const unrecorded = named('ledger')
+  const unpriced = named('price')
   return [
+    ...(unpriced.length
+      ? [`Paid sources that name no usable price per call (${unpriced.join(', ')}) were not used.`]
+      : []),
     ...(unrecorded.length
       ? [
           `The usage ledger could not be written, so paid sources (${unrecorded.join(', ')}) were not used.`,

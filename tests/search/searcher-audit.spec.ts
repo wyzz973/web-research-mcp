@@ -642,3 +642,84 @@ describe('an adapter whose maxQueriesPerCall is not a number of queries (round 6
     expect(store.usageTodayBySource('other').calls).toBe(2)
   })
 })
+
+describe('optional traits of an adapter that are not what the interface says', () => {
+  const broken = (): never => {
+    throw new TypeError('not what you think')
+  }
+
+  it.each([
+    ['a number instead of a function', 10],
+    ['a function that returns NaN', () => Number.NaN],
+    ['a function that returns a string', () => '10'],
+    ['a function that throws', broken],
+  ])('maxResultsPerCall as %s does not fail a search that has results', async (_name, value) => {
+    const custom = Object.assign(fakeSource('custom', hits('c', 12)), { maxResultsPerCall: value })
+    const result = await searcherWith([custom as SourceAdapter]).search(
+      { query: 'fetch abort' },
+      never,
+    )
+    expect(result).toMatchObject({ status: 'ok', returned: 10 })
+    expect(result.error).toBeUndefined()
+  })
+
+  it.each([
+    ['a boolean instead of a function', true],
+    ['a function that throws', broken],
+  ])('nativeFilters as %s does not fail a search with sites', async (_name, value) => {
+    const custom = Object.assign(fakeSource('custom', hits('c', 12)), { nativeFilters: value })
+    // Two sources, so that they have to be put in order: that is where the trait is read.
+    const other = fakeSource('exa', hits('e', 12))
+    const result = await searcherWith([custom as SourceAdapter, other]).search(
+      { query: 'fetch abort', sites: ['example.com'], depth: 'fast' },
+      never,
+    )
+    expect(result).toMatchObject({ status: 'ok', returned: 10 })
+  })
+
+  it.each([
+    ['a number instead of a function', 0.01],
+    ['NaN', () => Number.NaN],
+    ['Infinity', () => Number.POSITIVE_INFINITY],
+    ['a negative number', () => -5],
+    ['a function that throws', broken],
+  ])(
+    'a paid source whose unitCostUsd is %s is not used, and the reason given is the real one',
+    async (_name, value) => {
+      const paid = Object.assign(fakeSource('custom', hits('c', 12), { paid: 0.01 }), {
+        unitCostUsd: value,
+      })
+      const alone = await searcherWith([paid as SourceAdapter]).search(
+        { query: 'fetch abort', depth: 'fast' },
+        never,
+      )
+      expect(alone).toMatchObject({
+        status: 'error',
+        error: { code: 'internal' },
+        sources: [{ id: 'custom', status: 'skipped', detail: 'no usable price per call' }],
+      })
+      expect(alone.error?.message).toMatch(/unitCostUsd/u)
+      expect(alone.error?.message).not.toMatch(/budget is spent|ledger/u)
+      // Nothing was sent and nothing was booked: a price below zero must not enlarge the budget.
+      expect(paid.requests).toHaveLength(0)
+      expect(store.usageToday()).toMatchObject({ calls: 0, cost_usd: 0 })
+
+      // Next to a source that works, the search goes on and says what was left out.
+      const exa = fakeSource('exa', hits('e', 12))
+      const mixed = await searcherWith([paid as SourceAdapter, exa]).search(
+        { query: 'fetch retry', depth: 'fast' },
+        never,
+      )
+      expect(mixed.status).toBe('ok')
+      expect(mixed.notes.join(' ')).toMatch(/no usable price per call \(custom\)/u)
+    },
+  )
+
+  it('still reads a paid source without unitCostUsd as costing nothing, as documented', async () => {
+    const paid = fakeSource('custom', hits('c', 12), { paid: 0.01 })
+    delete paid.unitCostUsd
+    const result = await searcherWith([paid]).search({ query: 'fetch abort', depth: 'fast' }, never)
+    expect(result.status).toBe('ok')
+    expect(store.usageToday()).toMatchObject({ calls: 1, cost_usd: 0 })
+  })
+})

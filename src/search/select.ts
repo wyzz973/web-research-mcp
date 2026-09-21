@@ -30,6 +30,8 @@ export type Hold =
   | { kind: 'budget' }
   /** The ledger could not be written, and money is not spent without a record of it. */
   | { kind: 'ledger' }
+  /** A keyed source names a price that is not one, so it cannot be held to the budget. */
+  | { kind: 'price' }
 
 /** Books the calls a source would make. Returns the hold when they cannot be booked. */
 export type Admit = (adapter: SourceAdapter) => Hold | undefined
@@ -56,8 +58,17 @@ function coolingHold(adapter: SourceAdapter, cooldowns: Cooldowns): Hold | undef
   return cooling ? { kind: 'cooling', ...cooling } : undefined
 }
 
+/** An optional trait of outside code: anything but a plain `true` counts as "no". */
+function filtersNatively(adapter: SourceAdapter): boolean {
+  try {
+    return adapter.nativeFilters?.() === true
+  } catch {
+    return false
+  }
+}
+
 function filterPenalty(adapter: SourceAdapter, wantsFilters: boolean): number {
-  return wantsFilters && adapter.nativeFilters?.() !== true ? 1 : 0
+  return wantsFilters && !filtersNatively(adapter) ? 1 : 0
 }
 
 export function buildLineup(input: LineupInput): Lineup {
@@ -83,6 +94,7 @@ const HOLD_DETAIL: Record<Exclude<Hold['kind'], 'cooling'>, string> = {
   cap: 'daily anonymous cap reached',
   budget: 'daily budget reached',
   ledger: 'usage ledger unavailable',
+  price: 'no usable price per call',
 }
 
 function skippedStatus(id: string, hold: Hold): SourceStatus {
