@@ -120,13 +120,13 @@ describe('mirrorIdentity', () => {
 
   it('knows which labels can hardly be anything but a language', () => {
     const certain = (host: string) => mirrorIdentity(`https://${host}/pricing`)?.certain
-    for (const host of ['fr.example.com', 'zh.example.com', 'ko.example.com', 'uk.example.com'])
+    for (const host of ['fr.example.com', 'zh.example.com', 'ko.example.com', 'fa.example.com'])
       expect(certain(host)).toBe(true)
     // A region or script subtag settles it, whatever the primary code is.
     for (const host of ['zh-cn.example.com', 'pt-br.example.com', 'it-it.example.com'])
       expect(certain(host)).toBe(true)
     // Codes that are just as often a region, a department, or a product.
-    for (const code of 'eu it is no id ml hr ga ca be pa te sk bg cs da'.split(' '))
+    for (const code of 'eu it is no id ml hr ga ca be pa te sk bg cs da uk'.split(' '))
       expect(certain(`${code}.example.com`)).toBe(false)
     // Not a language label at all: the host is its own page.
     expect(mirrorIdentity('https://api.example.com/guide')).toMatchObject({
@@ -154,7 +154,16 @@ describe('mirrorIdentity', () => {
     expect(languageOfLabel('pt-br')).toBe('pt')
     expect(languageOfLabel('zh-hans')).toBe('zh')
     expect(languageOfLabel('fil')).toBe('fil')
+    expect(languageOfLabel('sr-latn')).toBe('sr')
     for (const label of ['api', 'my', 'xx', 'docs', 'e', 'en-'])
       expect(languageOfLabel(label)).toBeUndefined()
+    // A region is two letters and a script is one of a few: anything else is a host name.
+    for (const label of ['eu-west', 'id-auth', 'hr-jobs', 'is-beta', 'it-help', 'en-usa'])
+      expect(languageOfLabel(label)).toBeUndefined()
+    expect(mirrorIdentity('https://eu-west.example.com/docs')).toEqual({
+      key: 'example.com|eu-west|/docs',
+      language: '',
+      certain: false,
+    })
   })
 })

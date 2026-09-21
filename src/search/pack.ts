@@ -5,7 +5,8 @@
  * between the excerpts; only when the smallest units do not fit does the page carry fewer results.
  */
 import type { SearchHit } from '../contract.ts'
-import { stripInvisible } from '../invisible.ts'
+import { neutralize } from '../envelope.ts'
+import { stripInvisible, type Visible } from '../invisible.ts'
 import { estimateTokens } from '../tokens.ts'
 import { PASSAGE_GAP, pickExcerpt, type ExcerptLimit } from './excerpt.ts'
 import type { Term } from './terms.ts'
@@ -42,57 +43,60 @@ export interface Page {
 }
 
 /**
- * The text view defuses web text that imitates its own markup: "<results", "</page" and the like
- * become "&lt;..." (three characters longer), and a line that begins like one of the view's own
- * lines gets "| " in front. Shown text is therefore longer than the text we picked, and a size
- * that ignores it understates. The line test is deliberately a little wider than the view's.
+ * Sizes are taken from the text the text view prints, not from the text that was picked. The view
+ * keeps web text from passing for its own markup (src/envelope.ts), which makes it longer:
+ * "<results" becomes "&lt;results", and a line that begins like one of the view's own lines gets
+ * "| " in front. What follows spells a result the way render/text.ts does, in the same order;
+ * tests/search/text-budget.spec.ts holds the two against each other.
  */
-const ENVELOPE_TAG = /<\/?\s*(?:results|page)\b/giu
-const PROTOCOL_LIKE_LINE =
-  /^\s*(?:web_search |web_fetch |page \d|sources:|note:|error |more:|read|outline |size ~|title: |url: |\[|\d+\. )/u
-const TOKENS_PER_ESCAPED_TAG = 1.07
-const TOKENS_PER_PREFIXED_LINE = 0.67
-
-/** The size of `text` once the text view has shown it. */
-function shownSize(text: string): ExcerptLimit {
-  if (!text) return { tokens: 0, chars: 0 }
-  const tags = text.match(ENVELOPE_TAG)?.length ?? 0
-  const lines = text.split('\n').filter((line) => PROTOCOL_LIKE_LINE.test(line)).length
-  return {
-    tokens:
-      estimateTokens(text) +
-      Math.ceil(tags * TOKENS_PER_ESCAPED_TAG + lines * TOKENS_PER_PREFIXED_LINE),
-    chars: text.length + tags * 3 + lines * 2,
-  }
+function sizeOf(printed: string): ExcerptLimit {
+  return { tokens: estimateTokens(printed), chars: printed.length }
 }
 
 /**
- * The lines the text view prints for a result before its excerpt: our own fields, the title with
- * the site, the address; and the line breaks around the excerpt, the blank separator included.
+ * The lines of a result before its excerpt: our own fields, the title with the site, the address.
+ * `title` is the title as it is shown: one with nothing visible in it prints as "(untitled)".
  */
-function fixedSize(hit: SearchHit): ExcerptLimit {
+function fixedLines(hit: SearchHit, title: string): string {
   const ours = [
     hit.published ? `published ${hit.published}` : undefined,
     hit.found_by.length > 1 ? `${hit.found_by.length} sources` : undefined,
   ].filter(Boolean)
   const fields = `[${hit.ref}]${ours.length ? ` ${ours.join(' | ')}` : ''}`
-  const heading = shownSize(`${hit.title.trim() || '(untitled)'} - ${hit.site}`)
-  const rest = `${fields}\n\n${hit.url}\n\n\n`
-  return { tokens: estimateTokens(rest) + heading.tokens, chars: rest.length + heading.chars }
+  const heading = neutralize(`${title.trim() || '(untitled)'} - ${hit.site}`.replace(/\s+/gu, ' '))
+  return `${fields}\n${heading.text}\n${hit.url}`
+}
+
+/** An excerpt as printed; an empty one prints no line at all. */
+function printedExcerpt(excerpt: string): string {
+  return neutralize(excerpt.trim()).text
+}
+
+/** Results are separated by a blank line, and the last one ends its line. */
+function printedResults(results: readonly string[]): string {
+  return `${results.join('\n\n')}\n`
 }
 
 interface Slot {
   hit: SearchHit
+  /** The title cleaned for display; the pool keeps it as the source gave it. */
+  title: Visible
   passages: string[]
-  /** Everything of the result but its excerpt. */
+  /** Everything of the result but its excerpt, as printed. */
+  lines: string
+  /** The size of `lines` and of the blank line that follows a result. */
   fixed: ExcerptLimit
 }
 
 function slotFor(hit: SearchHit): Slot {
+  const title = stripInvisible(hit.title)
+  const lines = fixedLines(hit, title.text)
   return {
     hit,
+    title,
     passages: hit.excerpt ? hit.excerpt.split(PASSAGE_GAP) : [],
-    fixed: fixedSize(hit),
+    lines,
+    fixed: sizeOf(`${lines}\n\n`),
   }
 }
 
@@ -138,15 +142,18 @@ function shownExcerpt(slot: Slot, terms: readonly Term[], share: ExcerptLimit) {
   let limit = share
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const excerpt = stripInvisible(pickExcerpt(slot.passages, terms, limit))
-    const size = shownSize(excerpt.text)
+    const printed = printedExcerpt(excerpt.text)
+    if (!printed) return { ...excerpt, printed }
+    // The excerpt takes a line of its own, so its line break is part of what it costs.
+    const size = sizeOf(`\n${printed}`)
     const over = { tokens: size.tokens - share.tokens, chars: size.chars - share.chars }
-    if (over.tokens <= 0 && over.chars <= 0) return { ...excerpt, size }
+    if (over.tokens <= 0 && over.chars <= 0) return { ...excerpt, printed }
     limit = {
       tokens: limit.tokens - Math.max(over.tokens, 0) - 1,
       chars: limit.chars - Math.max(over.chars, 0) - 1,
     }
   }
-  return { text: '', removed: 0, size: shownSize('') }
+  return { text: '', removed: 0, printed: '' }
 }
 
 export function packPage(request: PageRequest): Page {
@@ -166,13 +173,20 @@ export function packPage(request: PageRequest): Page {
   // The pool keeps the text as the source gave it. What is shown is cleaned here, so the count
   // covers exactly this page, whether it comes from a fresh search, the cache, or a cursor.
   let hiddenRemoved = 0
-  let tokens = reserved.tokens
-  const results = slots.map((slot) => {
-    const title = stripInvisible(slot.hit.title)
+  const shown = slots.map((slot) => {
     const excerpt = shownExcerpt(slot, request.terms, share)
-    hiddenRemoved += title.removed + excerpt.removed
-    tokens += slot.fixed.tokens + excerpt.size.tokens
-    return { ...slot.hit, title: title.text, excerpt: excerpt.text }
+    hiddenRemoved += slot.title.removed + excerpt.removed
+    return {
+      result: { ...slot.hit, title: slot.title.text, excerpt: excerpt.text },
+      printed: excerpt.printed ? `${slot.lines}\n${excerpt.printed}` : slot.lines,
+    }
   })
-  return { results, tokens, hiddenRemoved }
+  // Estimates round up. The parts were fitted one by one; the page is sized in one piece, so
+  // that fifty results do not report fifty roundings on top of what is printed.
+  const printed = printedResults(shown.map((entry) => entry.printed))
+  return {
+    results: shown.map((entry) => entry.result),
+    tokens: reserved.tokens + estimateTokens(printed),
+    hiddenRemoved,
+  }
 }

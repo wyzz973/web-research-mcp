@@ -2,8 +2,9 @@
  * The size a search result reports for itself is checked against the real thing: the text view
  * that render/text.ts produces from it. Two promises are pinned for every scenario: the rendered
  * text stays within `max_tokens` (and the character ceiling), and the "~N tokens" in the header
- * is never lower than the text it heads. The packer knows the layout of the text view only
- * through constants; when that layout changes, these tests say which constant to look at.
+ * is never lower than the text it heads. The packer spells a result the way the text view prints
+ * it and reserves a fixed amount for the lines around the results; when that layout changes,
+ * these tests say so.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { SearchRequest, SearchResult, Store } from '../../src/contract.ts'
@@ -14,6 +15,13 @@ import type { SourceHit } from '../../src/sources/types.ts'
 import { createSqliteStore } from '../../src/store/sqlite.ts'
 import { estimateTokens } from '../../src/tokens.ts'
 import { fakeSource, never, testConfig } from './helpers.ts'
+
+/**
+ * How far the header may overstate. The results are sized exactly as they are printed; what is
+ * left is the reserve, which covers a header line with every field and both footer lines, and
+ * not every response has them all. Measured here: 22 to 45 tokens, whatever the number of results.
+ */
+const MARGIN = 50
 
 let store: Store
 
@@ -66,6 +74,15 @@ function awkward(index: number): SourceHit {
   }
 }
 
+/** Small results, and a title with nothing visible in it, which is shown as "(untitled)". */
+function untitled(index: number): SourceHit {
+  return {
+    url: `https://e.test/${index}`,
+    title: ` ${String.fromCodePoint(0xad)} `,
+    passages: [`Sentence ${index} about fetch abort timeout, with more words to fill the excerpt.`],
+  }
+}
+
 const many = (make: (index: number) => SourceHit, count: number) =>
   Array.from({ length: count }, (_, index) => make(index + 1))
 
@@ -79,8 +96,8 @@ function expectHonestSize(result: SearchResult, maxTokens: number): void {
   expect(real, 'rendered text within max_tokens').toBeLessThanOrEqual(maxTokens)
   expect(text.length, 'rendered text within the character ceiling').toBeLessThanOrEqual(30_000)
   expect(result.tokens, 'header never understates').toBeGreaterThanOrEqual(real)
-  // ... and does not overstate much either: an inflated estimate is budget taken from excerpts.
-  expect(result.tokens - real, 'estimate stays tight').toBeLessThanOrEqual(40 + real * 0.03)
+  // ... and does not overstate either: an inflated estimate is budget taken from excerpts.
+  expect(result.tokens - real, 'estimate stays tight').toBeLessThanOrEqual(MARGIN)
 }
 
 const scenarios: Array<[name: string, make: (index: number) => SourceHit, request: SearchRequest]> =
@@ -97,6 +114,13 @@ const scenarios: Array<[name: string, make: (index: number) => SourceHit, reques
     ['ten Chinese results', chinese, {}],
     ['fifty Chinese results', chinese, { max_results: 50 }],
     ['text that has to be neutralized', awkward, {}],
+    ['fifty results that have to be neutralized', awkward, { max_results: 50 }],
+    [
+      'fifty small results whose titles have nothing visible in them',
+      untitled,
+      { max_results: 50 },
+    ],
+    ['the same in 1,200 tokens', untitled, { max_results: 50, max_tokens: 1200 }],
   ]
 
 describe('the reported size of a search response', () => {

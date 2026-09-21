@@ -3,6 +3,7 @@
  * merging of duplicates, folding of translated mirrors, and reciprocal rank fusion.
  */
 import type { SourceHit } from '../sources/types.ts'
+import { headOf } from './cut.ts'
 import { informativeLength } from './low-information.ts'
 import {
   canonicalUrl,
@@ -66,7 +67,7 @@ function limitText(passages: readonly string[]): string[] {
   for (const passage of passages) {
     const room = MAX_TEXT_CHARS - used
     if (room <= 0) break
-    kept.push(passage.length <= room ? passage : `${passage.slice(0, room).trimEnd()}…`)
+    kept.push(passage.length <= room ? passage : `${headOf(passage, room).trimEnd()}…`)
     used += passage.length
   }
   return kept
@@ -75,12 +76,22 @@ function limitText(passages: readonly string[]): string[] {
 function limitTitle(title: string): string {
   return title.length <= MAX_TITLE_CHARS
     ? title
-    : `${title.slice(0, MAX_TITLE_CHARS - 1).trimEnd()}…`
+    : `${headOf(title, MAX_TITLE_CHARS - 1).trimEnd()}…`
 }
 
-function keeps(hit: SourceHit, url: string, options: FuseOptions): boolean {
+/**
+ * The adapter contract says YYYY-MM-DD. Anything else is text from the source, not a date: it is
+ * neither compared with `since` nor passed on, so this field cannot carry words into a response.
+ */
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/u
+
+function publishedDay(hit: SourceHit): string | undefined {
+  return hit.published !== undefined && ISO_DAY.test(hit.published) ? hit.published : undefined
+}
+
+function keeps(published: string | undefined, url: string, options: FuseOptions): boolean {
   if (options.sites.length && !hostMatchesSites(siteOf(url), options.sites)) return false
-  return !(options.since && hit.published && hit.published < options.since)
+  return !(options.since && published && published < options.since)
 }
 
 /**
@@ -89,7 +100,7 @@ function keeps(hit: SourceHit, url: string, options: FuseOptions): boolean {
  */
 function absorb(target: Candidate, hit: SourceHit, url: string): void {
   if (!target.title && hit.title) target.title = hit.title
-  target.published ??= hit.published
+  target.published ??= publishedDay(hit)
   if (informativeLength(hit.passages) > informativeLength(target.passages))
     target.passages = hit.passages
   if (displayRank(url) < displayRank(target.url)) target.url = url
@@ -101,7 +112,8 @@ function collect(lists: readonly RankedList[], options: FuseOptions): Candidate[
     let rank = 0
     for (const hit of list.hits) {
       const url = canonicalUrl(hit.url)
-      if (!url || !keeps(hit, url, options)) continue
+      const published = publishedDay(hit)
+      if (!url || !keeps(published, url, options)) continue
       rank += 1
       const key = dedupeKey(url)
       let candidate = byKey.get(key)
@@ -110,7 +122,7 @@ function collect(lists: readonly RankedList[], options: FuseOptions): Candidate[
         candidate = {
           url,
           title: hit.title,
-          published: hit.published,
+          published,
           passages: hit.passages,
           foundBy: new Set(),
           queries: new Set(),
@@ -151,20 +163,21 @@ interface MirrorMember {
 /**
  * Which members of one key are the same page in different languages.
  *
- * Labelled hosts fold among themselves. The unlabelled host joins them only when the labels prove
- * that the site really publishes translations under language subdomains: one label that can
- * hardly be anything else ("fr", "zh-cn"), or two different labels at once. A single ambiguous
- * label does not: eu.example.com/pricing next to example.com/pricing may be a different page, and
- * claiming otherwise would hide a result and forge a "2 sources" signal. Two ambiguous labels on
- * the same path ("eu." and "it." next to the bare host) are taken as a locale scheme: two unrelated
- * functional subdomains that both mirror a path of the main site are far less likely than that.
+ * Only a label that can hardly be anything but a language ("fr", "zh-cn", "it-it") proves that a
+ * site publishes this path per language. With such a label in the group, everything that shares
+ * the key folds: the other labels and the unlabelled host. Same site, same remaining subdomain,
+ * same path and query, and one proven translation: "da." next to "fa." and "ko." in a recorded
+ * answer is Danish, and "it." next to "fr." is Italian.
+ *
+ * Without one, nothing folds. Codes that are just as often a region, a department, or a product
+ * ("eu", "uk", "it", "hr", "id") prove nothing, alone or together: eu.example.com/pricing and
+ * it.example.com/pricing are the EU site and the IT department far more often than Basque and
+ * Italian, with or without example.com/pricing beside them. Folding them would hide a result and
+ * forge a "2 sources" signal; leaving a real translation unfolded only costs a place in the list.
  */
 function mirrorsToFold(members: readonly MirrorMember[]): MirrorMember[] {
-  const labelled = members.filter((member) => member.identity.language !== '')
-  const labels = new Set(labelled.map((member) => member.identity.language))
-  const proven = labelled.some((member) => member.identity.certain) || labels.size >= 2
-  const folding = proven ? members : labelled
-  return folding.length >= 2 ? [...folding] : []
+  const proven = members.some((member) => member.identity.certain)
+  return proven && members.length >= 2 ? [...members] : []
 }
 
 function foldMirrors(candidates: Candidate[], languages: ReadonlySet<string>): Candidate[] {

@@ -85,12 +85,26 @@ function perCallResults(search: ResolvedSearch): number {
   return Math.min(Math.max(Math.ceil(search.maxResults * factor), 10), 50)
 }
 
+/**
+ * How many queries one call carries. An adapter is outside code, so its trait is read, not
+ * trusted: anything but a number of at least one counts as one, which every adapter can do, and
+ * a fraction counts as its whole part. NaN here once made every reservation fail, and a search
+ * that had called nobody reported that the daily cap was reached.
+ */
+function queriesPerCall(adapter: SourceAdapter, search: ResolvedSearch): number {
+  const size: unknown = adapter.maxQueriesPerCall
+  if (typeof size !== 'number' || Number.isNaN(size) || size < 1) return 1
+  // Infinity is a fair way to say "all of them".
+  return Math.max(1, Math.min(Math.floor(size), search.queries.length))
+}
+
+/** What admission books. It has to be the number of calls `callsFor` builds. */
 function callCount(adapter: SourceAdapter, search: ResolvedSearch): number {
-  return Math.ceil(search.queries.length / Math.max(1, adapter.maxQueriesPerCall ?? 1))
+  return Math.ceil(search.queries.length / queriesPerCall(adapter, search))
 }
 
 function callsFor(adapter: SourceAdapter, search: ResolvedSearch, now: Date): SourceCall[] {
-  const size = Math.max(1, adapter.maxQueriesPerCall ?? 1)
+  const size = queriesPerCall(adapter, search)
   const calls: SourceCall[] = []
   for (let start = 0; start < search.queries.length; start += size) {
     const queries = search.queries.slice(start, start + size)

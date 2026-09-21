@@ -6,6 +6,8 @@
 import type { Config } from '../config.ts'
 import type { Depth, Recency, ResolvedSearch, SearchRequest } from '../contract.ts'
 import { WebError } from '../errors.ts'
+import { stripInvisible } from '../invisible.ts'
+import { headOf } from './cut.ts'
 import { siteFromInput } from './url.ts'
 
 export type NormalizedSearch =
@@ -55,14 +57,34 @@ function present(value: unknown): boolean {
   return typeof value !== 'string' || value.trim().length > 0
 }
 
-function tidy(text: string): string {
-  return text.normalize('NFC').replace(/\s+/gu, ' ').trim()
+/** Counts what `tidy` took out across one request, so that one note can say so. */
+interface Hidden {
+  removed: number
+}
+
+/**
+ * Queries and goals are often pasted text. Characters nobody can see are taken out before anything
+ * else: they would split words, miss the cache, and travel on to the sources, where a sentence
+ * spelled in tag characters is read by whatever model sits behind the search.
+ */
+function tidy(text: string, hidden: Hidden): string {
+  // Line and page breaks are controls too, but they are whitespace: nothing hidden, not counted.
+  const visible = stripInvisible(text.replace(/[\r\v\f\u0085]+/gu, ' '))
+  hidden.removed += visible.removed
+  return visible.text.normalize('NFC').replace(/\s+/gu, ' ').trim()
+}
+
+function hiddenNote(hidden: Hidden): string | undefined {
+  if (hidden.removed === 0) return undefined
+  return hidden.removed === 1
+    ? '1 invisible character was removed from the request.'
+    : `${hidden.removed} invisible characters were removed from the request.`
 }
 
 /** Cuts at a word boundary when one is near the limit. */
 function clip(text: string, limit: number): string {
   if (text.length <= limit) return text
-  const head = text.slice(0, limit)
+  const head = headOf(text, limit)
   const space = head.lastIndexOf(' ')
   return (space > limit * 0.6 ? head.slice(0, space) : head).trim()
 }
@@ -173,12 +195,12 @@ interface Queries {
   sites: string[]
 }
 
-function resolveQueries(request: SearchRequest, notes: string[]): Queries {
+function resolveQueries(request: SearchRequest, notes: string[], hidden: Hidden): Queries {
   const raw = [
     ...singleQuery(request.query, notes),
     ...stringList(request.queries, 'queries', notes),
   ]
-  const moved = raw.map((query) => moveSiteOperators(tidy(query)))
+  const moved = raw.map((query) => moveSiteOperators(tidy(query, hidden)))
   const sites = moved.flatMap((entry) => entry.sites)
   if (sites.length) notes.push('site: operators were moved from the query into sites.')
   const texts = moved.map((entry) => entry.query).filter((query) => query.length > 0)
@@ -211,10 +233,12 @@ function resolveSites(value: unknown, fromQueries: string[], notes: string[]): s
   return sites.slice(0, MAX_SITES)
 }
 
-function resolveGoal(value: unknown, notes: string[]): string | undefined {
+function resolveGoal(value: unknown, notes: string[], hidden: Hidden): string | undefined {
   if (!present(value)) return undefined
   if (typeof value !== 'string') return invalid('goal must be a string')
-  const goal = tidy(value)
+  const goal = tidy(value, hidden)
+  // Nothing visible is no goal: an empty one would still count as a different search.
+  if (!goal) return undefined
   if (goal.length > MAX_GOAL_CHARS)
     notes.push(`goal was shortened to ${MAX_GOAL_CHARS} characters.`)
   return clip(goal, MAX_GOAL_CHARS)
@@ -276,12 +300,16 @@ function resolveQuerySearch(
   shape: PageShape,
   notes: string[],
 ): ResolvedSearch {
-  const { queries, sites: sitesFromQueries } = resolveQueries(request, notes)
+  const hidden: Hidden = { removed: 0 }
+  const { queries, sites: sitesFromQueries } = resolveQueries(request, notes, hidden)
   if (queries.length === 0) invalid('query is required: pass query, queries, or a cursor')
+  const goal = resolveGoal(request.goal, notes, hidden)
+  const removed = hiddenNote(hidden)
+  if (removed) notes.push(removed)
   return {
     queries,
     maxResults: shape.maxResults ?? config.limits.searchDefaultResults,
-    goal: resolveGoal(request.goal, notes),
+    goal,
     sites: resolveSites(request.sites, sitesFromQueries, notes),
     recency: oneOf(request.recency, 'recency', RECENCIES),
     depth: oneOf(request.depth, 'depth', DEPTHS) ?? 'standard',

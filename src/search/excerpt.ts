@@ -11,6 +11,7 @@
  */
 import { withoutInvisible } from '../invisible.ts'
 import { charsWithinTokens, estimateTokens } from '../tokens.ts'
+import { headOf } from './cut.ts'
 import { contentWeight, lowInformationLines } from './low-information.ts'
 import type { Term } from './terms.ts'
 
@@ -238,10 +239,8 @@ function closeOpenFence(text: string): string {
 /** For a sentence or code block that is larger than the whole budget. */
 function cutUnit(text: string, unit: Unit, limit: ExcerptLimit): string {
   const body = text.slice(unit.start, unit.end).trim()
-  let room = Math.min(charsWithinTokens(body, limit.tokens), limit.chars, body.length)
-  // Never split a surrogate pair.
-  if (room > 0 && /[\uD800-\uDBFF]/u.test(body.charAt(room - 1))) room -= 1
-  const head = body.slice(0, room)
+  const room = Math.min(charsWithinTokens(body, limit.tokens), limit.chars, body.length)
+  const head = headOf(body, room)
   const boundary = Math.max(head.lastIndexOf('\n'), head.lastIndexOf(' '))
   const kept = boundary > room * 0.6 ? head.slice(0, boundary) : head
   return closeOpenFence(`${unit.opensPassage ? '' : '… '}${kept.trimEnd()}…`)

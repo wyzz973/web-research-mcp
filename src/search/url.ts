@@ -236,19 +236,24 @@ const LANGUAGE_CODES = new Set(
   ).split(' '),
 )
 
-/** "fa", "zh-cn", "pt-br", "zh-hans" -> primary subtag; anything else -> undefined. */
+/**
+ * "fa", "zh-cn", "pt-br", "zh-hans" -> primary subtag; anything else -> undefined. What follows
+ * the hyphen has to be a region (two letters) or one of the scripts sites publish under: a looser
+ * pattern read "eu-west", "id-auth" and "hr-jobs" as Basque, Indonesian and Croatian locales.
+ */
 export function languageOfLabel(label: string): string | undefined {
-  const match = /^([a-z]{2,3})(?:-[a-z]{2,4})?$/u.exec(label)
+  const match = /^([a-z]{2,3})(?:-(?:[a-z]{2}|hans|hant|latn|cyrl))?$/u.exec(label)
   return match?.[1] && LANGUAGE_CODES.has(match[1]) ? match[1] : undefined
 }
 
 /**
  * Codes that are rarely anything but a language or a locale when they lead a host name. Every
- * other code in LANGUAGE_CODES is also a common functional subdomain ("eu" region, "it" and "hr"
- * departments, "id" sign-in, "ml", "cs", "ga", ...), so on its own it proves nothing.
+ * other code in LANGUAGE_CODES is also a common regional or functional subdomain ("eu" region,
+ * "uk" for the United Kingdom rather than Ukrainian, "it" and "hr" departments, "id" sign-in,
+ * "ml", "cs", "ga", ...), so on its own it proves nothing.
  */
 const UNAMBIGUOUS_LANGUAGE_CODES = new Set(
-  'en fr de es pt ru ja zh ko fa tr pl nl sv fi hu el he ro vi th ar hi uk'.split(' '),
+  'en fr de es pt ru ja zh ko fa tr pl nl sv fi hu el he ro vi th ar hi'.split(' '),
 )
 
 export interface MirrorIdentity {

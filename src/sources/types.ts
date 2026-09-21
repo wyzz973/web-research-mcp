@@ -29,7 +29,10 @@ export interface SourceHit {
  */
 export interface SourceAdapter {
   readonly id: string
-  /** How many queries one upstream call can carry. Defaults to 1. */
+  /**
+   * How many queries one upstream call can carry. Defaults to 1, and anything that is not a
+   * number of at least 1 is read as 1.
+   */
   readonly maxQueriesPerCall?: number
   /** True when calls go to a vendor's anonymous tier and cost nothing. */
   free(): boolean
