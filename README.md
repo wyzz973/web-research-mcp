@@ -111,15 +111,17 @@ Both methods never throw; failures are part of the returned object.
 
 ## How well does it search?
 
-`pnpm bench` runs a sample of [evals/queries.json](evals/queries.json) against the live sources and checks whether a domain that ought to answer each query shows up near the top. It is a smoke signal, not a relevance judgment. The first recorded run ([evals/runs/2026-09-21-standard.json](evals/runs/2026-09-21-standard.json): 12 queries in English and Chinese, default `depth`, no API keys, cold cache):
+`pnpm bench` runs a sample of [evals/queries.json](evals/queries.json) against the live sources and checks whether a domain that ought to answer each query shows up near the top. It is a smoke signal, not a relevance judgment. Latest recorded run ([evals/runs/2026-09-21-final-standard.json](evals/runs/2026-09-21-final-standard.json): 12 queries in English and Chinese, default `depth`, no API keys, cold cache):
 
 | Measure | Result |
 | --- | --- |
 | Queries answered | 12 of 12 |
-| Latency | median 1.6 s, 90th percentile 2.6 s |
-| Expected domain in the top 3 / top 10 | 10 of 12 / 12 of 12 |
+| Latency | median 1.7 s, 90th percentile 3.1 s |
+| Expected domain in the top 3 / top 10 | 11 of 12 / 12 of 12 |
 | Upstream calls | 13 (one escalation to a second source) |
 | Output size for 10 results | about 3,800 tokens on average |
+
+The run of the evening before, on an earlier build, is kept next to it (median 1.6 s, top 3 for 10 of 12). Twelve queries cannot tell a real difference from the time of day.
 
 Concurrency, measured the same day in one process: 8 different searches started together finished in 2.9 s in total, spread over the three sources; repeating them was served entirely from the cache with no upstream call; reading 4 pages from 4 hosts in one `web_fetch` took 4.8 s.
 

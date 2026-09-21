@@ -1,0 +1,297 @@
+{
+  "summary": {
+    "date": "2026-09-21T03:08:34.749Z",
+    "depth": "standard",
+    "queries": 12,
+    "answered": 12,
+    "errors": 0,
+    "provider_calls": 13,
+    "latency_ms": {
+      "p50": 1721,
+      "p90": 3067,
+      "max": 3214
+    },
+    "expected_domain_in_top3": 11,
+    "expected_domain_in_top10": 12,
+    "mean_tokens": 3785
+  },
+  "rows": [
+    {
+      "id": "q001",
+      "category": "exact",
+      "language": "en",
+      "query": "MCP tools structuredContent",
+      "expected": [
+        "modelcontextprotocol.io"
+      ],
+      "status": "ok",
+      "ms": 2237,
+      "results": 10,
+      "tokens": 4439,
+      "sources": [
+        "exa:ok"
+      ],
+      "provider_calls": 1,
+      "first_expected_rank": 1,
+      "top3": [
+        "https://modelcontextprotocol.io/specification/2025-06-18/server/tools",
+        "https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1624",
+        "https://chatforest.com/guides/mcp-structured-output-deep-dive/"
+      ]
+    },
+    {
+      "id": "q002",
+      "category": "error",
+      "language": "en",
+      "query": "SQLite SQLITE_BUSY error",
+      "expected": [
+        "sqlite.org"
+      ],
+      "status": "ok",
+      "ms": 1478,
+      "results": 10,
+      "tokens": 3581,
+      "sources": [
+        "parallel:ok"
+      ],
+      "provider_calls": 1,
+      "first_expected_rank": 1,
+      "top3": [
+        "https://www.sqlite.org/rescode.html",
+        "https://sqlite.org/lang_transaction.html",
+        "https://www2.sqlite.org/matrix/matrix_dbusy_handler.html"
+      ]
+    },
+    {
+      "id": "q006",
+      "category": "version",
+      "language": "en",
+      "query": "Node.js 24 permission model",
+      "expected": [
+        "nodejs.org"
+      ],
+      "status": "ok",
+      "ms": 3214,
+      "results": 10,
+      "tokens": 3712,
+      "sources": [
+        "tavily:ok"
+      ],
+      "provider_calls": 1,
+      "first_expected_rank": 2,
+      "top3": [
+        "https://blog.codeminer42.com/whats-new-in-node-js-24",
+        "https://nodejs.org/download/release/v24.5.0/docs/api/permissions.html",
+        "https://www.bacancytechnology.com/blog/nodejs-24"
+      ]
+    },
+    {
+      "id": "q008",
+      "category": "comparison",
+      "language": "en",
+      "query": "SQLite WAL versus rollback journal",
+      "expected": [
+        "sqlite.org"
+      ],
+      "status": "ok",
+      "ms": 1262,
+      "results": 10,
+      "tokens": 4740,
+      "sources": [
+        "exa:ok"
+      ],
+      "provider_calls": 1,
+      "first_expected_rank": 1,
+      "top3": [
+        "https://www.sqlite.org/wal.html",
+        "https://www.sqlite.org/isolation.html",
+        "https://formats.jarhalab.com/comparisons/sqlite-wal-vs-sqlite-journal"
+      ]
+    },
+    {
+      "id": "q009",
+      "category": "sites",
+      "language": "zh",
+      "query": "SearXNG 搜索引擎 配置",
+      "expected": [
+        "docs.searxng.org"
+      ],
+      "status": "ok",
+      "ms": 3067,
+      "results": 10,
+      "tokens": 4111,
+      "sources": [
+        "parallel:ok",
+        "tavily:ok"
+      ],
+      "provider_calls": 2,
+      "first_expected_rank": 3,
+      "top3": [
+        "https://github.com/searxng/searxng/blob/master/searx/settings.yml",
+        "https://cloud.tencent.com/developer/article/2619653",
+        "https://docs.searxng.org/admin/settings/settings.html"
+      ]
+    },
+    {
+      "id": "q021",
+      "category": "freshness",
+      "language": "zh",
+      "query": "Node.js 最新 LTS 版本 2026",
+      "expected": [
+        "nodejs.org"
+      ],
+      "status": "ok",
+      "ms": 1355,
+      "results": 10,
+      "tokens": 2880,
+      "sources": [
+        "exa:ok"
+      ],
+      "provider_calls": 1,
+      "first_expected_rank": 1,
+      "top3": [
+        "https://nodejs.org/zh-tw/download/current",
+        "https://nodejs.org/zh-cn/about/previous-releases",
+        "https://nodejs.org/zh-cn/download"
+      ]
+    },
+    {
+      "id": "q004",
+      "category": "exact",
+      "language": "en",
+      "query": "Python asyncio TaskGroup",
+      "expected": [
+        "docs.python.org"
+      ],
+      "status": "ok",
+      "ms": 1173,
+      "results": 10,
+      "tokens": 3233,
+      "sources": [
+        "parallel:ok"
+      ],
+      "provider_calls": 1,
+      "first_expected_rank": 2,
+      "top3": [
+        "https://github.com/python/cpython/blob/main/Lib/asyncio/taskgroups.py",
+        "https://docs.python.org/3/_sources/library/asyncio-task.rst.txt",
+        "https://docs.python.org/es/dev/library/asyncio-task.html"
+      ]
+    },
+    {
+      "id": "q014",
+      "category": "error",
+      "language": "en",
+      "query": "HTTP 429 Retry-After",
+      "expected": [
+        "developer.mozilla.org"
+      ],
+      "status": "ok",
+      "ms": 1721,
+      "results": 10,
+      "tokens": 3981,
+      "sources": [
+        "tavily:ok"
+      ],
+      "provider_calls": 1,
+      "first_expected_rank": 2,
+      "top3": [
+        "https://firebearstudio.com/blog/http-error-429-explained-why-too-many-requests-happens-and-how-to-fix-it.html",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/429",
+        "https://reliqus.com/what-is-http-429-status-code"
+      ]
+    },
+    {
+      "id": "q015",
+      "category": "version",
+      "language": "zh",
+      "query": "Python 3.13 自由线程",
+      "expected": [
+        "docs.python.org"
+      ],
+      "status": "ok",
+      "ms": 1302,
+      "results": 10,
+      "tokens": 4679,
+      "sources": [
+        "exa:ok"
+      ],
+      "provider_calls": 1,
+      "first_expected_rank": 1,
+      "top3": [
+        "https://docs.python.org/zh-cn/3.13/howto/free-threading-python.html",
+        "https://docs.pythonlang.cn/3.14/whatsnew/3.13.html",
+        "https://docs.pythonlang.cn/3/howto/free-threading-python.html"
+      ]
+    },
+    {
+      "id": "q024",
+      "category": "comparison",
+      "language": "en",
+      "query": "HTTP cache ETag versus Last-Modified",
+      "expected": [
+        "developer.mozilla.org"
+      ],
+      "status": "ok",
+      "ms": 853,
+      "results": 10,
+      "tokens": 3306,
+      "sources": [
+        "parallel:ok"
+      ],
+      "provider_calls": 1,
+      "first_expected_rank": 1,
+      "top3": [
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Last-Modified",
+        "https://stackoverflow.com/questions/824152/what-takes-precedence-the-etag-or-last-modified-http-header",
+        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/ETag"
+      ]
+    },
+    {
+      "id": "q016",
+      "category": "sites",
+      "language": "en",
+      "query": "PostgreSQL full text search ranking",
+      "expected": [
+        "postgresql.org"
+      ],
+      "status": "ok",
+      "ms": 1957,
+      "results": 10,
+      "tokens": 3826,
+      "sources": [
+        "tavily:ok"
+      ],
+      "provider_calls": 1,
+      "first_expected_rank": 7,
+      "top3": [
+        "https://www.paradedb.com/learn/search-in-postgresql/full-text-search",
+        "https://pganalyze.com/blog/full-text-search-django-postgres",
+        "https://tacnode.io/post/full-text-search-postgresql-complete-guide"
+      ]
+    },
+    {
+      "id": "q030",
+      "category": "freshness",
+      "language": "en",
+      "query": "Python current stable release September 2026",
+      "expected": [
+        "python.org"
+      ],
+      "status": "ok",
+      "ms": 1908,
+      "results": 10,
+      "tokens": 2927,
+      "sources": [
+        "exa:ok"
+      ],
+      "provider_calls": 1,
+      "first_expected_rank": 1,
+      "top3": [
+        "https://www.python.org/downloads/release/python-3147/",
+        "https://www.python.org/downloads/source/",
+        "https://endoflife.date/python"
+      ]
+    }
+  ]
+}
