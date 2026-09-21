@@ -30,17 +30,20 @@ export interface Visible {
 }
 
 /**
- * Never shown and never needed. The base is the format class itself, not a list of its members:
- * the seventh audit round smuggled a whole sentence through 29 format characters that a
- * hand-written list had missed (the Arabic number signs, the Egyptian hieroglyph controls, and
- * more), and Unicode keeps adding to the class. What is added here by hand is only what the
- * class does not contain: controls, the fillers that are letters, the unassigned code point in
- * the middle of the format block, and the variation selectors, which are marks.
+ * Never shown and never needed. The base is two Unicode properties, not a list of their members.
+ * The seventh audit round smuggled a sentence through 29 format characters that a hand-written
+ * list had missed; the eighth smuggled one through 159 code points that the format class does
+ * not contain because Unicode has not assigned them yet, in blocks that are reserved for
+ * characters a reader will never see. "Default ignorable" is the property for exactly that:
+ * what a renderer is told to draw as nothing, assigned or not, which is why it covers the
+ * variation selectors as well. What is added here by hand is only what neither property holds:
+ * controls, the fillers that are letters, the selectors that are marks, and the unassigned tail
+ * of the shorthand format block.
  */
 const ALWAYS =
-  '(?![\\n\\t])\\p{Cc}|\\p{Cf}' +
-  '|[\\u034F\\u115F\\u1160\\u17B4\\u17B5\\u2065\\u3164\\uFE00-\\uFE0D\\uFFA0]' +
-  '|[\\u{E0100}-\\u{E01EF}]'
+  '(?![\\n\\t])\\p{Cc}|\\p{Cf}|\\p{Default_Ignorable_Code_Point}' +
+  '|[\\u034F\\u115F\\u1160\\u17B4\\u17B5\\u3164\\uFE00-\\uFE0D\\uFFA0]' +
+  '|[\\u{1BCA4}-\\u{1BCAF}]'
 /** The subdivision flags in the emoji set: a black flag, the region in tag letters, a cancel tag. */
 const FLAG =
   '\\u{1F3F4}(?:\\u{E0067}\\u{E0062}\\u{E0065}\\u{E006E}\\u{E0067}|\\u{E0067}\\u{E0062}\\u{E0073}\\u{E0063}\\u{E0074}|\\u{E0067}\\u{E0062}\\u{E0077}\\u{E006C}\\u{E0073})\\u{E007F}'

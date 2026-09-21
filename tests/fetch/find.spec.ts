@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { analyze } from '../../src/fetch/document.ts'
 import { runSliced } from '../../src/fetch/slices.ts'
-import { counting, countTurns, FUSE_MS, growth, mustFold } from './helpers.ts'
+import { counting, countTurns, FUSE_MS, growth, mustFold, MAX_GROWTH } from './helpers.ts'
 import {
   createFoldCache,
   findMatches,
@@ -278,7 +278,7 @@ describe('hostile input', () => {
     const ratio = growth(make, (input) => void mustFold(input, Number.POSITIVE_INFINITY))
     expect(performance.now() - started).toBeLessThan(FUSE_MS)
     // Four times the input: about 4 when linear, about 16 when quadratic.
-    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(8)
+    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(MAX_GROWTH)
   })
 
   it('gives the same result in slices as in one go', async () => {

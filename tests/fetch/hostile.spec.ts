@@ -22,6 +22,7 @@ import {
   FUSE_MS,
   growth,
   type Harness,
+  MAX_GROWTH,
 } from './helpers.ts'
 
 let harness: Harness | undefined
@@ -57,7 +58,7 @@ describe('document analysis', () => {
     const ratio = growth(make, (input) => void analyze(input))
     expect(performance.now() - started).toBeLessThan(FUSE_MS)
     // Four times the input: about 4 when linear, about 16 when quadratic.
-    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(8)
+    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(MAX_GROWTH)
   })
 
   it('tiles hostile shapes completely, like any other document', () => {
@@ -189,7 +190,7 @@ describe('headings as hostile input', () => {
     )
     expect(performance.now() - started).toBeLessThan(FUSE_MS)
     // Four times the headings: about 4 when linear, about 16 when every copy starts over at "-2".
-    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(8)
+    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(MAX_GROWTH)
     const ids = analyze(page(300)).outline.map((entry) => entry.id)
     expect(ids.slice(0, 3)).toEqual(['1.1', '1.1-2', '1.1-3'])
     expect(ids.at(-1)).toBe('1.1-300')
@@ -210,7 +211,7 @@ describe('headings as hostile input', () => {
     )
     expect(performance.now() - started).toBeLessThan(FUSE_MS)
     // The pattern this replaced looked ahead from every bracket: hundreds of times the cost.
-    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(8)
+    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(MAX_GROWTH)
   })
 
   it('reads a heading line of megabytes only as far as a title can go', () => {
@@ -269,7 +270,7 @@ describe('passage ranking', () => {
       (input) => void rankPassages([analyze(input)], 'a'),
     )
     expect(performance.now() - started).toBeLessThan(FUSE_MS)
-    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(8)
+    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(MAX_GROWTH)
   })
 
   it('lets the event loop run while it tokenizes a large page, with the same result', async () => {

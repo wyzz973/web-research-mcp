@@ -7,7 +7,7 @@ import {
   parseRobots,
   type RobotsRule,
 } from '../../src/fetch/robots.ts'
-import { cpuRatio, createHarness, fixture, type Harness } from './helpers.ts'
+import { cpuRatio, createHarness, fixture, type Harness, MAX_GROWTH } from './helpers.ts'
 
 let harness: Harness | undefined
 afterEach(() => {
@@ -404,9 +404,10 @@ describe('a robots.txt too large to evaluate completely', () => {
       ].join('\n')
     const small = file(10_000)
     const large = file(40_000)
-    // Many addresses per run, so that the smaller file is slow enough to be measured at all.
+    // Many addresses per run, so that the smaller file is slow enough to be measured at all:
+    // the clock has to be well clear of its own granularity, which is about 16 ms on Windows.
     const paths = Array.from(
-      { length: 40 },
+      { length: 120 },
       (_, index) => `/${'segment/'.repeat(30)}page-${index}?id=1`,
     )
     const evaluate = (text: string): void => {
@@ -420,6 +421,6 @@ describe('a robots.txt too large to evaluate completely', () => {
     )
     // Four times the rules: about 4 when linear, about 16 when quadratic.
     expect(ratio).toBeDefined()
-    expect(ratio).toBeLessThanOrEqual(8)
+    expect(ratio).toBeLessThanOrEqual(MAX_GROWTH)
   })
 })

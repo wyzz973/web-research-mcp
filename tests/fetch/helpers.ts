@@ -217,8 +217,18 @@ function cpuMs(run: () => void): number {
 const KB = 1024
 const MB = 1024 * KB
 const RUNS = 5
-/** Below this the measurement is mostly noise. */
-const MEASURABLE_MS = 5
+/**
+ * Below this the measurement is mostly noise. Well above the granularity of process CPU time on
+ * Windows, which is about 16 ms: a Windows runner read 10.4 where this machine reads 4. It
+ * cannot be raised much further without the cheaper steps needing inputs of many megabytes.
+ */
+const MEASURABLE_MS = 30
+/**
+ * How much four times the input may cost. Linear is about 4 and quadratic about 16; what these
+ * tests exist to catch was 50 to 900 times slower, so the room here is for the clock, not for a
+ * regression.
+ */
+export const MAX_GROWTH = 12
 /** Only a fuse: far above any honest run, it catches a return to tens of seconds. */
 export const FUSE_MS = 30_000
 
@@ -250,6 +260,7 @@ export function cpuRatioOf(
   small: () => () => void,
   large: () => () => void,
   runs = 3,
+  minMs = 8,
 ): number | undefined {
   let smallMs = Number.POSITIVE_INFINITY
   let largeMs = Number.POSITIVE_INFINITY
@@ -257,7 +268,7 @@ export function cpuRatioOf(
     smallMs = Math.min(smallMs, cpuMs(small()))
     largeMs = Math.min(largeMs, cpuMs(large()))
   }
-  return smallMs >= MEASURABLE_MS ? largeMs / smallMs : undefined
+  return smallMs >= minMs ? largeMs / smallMs : undefined
 }
 
 /**
@@ -293,7 +304,7 @@ export function growthOf(
 export function growth(
   make: (size: number) => string,
   run: (input: string) => void,
-  sizes: readonly number[] = [64 * KB, 256 * KB, MB],
+  sizes: readonly number[] = [64 * KB, 256 * KB, MB, 2 * MB],
 ): number | undefined {
   for (const base of sizes) {
     const small = make(base)

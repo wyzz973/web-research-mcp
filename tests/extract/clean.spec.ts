@@ -15,7 +15,7 @@ import {
   restoreHeadingLevels,
   rewriteLinks,
 } from '../../src/extract/clean.ts'
-import { FUSE_MS, growthOf } from '../fetch/helpers.ts'
+import { FUSE_MS, growthOf, MAX_GROWTH } from '../fetch/helpers.ts'
 
 const URL_OF_PAGE = 'https://docs.example.com/guide'
 
@@ -95,7 +95,7 @@ describe('cleaning passes with very many siblings', () => {
     // granularity of CPU time on Windows is close to that: a Windows runner measured 8.3 for a
     // pass that is 2.2 to 4.0 here. What this has to catch is a return to scanning the siblings
     // on every change, which was 50 to 900 times slower, not a factor of two.
-    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(12)
+    if (ratio !== undefined) expect(ratio).toBeLessThanOrEqual(MAX_GROWTH)
   })
 
   it.each(PASSES)(

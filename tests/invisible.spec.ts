@@ -148,6 +148,39 @@ describe('stripInvisible', () => {
     expect(survivors).toEqual([])
   })
 
+  // Eighth audit round: switching the base to the format class dropped the code points of those
+  // blocks that Unicode has not assigned yet, and an alphabet of 159 of them carried a sentence.
+  it('removes what a reader cannot see, assigned or not', () => {
+    const blocks: [string, number, number][] = [
+      ['tag block', 0xe0000, 0xe007f],
+      ['tag block, unassigned tail', 0xe0080, 0xe00ff],
+      ['variation selectors supplement', 0xe0100, 0xe01ef],
+      ['its unassigned tail', 0xe01f0, 0xe02ff],
+      ['shorthand format controls', 0x1bca0, 0x1bcaf],
+      ['general punctuation formats', 0x2060, 0x206f],
+      ['specials', 0xfff0, 0xfffb],
+    ]
+    const survivors: string[] = []
+    for (const [, from, to] of blocks)
+      for (let point = from; point <= to; point += 1) {
+        const character = String.fromCodePoint(point)
+        if (character === ZWNJ || character === ZWJ) continue // joiners, checked on their own
+        const { text, removed } = stripInvisible(`a${character}b`)
+        if (text !== 'ab' || removed !== 1) survivors.push(`U+${point.toString(16).toUpperCase()}`)
+      }
+    expect(survivors).toEqual([])
+  })
+
+  it('leaves no alphabet of its own for hiding a sentence in', () => {
+    // The attack: take whatever survives, one symbol per value, and spell with it.
+    const alphabet: string[] = []
+    for (let point = 0xe0000; point <= 0xe0fff; point += 1) {
+      const character = String.fromCodePoint(point)
+      if (stripInvisible(`a${character}b`).removed === 0) alphabet.push(character)
+    }
+    expect(alphabet).toEqual([])
+  })
+
   it('cannot be used to hide a word from comparison', () => {
     expect(withoutInvisible('Abort\u200BCont\u00ADroller')).toBe('AbortController')
     expect(withoutInvisible(`Abort${tags('x')}Controller`)).toBe('AbortController')
