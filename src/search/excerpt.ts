@@ -9,8 +9,8 @@
  *    of an excerpt; between two kept sentences they stay, so the text remains contiguous;
  *  - a prose sentence that already occurs earlier in the same excerpt is shown once.
  */
+import { withoutInvisible } from '../invisible.ts'
 import { charsWithinTokens, estimateTokens } from '../tokens.ts'
-import { withoutInvisible } from './invisible.ts'
 import { contentWeight, lowInformationLines } from './low-information.ts'
 import type { Term } from './terms.ts'
 

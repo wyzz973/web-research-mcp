@@ -19,7 +19,7 @@ export function parseJson(text: string, source: string): unknown {
 /**
  * Whitespace hygiene only; words and their order are never changed. Invisible characters are
  * deliberately left in: the search core removes them where text is shown, because only there
- * can the removal be counted against what the reader actually gets (src/search/invisible.ts).
+ * can the removal be counted against what the reader actually gets (src/invisible.ts).
  */
 export function cleanText(value: unknown): string {
   if (typeof value !== 'string') return ''

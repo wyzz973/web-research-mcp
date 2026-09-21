@@ -1,5 +1,5 @@
 /** Query and goal words used to pick excerpts and to judge whether results match the query. */
-import { withoutInvisible } from './invisible.ts'
+import { withoutInvisible } from '../invisible.ts'
 
 export interface Term {
   text: string

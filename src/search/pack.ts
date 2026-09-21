@@ -5,9 +5,9 @@
  * between the excerpts; only when the smallest units do not fit does the page carry fewer results.
  */
 import type { SearchHit } from '../contract.ts'
+import { stripInvisible } from '../invisible.ts'
 import { estimateTokens } from '../tokens.ts'
 import { PASSAGE_GAP, pickExcerpt, type ExcerptLimit } from './excerpt.ts'
-import { stripInvisible } from './invisible.ts'
 import type { Term } from './terms.ts'
 
 /**

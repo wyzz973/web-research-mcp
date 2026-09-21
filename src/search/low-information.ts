@@ -25,7 +25,7 @@
  * A CJK character counts as two letters: three of them can already be a sentence.
  */
 
-import { withoutInvisible } from './invisible.ts'
+import { withoutInvisible } from '../invisible.ts'
 
 const MIN_LETTERS_BESIDE_URL = 8
 const MIN_TRAIL_SEGMENTS = 3
