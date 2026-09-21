@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createHostGate } from '../../src/fetch/host-gate.ts'
-import { isAllowed, parseRobots } from '../../src/fetch/robots.ts'
-import { createHarness, fixture, type Harness } from './helpers.ts'
+import {
+  isAllowed,
+  MAX_PATTERN_CHARS,
+  MAX_RULES,
+  parseRobots,
+  type RobotsRule,
+} from '../../src/fetch/robots.ts'
+import { cpuRatio, createHarness, fixture, type Harness } from './helpers.ts'
 
 let harness: Harness | undefined
 afterEach(() => {
@@ -10,6 +16,13 @@ afterEach(() => {
 })
 
 const AGENT = 'web-research-mcp'
+
+/** The rules that apply to us, for files small enough to be evaluated completely. */
+function rulesOf(text: string, agent = AGENT): RobotsRule[] {
+  const policy = parseRobots(text, agent)
+  expect(policy.incomplete).toBe(false)
+  return policy.rules
+}
 const STAR_ONLY = [
   '# comment line',
   'User-agent: Googlebot',
@@ -29,7 +42,7 @@ const STAR_ONLY = [
 const ROBOTS = STAR_ONLY
 
 describe('robots rules', () => {
-  const rules = parseRobots(STAR_ONLY, AGENT)
+  const rules = rulesOf(STAR_ONLY, AGENT)
 
   it('uses the * group when no group names us, ignoring other crawlers and empty rules', () => {
     expect(rules).toEqual([
@@ -57,17 +70,17 @@ describe('robots rules', () => {
 
   it('lets a group that names us replace the * group entirely, in either direction', () => {
     const stricter = 'User-agent: *\nAllow: /docs/\n\nUser-agent: WEB-RESEARCH-MCP\nDisallow: /'
-    expect(parseRobots(stricter, AGENT)).toEqual([{ allow: false, pattern: '/' }])
-    expect(isAllowed(parseRobots(stricter, AGENT), '/docs/page')).toBe(false)
+    expect(rulesOf(stricter, AGENT)).toEqual([{ allow: false, pattern: '/' }])
+    expect(isAllowed(rulesOf(stricter, AGENT), '/docs/page')).toBe(false)
     const looser = 'User-agent: *\nDisallow: /\n\nUser-agent: web-research-mcp\nDisallow: /drafts/'
-    expect(isAllowed(parseRobots(looser, AGENT), '/docs/page')).toBe(true)
-    expect(isAllowed(parseRobots(looser, AGENT), '/drafts/x')).toBe(false)
+    expect(isAllowed(rulesOf(looser, AGENT), '/docs/page')).toBe(true)
+    expect(isAllowed(rulesOf(looser, AGENT), '/drafts/x')).toBe(false)
   })
 
   it('treats a named group without rules as "everything is allowed for you"', () => {
     const open = 'User-agent: *\nDisallow: /\n\nUser-agent: web-research-mcp\nDisallow:'
-    expect(parseRobots(open, AGENT)).toEqual([])
-    expect(isAllowed(parseRobots(open, AGENT), '/anything')).toBe(true)
+    expect(rulesOf(open, AGENT)).toEqual([])
+    expect(isAllowed(rulesOf(open, AGENT), '/anything')).toBe(true)
   })
 
   it('applies a group shared by * and our token, and merges several groups that name us', () => {
@@ -82,26 +95,24 @@ describe('robots rules', () => {
       'User-agent: *',
       'Disallow: /star-only/',
     ].join('\n')
-    const ours = parseRobots(shared, AGENT)
+    const ours = rulesOf(shared, AGENT)
     expect(ours).toEqual([
       { allow: false, pattern: '/shared/' },
       { allow: false, pattern: '/ours/' },
     ])
-    expect(parseRobots(shared, 'another-bot')).toEqual([
+    expect(rulesOf(shared, 'another-bot')).toEqual([
       { allow: false, pattern: '/shared/' },
       { allow: false, pattern: '/star-only/' },
     ])
   })
 
   it('lets Allow win a tie and treats no rules as allowed', () => {
-    expect(isAllowed(parseRobots('User-agent: *\nDisallow: /a\nAllow: /a', AGENT), '/a/b')).toBe(
-      true,
-    )
+    expect(isAllowed(rulesOf('User-agent: *\nDisallow: /a\nAllow: /a', AGENT), '/a/b')).toBe(true)
     expect(isAllowed([], '/anything')).toBe(true)
   })
 
   it('matches wildcards in linear time even for hostile patterns', () => {
-    const hostile = parseRobots(`User-agent: *\nDisallow: /${'*a'.repeat(400)}*b$`, AGENT)
+    const hostile = rulesOf(`User-agent: *\nDisallow: /${'*a'.repeat(400)}*b$`, AGENT)
     const started = Date.now()
     expect(isAllowed(hostile, `/${'a'.repeat(20_000)}`)).toBe(true)
     expect(Date.now() - started).toBeLessThan(500)
@@ -315,5 +326,100 @@ describe('host gate', () => {
       Array.from({ length: 6 }, () => gate.withSlot('a.example.com', never(), task)),
     )
     expect(peak).toBe(2)
+  })
+})
+
+describe('a robots.txt too large to evaluate completely', () => {
+  const article = { body: fixture('article.html') }
+  const plain = (body: string): { body: string; headers: Record<string, string> } => ({
+    body,
+    headers: { 'content-type': 'text/plain' },
+  })
+  const REFUSAL =
+    /has more rules than can be evaluated completely.*not an explicit refusal of this path/u
+
+  it('evaluates thousands of rules normally: the last of 2,001 decides', async () => {
+    const rules = Array.from({ length: 2000 }, (_, index) => `Disallow: /private/area-${index}/`)
+    harness = await createHarness({
+      '/robots.txt': plain(['User-agent: *', ...rules, 'Disallow: /docs/secret'].join('\n')),
+      '/docs/secret': article,
+      '/docs/open': article,
+    })
+    const refused = await harness.fetch({ url: 'https://example.com/docs/secret' })
+    expect(refused.pages[0]?.error?.code).toBe('robots_disallowed')
+    expect(refused.pages[0]?.error?.message).toContain('disallows automated reading of this path')
+    expect((await harness.fetch({ url: 'https://example.com/docs/open' })).status).toBe('ok')
+    expect(harness.requests).toEqual(['https://example.com/docs/open'])
+  })
+
+  it('treats the host as refusing when a pattern is too long to evaluate', async () => {
+    const long = `Disallow: /${'x'.repeat(MAX_PATTERN_CHARS)}`
+    expect(parseRobots(`User-agent: *\n${long}\nDisallow: /a`, AGENT)).toEqual({
+      rules: [{ allow: false, pattern: '/a' }],
+      incomplete: true,
+    })
+    harness = await createHarness({
+      '/robots.txt': plain(`User-agent: *\n${long}`),
+      '/docs': article,
+    })
+    const result = await harness.fetch({ url: 'https://example.com/docs' })
+    expect(result.pages[0]?.error?.code).toBe('robots_disallowed')
+    expect(result.pages[0]?.error?.message).toMatch(REFUSAL)
+    expect(harness.requests).toEqual([])
+  })
+
+  it('treats the host as refusing when there are more rules than are kept', () => {
+    const many = [
+      'User-agent: *',
+      ...Array.from({ length: MAX_RULES + 1 }, (_, index) => `Allow: /${index}`),
+    ]
+    const policy = parseRobots(many.join('\n'), AGENT)
+    expect(policy.incomplete).toBe(true)
+    expect(policy.rules).toHaveLength(MAX_RULES)
+  })
+
+  it('only counts what applies to us: an oversized group for another crawler changes nothing', () => {
+    const other = ['User-agent: bigbot', `Disallow: /${'y'.repeat(MAX_PATTERN_CHARS + 5)}`]
+    const policy = parseRobots([...other, '', 'User-agent: *', 'Disallow: /a'].join('\n'), AGENT)
+    expect(policy).toEqual({ rules: [{ allow: false, pattern: '/a' }], incomplete: false })
+  })
+
+  it('treats the host as refusing when the file is larger than is read, and remembers it', async () => {
+    harness = await createHarness({
+      '/robots.txt': plain(`User-agent: *\n${'Allow: /some/allowed/path\n'.repeat(30_000)}`),
+      '/docs': article,
+    })
+    const first = await harness.fetch({ url: 'https://example.com/docs' })
+    expect(first.pages[0]?.error?.message).toMatch(REFUSAL)
+    await harness.fetch({ url: 'https://example.com/docs' })
+    expect(harness.robotsRequests).toHaveLength(1)
+    expect(harness.requests).toEqual([])
+  })
+
+  it('evaluates a large file in linear time', () => {
+    const file = (rules: number): string =>
+      [
+        'User-agent: *',
+        ...Array.from({ length: rules }, (_, index) => `Disallow: /area-${index}/*/private$`),
+      ].join('\n')
+    const small = file(10_000)
+    const large = file(40_000)
+    // Many addresses per run, so that the smaller file is slow enough to be measured at all.
+    const paths = Array.from(
+      { length: 40 },
+      (_, index) => `/${'segment/'.repeat(30)}page-${index}?id=1`,
+    )
+    const evaluate = (text: string): void => {
+      const policy = parseRobots(text, AGENT)
+      expect(policy.incomplete).toBe(false)
+      for (const path of paths) expect(isAllowed(policy.rules, path)).toBe(true)
+    }
+    const ratio = cpuRatio(
+      () => evaluate(small),
+      () => evaluate(large),
+    )
+    // Four times the rules: about 4 when linear, about 16 when quadratic.
+    expect(ratio).toBeDefined()
+    expect(ratio).toBeLessThanOrEqual(8)
   })
 })

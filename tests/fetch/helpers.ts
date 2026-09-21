@@ -198,25 +198,42 @@ export function counting<T>(work: Generator<void, T>): {
   return { work: counted(), steps: () => steps }
 }
 
-function fastest(run: () => void, runs = 3): number {
-  let best = Number.POSITIVE_INFINITY
-  for (let attempt = 0; attempt < runs; attempt += 1) {
-    const started = performance.now()
-    run()
-    best = Math.min(best, performance.now() - started)
-  }
-  return best
+/** CPU time this process spent in `run`, in milliseconds: user plus system, all threads. */
+function cpuMs(run: () => void): number {
+  const before = process.cpuUsage()
+  run()
+  const spent = process.cpuUsage(before)
+  return (spent.user + spent.system) / 1000
 }
 
 const MB = 1024 * 1024
-/** Below this the clock is mostly noise. */
+const RUNS = 5
+/** Below this the measurement is mostly noise. */
 const MEASURABLE_MS = 5
 /** Only a fuse: far above any honest run, it catches a return to tens of seconds. */
 export const FUSE_MS = 30_000
 
 /**
+ * Cost of `large` relative to `small`, or undefined when `small` is too fast to measure.
+ *
+ * The clock is the CPU time of this process, not the wall: vitest runs every test file in its
+ * own process and the tests of a file one after another, so other test files and other programs
+ * on a loaded machine do not show up in it. The two are measured alternately, so a change in
+ * machine state hits both alike, and the smallest of several runs of each is compared.
+ */
+export function cpuRatio(small: () => void, large: () => void): number | undefined {
+  let smallMs = Number.POSITIVE_INFINITY
+  let largeMs = Number.POSITIVE_INFINITY
+  for (let attempt = 0; attempt < RUNS; attempt += 1) {
+    smallMs = Math.min(smallMs, cpuMs(small))
+    largeMs = Math.min(largeMs, cpuMs(large))
+  }
+  return smallMs >= MEASURABLE_MS ? largeMs / smallMs : undefined
+}
+
+/**
  * Cost of a fourfold larger input relative to the smaller one: about 4 when the work is linear,
- * about 16 when it is quadratic. Undefined when even the larger size is too fast to time.
+ * about 16 when it is quadratic. Undefined when even the larger size is too fast to measure.
  */
 export function growth(
   make: (chars: number) => string,
@@ -225,9 +242,11 @@ export function growth(
   for (const base of [MB, 2 * MB]) {
     const small = make(base)
     const large = make(4 * base)
-    const smallMs = fastest(() => run(small))
-    if (smallMs < MEASURABLE_MS) continue
-    return fastest(() => run(large)) / smallMs
+    const ratio = cpuRatio(
+      () => run(small),
+      () => run(large),
+    )
+    if (ratio !== undefined) return ratio
   }
   return undefined
 }
